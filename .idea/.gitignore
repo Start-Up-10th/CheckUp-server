@@ -8,3 +8,11 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+# 개인 JDK·Gradle JVM 이름이 들어가는 로컬 설정
+/gradle.xml
+/misc.xml
+# Gradle 가져오기 때 자동 생성되는 파일
+/.name
+/compiler.xml
+/modules.xml
+/modules/
