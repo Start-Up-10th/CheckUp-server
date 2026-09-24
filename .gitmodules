@@ -1,0 +1,3 @@
+[submodule "docs-harness"]
+	path = docs-harness
+	url = https://github.com/Start-Up-10th/Start-Up-harness.git
