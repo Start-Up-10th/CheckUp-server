@@ -39,3 +39,14 @@ models/
 *.log
 .DS_Store
 Thumbs.db
+
+# Gradle / IDE
+HELP.md
+!gradle/wrapper/gradle-wrapper.jar
+bin/
+out/
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
