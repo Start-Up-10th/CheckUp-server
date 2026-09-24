@@ -30,10 +30,18 @@ git commit -m "chore: 하네스 최신화"
 ## 빌드·테스트
 
 - Java 25
-- 환경변수: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`
+- Docker 실행 중이어야 합니다. 테스트가 Testcontainers로 Postgres·Redis를 자동으로 띄웁니다.
 
 ```bash
 ./gradlew build
+```
+
+로컬에서 앱을 실행(`bootRun`)할 때는 `compose.yaml`로 DB·Redis를 띄우고 `.env.example`의 값을 환경변수로 넣습니다.
+
+```bash
+docker compose up -d --wait
+set -a; source .env.example; set +a
+./gradlew bootRun
 ```
 
 하네스 검사는 서브모듈 안에서 실행합니다(Node.js 22 이상).
