@@ -8,7 +8,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # 테스트는 Testcontainers로 Postgres·Redis를 직접 띄운다. ubuntu-latest에 Docker가 있다.
+    # contextLoads 테스트가 Flyway·JPA로 DB에 접속하므로 CI 전용 Postgres·Redis를 띄운다.
+    # 포트·계정은 application.yaml 기본값(로컬 compose.yaml과 동일)에 맞춘 테스트용 값이며 운영 자격증명이 아니다.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: checkup
+          POSTGRES_USER: checkup
+          POSTGRES_PASSWORD: checkup
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 

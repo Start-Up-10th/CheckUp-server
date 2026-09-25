@@ -1,15 +1,19 @@
 spring:
   application:
     name: checkup
+  # 개인 설정·secret은 커밋하지 않는 application-local.yaml에 둔다. 파일이 없으면 무시한다.
+  config:
+    import: optional:classpath:application-local.yaml
+  # 기본값은 로컬 compose.yaml·CI와 같은 개발용 값이다. 운영 서버는 환경변수로 덮어쓴다.
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/checkup}
+    username: ${DB_USERNAME:checkup}
+    password: ${DB_PASSWORD:checkup}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
