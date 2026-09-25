@@ -50,3 +50,6 @@ out/
 *.iws
 *.ipr
 .vscode/
+
+# Personal Spring config
+application-local.yaml

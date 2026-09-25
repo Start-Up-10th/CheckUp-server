@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # contextLoads 테스트가 Flyway·JPA로 DB에 접속하므로 CI 전용 Postgres·Redis를 띄운다.
-    # 아래 값은 CI에서만 쓰는 테스트용 값이며 운영 자격증명이 아니다.
+    # 포트·계정은 application.yaml 기본값(로컬 compose.yaml과 동일)에 맞춘 테스트용 값이며 운영 자격증명이 아니다.
     services:
       postgres:
         image: postgres:17
@@ -18,7 +18,7 @@ jobs:
           POSTGRES_USER: checkup
           POSTGRES_PASSWORD: checkup
         ports:
-          - 5432:5432
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -33,13 +33,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
-    env:
-      DB_URL: jdbc:postgresql://localhost:5432/checkup
-      DB_USERNAME: checkup
-      DB_PASSWORD: checkup
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
 
     steps:
       - uses: actions/checkout@v4

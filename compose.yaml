@@ -1,0 +1,35 @@
+# 로컬 개발·테스트용 PostgreSQL·Redis. 운영 배포용이 아니다.
+# 아래 자격증명은 application.yaml 기본값·CI와 같은 개발 전용 값이다.
+# 호스트 5432는 다른 로컬 Postgres와 겹치기 쉬워 5433으로 연다. 포트는 127.0.0.1에만 바인딩한다.
+name: checkup
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: checkup
+      POSTGRES_USER: checkup
+      POSTGRES_PASSWORD: checkup
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkup -d checkup"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
