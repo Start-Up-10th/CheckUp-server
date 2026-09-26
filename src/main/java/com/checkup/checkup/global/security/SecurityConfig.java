@@ -14,8 +14,8 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
  *
  * <ul>
  *     <li>인증되지 않은 요청은 401, 권한이 없는 요청은 403을 반환한다.</li>
- *     <li>{@code POST /auth/logout}은 세션을 무효화하고 {@code SESSION} 쿠키를 지운 뒤 204를 반환한다.</li>
- *     <li>{@code /auth/me}를 제외한 {@code /auth/**}는 로그인 없이 접근할 수 있다.</li>
+ *     <li>{@code POST /api/v1/auth/logout}은 세션을 무효화하고 {@code SESSION} 쿠키를 지운 뒤 204를 반환한다.</li>
+ *     <li>{@code /api/v1/auth/me}를 제외한 {@code /api/v1/auth/**}는 로그인 없이 접근할 수 있다.</li>
  * </ul>
  */
 @Configuration
@@ -30,13 +30,13 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(l -> l
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT))
-                        .logoutUrl("/auth/logout")
+                        .logoutUrl("/api/v1/auth/logout")
                         .deleteCookies("SESSION")
                 )
                 .authorizeHttpRequests(
                         auth -> auth
-                                .requestMatchers("/auth/me").authenticated()
-                                .requestMatchers("/auth/**", "/error").permitAll()
+                                .requestMatchers("/api/v1/auth/me").authenticated()
+                                .requestMatchers("/api/v1/auth/**", "/error").permitAll()
                                 .anyRequest().authenticated()
                 );
         return http.build();
