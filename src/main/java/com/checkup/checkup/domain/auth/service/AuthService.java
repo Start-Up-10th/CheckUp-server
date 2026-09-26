@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.auth.service;
 
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
+import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,15 +43,14 @@ public class AuthService {
         return builder.build();
     }
 
-    public OAuthLoginResponse completeLogin(String code, String state) {
+    public Member completeLogin(String code, String state) {
         String codeVerifier = oAuthStateService.consume(state)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "state가 유효하지 않거나 만료되었습니다."));
 
         TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, codeVerifier);
         UserInfo userInfo = dataGsmOAuthClient.getUserInfo(token.getAccessToken());
         MemberRole role = resolveRole(userInfo);
-        memberService.saveOrUpdate(userInfo, role);
-        return OAuthLoginResponse.from(userInfo, role);
+        return memberService.saveOrUpdate(userInfo, role);
     }
 
     private MemberRole resolveRole(UserInfo userInfo) {
