@@ -17,3 +17,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+checkup:
+  qr:
+    token-ttl: 15m
+    lease-ttl: 60s
+    rotate-before: 30s
