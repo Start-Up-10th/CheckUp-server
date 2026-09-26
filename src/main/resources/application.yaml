@@ -18,8 +18,9 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   session:
-    redis:
-      namespace: checkup:session
+    data:
+      redis:
+        namespace: checkup:session
 
 datagsm:
   client-id: ${DATAGSM_CLIENT_ID}
