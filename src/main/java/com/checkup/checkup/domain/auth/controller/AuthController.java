@@ -5,12 +5,14 @@ import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.auth.service.AuthService;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
 import com.checkup.checkup.domain.member.entity.Member;
+import com.checkup.checkup.domain.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final LoginSessionService loginSessionService;
+    private final MemberService memberService;
 
     @GetMapping("/login")
     public ResponseEntity<Void> login() {
@@ -37,4 +40,11 @@ public class AuthController {
         loginSessionService.login(member, httpRequest, httpResponse);
         return OAuthLoginResponse.from(member);
     }
+
+    @GetMapping("/me")
+    public OAuthLoginResponse me(@AuthenticationPrincipal Long memberId) {
+        Member member = memberService.getById(memberId);
+        return OAuthLoginResponse.from(member);
+    }
+
 }

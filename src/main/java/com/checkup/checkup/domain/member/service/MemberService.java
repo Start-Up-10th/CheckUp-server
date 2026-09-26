@@ -6,8 +6,10 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.MemberRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.model.UserInfo;
 
 @RequiredArgsConstructor
@@ -47,5 +49,11 @@ public class MemberService {
         }
 
         return member;
+    }
+
+    @Transactional(readOnly = true)
+    public Member getById(Long id) {
+        return memberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."));
     }
 }

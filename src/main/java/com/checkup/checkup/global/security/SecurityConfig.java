@@ -20,6 +20,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(
                         auth -> auth
+                                .requestMatchers("/auth/me").authenticated()
                                 .requestMatchers("/auth/**", "/error").permitAll()
                                 .anyRequest().authenticated()
                 );
