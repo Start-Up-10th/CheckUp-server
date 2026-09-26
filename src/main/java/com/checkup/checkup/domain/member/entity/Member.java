@@ -1,4 +1,4 @@
-package com.checkup.checkup.member;
+package com.checkup.checkup.domain.member.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
