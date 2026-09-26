@@ -43,7 +43,6 @@ class OperatingDayCalculatorTest {
 
     @Test
     void 서버_시계가_UTC여도_KST_기준으로_계산한다() {
-        // UTC 2026-09-25 23:00 = KST 2026-09-26 08:00
         Instant utc = LocalDateTime.of(2026, 9, 25, 23, 0).toInstant(ZoneOffset.UTC);
 
         assertThat(at(LocalDateTime.of(2026, 1, 1, 12, 0)).of(utc))
