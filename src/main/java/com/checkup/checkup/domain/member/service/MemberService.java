@@ -43,6 +43,7 @@ public class MemberService {
         if (dataGsmStudent != null) {
             studentRepository.findByMember(member).ifPresentOrElse(
                     student -> student.update(
+                            dataGsmStudent.getId(),
                             dataGsmStudent.getGrade(),
                             dataGsmStudent.getClassNum(),
                             dataGsmStudent.getNumber(),
@@ -50,6 +51,7 @@ public class MemberService {
                             dataGsmStudent.getDormitoryRoom()),
                     () -> studentRepository.save(Student.create(
                             member,
+                            dataGsmStudent.getId(),
                             dataGsmStudent.getGrade(),
                             dataGsmStudent.getClassNum(),
                             dataGsmStudent.getNumber(),

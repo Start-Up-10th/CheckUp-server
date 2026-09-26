@@ -19,6 +19,9 @@ public class Student {
     @JoinColumn(name = "member_id", nullable = false, unique = true)
     private Member member;
 
+    @Column(unique = true)
+    private Long datagsmStudentId;
+
     @Column(nullable = false)
     private int number;
 
@@ -36,6 +39,7 @@ public class Student {
 
     public static Student create(
             Member member,
+            Long datagsmStudentId,
             int grade,
             int classNumber,
             int number,
@@ -43,6 +47,7 @@ public class Student {
             Integer roomNumber) {
         Student student = new Student();
         student.member = member;
+        student.datagsmStudentId = datagsmStudentId;
         student.grade = grade;
         student.classNumber = classNumber;
         student.number = number;
@@ -53,11 +58,13 @@ public class Student {
     }
 
     public void update(
+            Long datagsmStudentId,
             int grade,
             int classNumber,
             int number,
             int studentNumber,
             Integer roomNumber) {
+        this.datagsmStudentId = datagsmStudentId;
         this.grade = grade;
         this.classNumber = classNumber;
         this.number = number;
