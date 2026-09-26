@@ -9,6 +9,15 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 
+/**
+ * 세션 기반 Spring Security 설정.
+ *
+ * <ul>
+ *     <li>인증되지 않은 요청은 401, 권한이 없는 요청은 403을 반환한다.</li>
+ *     <li>{@code POST /auth/logout}은 세션을 무효화하고 {@code SESSION} 쿠키를 지운 뒤 204를 반환한다.</li>
+ *     <li>{@code /auth/me}를 제외한 {@code /auth/**}는 로그인 없이 접근할 수 있다.</li>
+ * </ul>
+ */
 @Configuration
 public class SecurityConfig {
 
