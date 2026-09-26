@@ -35,3 +35,9 @@ server:
         http-only: true # JS가 쿠키 못 읽음, XSS 방지
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
+
+checkup:
+  qr:
+    token-ttl: 15m
+    lease-ttl: 60s
+    rotate-before: 30s
