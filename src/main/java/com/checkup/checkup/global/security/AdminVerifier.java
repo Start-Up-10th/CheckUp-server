@@ -1,11 +1,11 @@
 package com.checkup.checkup.global.security;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,11 +24,12 @@ public class AdminVerifier {
      * 관리자가 아니면 예외를 던진다.
      *
      * @param memberId 세션의 회원 id
-     * @throws ResponseStatusException 회원이 없으면 401, 관리자가 아니면 403
+     * @throws CustomException 회원이 없으면 {@link ErrorCode#MEMBER_NOT_FOUND}(401),
+     *                         관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
      */
     public void verify(Long memberId) {
         if (memberService.getById(memberId).getRole() != MemberRole.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있습니다.");
+            throw new CustomException(ErrorCode.ADMIN_ONLY);
         }
     }
 }
