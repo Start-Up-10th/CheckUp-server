@@ -111,7 +111,7 @@ public class QrSessionService {
         LocalDate operatingDay = operatingDayCalculator.today();
         Instant expiresAt = earlier(now.plus(qrProperties.tokenTtl()), operatingDayCalculator.nextBoundary());
         QrToken token = new QrToken(qrTokenGenerator.generate(), session.id(), expiresAt);
-        qrSessionRepository.saveToken(token, Duration.between(now, expiresAt));
+        qrSessionRepository.saveToken(token, Duration.between(now, expiresAt).plus(qrProperties.tokenRetention()));
         return session.withToken(operatingDay, token.token(), expiresAt);
     }
 
