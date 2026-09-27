@@ -2,14 +2,14 @@ package com.checkup.checkup.domain.auth.service;
 
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient;
 import team.themoment.datagsm.sdk.oauth.model.*;
 
@@ -112,7 +112,7 @@ class AuthServiceTest {
     void otherTeacherIsForbidden() {
         givenLoginReturns(teacherUser(TeacherDepartment.GRADE));
 
-        assertRejectedWith(HttpStatus.FORBIDDEN);
+        assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
     }
 
     @Test
@@ -122,7 +122,7 @@ class AuthServiceTest {
         userInfo.setTeacher(null);
         givenLoginReturns(userInfo);
 
-        assertRejectedWith(HttpStatus.FORBIDDEN);
+        assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
     }
 
     @Test
@@ -132,7 +132,7 @@ class AuthServiceTest {
         userInfo.setStatus(AccountStatus.PENDING);
         givenLoginReturns(userInfo);
 
-        assertRejectedWith(HttpStatus.FORBIDDEN);
+        assertRejectedWith(ErrorCode.INACTIVE_ACCOUNT);
     }
 
     @Test
@@ -142,7 +142,7 @@ class AuthServiceTest {
         userInfo.setStudent(null);
         givenLoginReturns(userInfo);
 
-        assertRejectedWith(HttpStatus.FORBIDDEN);
+        assertRejectedWith(ErrorCode.MISSING_STUDENT_INFO);
     }
 
     @Test
@@ -150,7 +150,7 @@ class AuthServiceTest {
     void studentWithoutRoleIsForbidden() {
         givenLoginReturns(studentUser(null));
 
-        assertRejectedWith(HttpStatus.FORBIDDEN);
+        assertRejectedWith(ErrorCode.MISSING_STUDENT_INFO);
     }
 
     @Test
@@ -158,7 +158,7 @@ class AuthServiceTest {
     void invalidStateIsBadRequest() {
         given(oAuthStateService.consume(STATE)).willReturn(Optional.empty());
 
-        assertRejectedWith(HttpStatus.BAD_REQUEST);
+        assertRejectedWith(ErrorCode.INVALID_OAUTH_STATE);
         verify(dataGsmOAuthClient, never()).exchangeCodeForToken(anyString(), anyString(), anyString());
     }
 
@@ -170,10 +170,10 @@ class AuthServiceTest {
         given(dataGsmOAuthClient.getUserInfo(ACCESS_TOKEN)).willReturn(userInfo);
     }
 
-    private void assertRejectedWith(HttpStatus status) {
+    private void assertRejectedWith(ErrorCode errorCode) {
         assertThatThrownBy(() -> authService.completeLogin(CODE, STATE))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(status));
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(errorCode));
         verify(memberService, never()).saveOrUpdate(any(), any());
     }
 

@@ -4,10 +4,10 @@ import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient;
 import team.themoment.datagsm.sdk.oauth.model.*;
 
@@ -57,11 +57,11 @@ public class AuthService {
      * @param code  DataGSM 인가 코드
      * @param state 로그인 요청 때 발급한 state
      * @return 저장·갱신된 회원
-     * @throws ResponseStatusException state가 없거나 만료되면 400, 이용 권한이 없는 계정이면 403
+     * @throws CustomException state가 없거나 만료되면 INVALID_OAUTH_STATE, 이용 권한이 없는 계정이면 403 계열 코드
      */
     public Member completeLogin(String code, String state) {
         String codeVerifier = oAuthStateService.consume(state)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "state가 유효하지 않거나 만료되었습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_OAUTH_STATE));
 
         TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, codeVerifier);
         UserInfo userInfo = dataGsmOAuthClient.getUserInfo(token.getAccessToken());
@@ -77,15 +77,15 @@ public class AuthService {
         Student student = userInfo.getStudent();
         Teacher teacher = userInfo.getTeacher();
 
-        if (userInfo.getStatus() != AccountStatus.ACTIVE) throw new  ResponseStatusException(HttpStatus.FORBIDDEN, "올바르지 않은 계정 상태입니다.");
+        if (userInfo.getStatus() != AccountStatus.ACTIVE) throw new CustomException(ErrorCode.INACTIVE_ACCOUNT);
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
-                && (student == null || student.getRole() == null)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "학생 정보가 없습니다.");
+                && (student == null || student.getRole() == null)) throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
                 && student.getRole() == StudentRole.DORMITORY_MANAGER) return MemberRole.ADMIN;
         if (userInfo.getObjectType() == AccountObjectType.STUDENT) return MemberRole.STUDENT;
         if (userInfo.getObjectType() == AccountObjectType.TEACHER
                 && teacher != null
                 && teacher.getDepartment() == TeacherDepartment.DORMITORY) return MemberRole.ADMIN;
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이용 권한이 없는 계정입니다.");
+        throw new CustomException(ErrorCode.UNSUPPORTED_ACCOUNT);
     }
 }
