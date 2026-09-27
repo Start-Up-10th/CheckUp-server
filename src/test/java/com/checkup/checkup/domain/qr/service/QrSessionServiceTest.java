@@ -85,6 +85,17 @@ class QrSessionServiceTest {
     }
 
     @Test
+    void 토큰_기록은_만료_뒤에도_보관_시간만큼_남는다() {
+        QrSessionIssue issue = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+
+        Long ttlSeconds = redisTemplate.getExpire("qr:token:" + issue.token());
+
+        assertThat(ttlSeconds).isBetween(
+                Duration.ofMinutes(15).plusHours(1).minusSeconds(5).toSeconds(),
+                Duration.ofMinutes(15).plusHours(1).toSeconds());
+    }
+
+    @Test
     void 페이지마다_다른_세션과_토큰을_만든다() {
         QrSessionIssue first = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
         QrSessionIssue second = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
