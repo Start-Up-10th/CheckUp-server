@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.qr.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,5 +44,21 @@ public class QrController {
     ) {
         adminVerifier.verify(memberId);
         return QrSessionResponse.of(qrSessionService.create(memberId, request.purpose()), qrProperties.baseUrl());
+    }
+
+    /**
+     * lease를 연장하고 현재 QR 링크를 반환한다. 토큰 만료가 가까우면 새 토큰으로 바뀐다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param sessionId QR 세션 ID
+     * @return 세션·QR 링크. 세션이 없거나 끝났거나 다른 관리자의 세션이면 404
+     */
+    @PostMapping("/{sessionId}/heartbeat")
+    public QrSessionResponse heartbeat(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable String sessionId
+    ) {
+        adminVerifier.verify(memberId);
+        return QrSessionResponse.of(qrSessionService.heartbeat(memberId, sessionId), qrProperties.baseUrl());
     }
 }
