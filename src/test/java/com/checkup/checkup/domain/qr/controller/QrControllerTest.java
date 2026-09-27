@@ -17,18 +17,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.checkup.checkup.domain.qr.config.QrConfig;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
 import com.checkup.checkup.domain.qr.entity.QrPurpose;
 import com.checkup.checkup.domain.qr.service.QrSessionService;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.security.SecurityConfig;
 
@@ -88,13 +88,14 @@ class QrControllerTest {
 
     @Test
     void 관리자가_아니면_403이고_세션을_만들지_않는다() throws Exception {
-        willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN)).given(adminVerifier).verify(STUDENT_ID);
+        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(STUDENT_ID);
 
         mockMvc.perform(post("/api/v1/qr")
                         .with(loginAs(STUDENT_ID))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"purpose\":\"DORMITORY\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ADMIN_ONLY"));
 
         verify(qrSessionService, never()).create(any(), any());
     }
@@ -126,10 +127,11 @@ class QrControllerTest {
     @Test
     void 없는_세션의_heartbeat는_404다() throws Exception {
         given(qrSessionService.heartbeat(ADMIN_ID, "gone"))
-                .willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .willThrow(new CustomException(ErrorCode.QR_SESSION_NOT_FOUND));
 
         mockMvc.perform(post("/api/v1/qr/gone/heartbeat").with(loginAs(ADMIN_ID)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("QR_SESSION_NOT_FOUND"));
     }
 
     @Test
