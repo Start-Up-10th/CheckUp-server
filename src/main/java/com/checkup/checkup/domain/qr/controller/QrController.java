@@ -61,4 +61,20 @@ public class QrController {
         adminVerifier.verify(memberId);
         return QrSessionResponse.of(qrSessionService.heartbeat(memberId, sessionId), qrProperties.baseUrl());
     }
+
+    /**
+     * 이 페이지의 QR 세션만 종료한다. 페이지 이탈 때 {@code sendBeacon}으로 호출할 수 있다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param sessionId QR 세션 ID
+     */
+    @PostMapping("/{sessionId}/close")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void close(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable String sessionId
+    ) {
+        adminVerifier.verify(memberId);
+        qrSessionService.close(memberId, sessionId);
+    }
 }
