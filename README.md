@@ -77,7 +77,19 @@ spring:
     url: jdbc:postgresql://localhost:5432/checkup
 ```
 
+로컬에서도 기본값이 없는 값은 반드시 넣어야 서버와 테스트가 뜹니다.
+
+```yaml
+datagsm:
+  client-id: local-test
+  client-secret: local-test
+checkup:
+  qr:
+    base-url: http://localhost:3000
+```
+
 운영 서버에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` 환경변수로 값을 넣습니다.
+`PUBLIC_ORIGIN`(QR 링크의 학생 웹 주소)도 반드시 넣습니다. 비어 있으면 서버가 기동하지 않습니다.
 
 ## 명세·문서
 
