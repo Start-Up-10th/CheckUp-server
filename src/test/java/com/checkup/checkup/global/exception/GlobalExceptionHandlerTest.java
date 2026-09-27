@@ -5,7 +5,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,7 +24,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
@@ -33,10 +39,11 @@ import team.themoment.datagsm.sdk.oauth.exception.UnauthorizedException;
  * 응답 본문에 예외 메시지가 노출되지 않는지 검증한다.
  */
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, GlobalExceptionHandlerTest.BodyController.class})
 class GlobalExceptionHandlerTest {
 
     private static final String CALLBACK = "/api/v1/auth/callback";
+    private static final String BODY = "/test/body";
     private static final String UPSTREAM_MESSAGE = "upstream-body-must-not-leak";
 
     @Autowired
@@ -132,5 +139,38 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
+    }
+
+    @Test
+    @DisplayName("읽을 수 없는 body(enum에 없는 값)는 500이 아니라 400 INVALID_REQUEST로 응답한다")
+    void unreadableBodyIsBadRequest() throws Exception {
+        mockMvc.perform(post(BODY).with(user("admin"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purpose\":\"GYM\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    @DisplayName("Spring MVC 기본 4xx 예외(지원하지 않는 Content-Type)는 원래 상태 코드 415를 유지한다")
+    void unsupportedMediaTypeKeepsStatus() throws Exception {
+        mockMvc.perform(post(BODY).with(user("admin"))
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("purpose=DORMITORY"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    enum Purpose { DORMITORY }
+
+    record BodyRequest(Purpose purpose) {}
+
+    /** JSON body를 받는 API가 아직 없어 body 관련 예외를 재현하는 테스트 전용 컨트롤러. */
+    @RestController
+    static class BodyController {
+
+        @PostMapping(BODY)
+        void accept(@RequestBody BodyRequest request) {
+        }
     }
 }

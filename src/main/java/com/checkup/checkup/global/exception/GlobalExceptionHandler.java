@@ -2,7 +2,9 @@ package com.checkup.checkup.global.exception;
 
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -39,28 +41,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(errorCode.getStatus()).body(ErrorResponse.of(errorCode, errors));
     }
 
-    /**
-     * 아직 {@link CustomException}으로 바꾸지 않은 코드의 {@link ResponseStatusException}을 처리한다.
-     * 이 핸들러가 없으면 아래 {@code Exception} 핸들러가 잡아 모두 500이 된다.
-     * 상태 코드는 유지하고, 코드·메시지는 같은 상태의 공통 {@link ErrorCode}를 쓴다.
-     *
-     * <p>임시 처리다. 모든 {@code ResponseStatusException}을 교체하면 삭제한다.
-     */
-    @ExceptionHandler(ResponseStatusException.class)
-    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException e) {
-        ErrorCode errorCode = switch (e.getStatusCode().value()) {
-            case 400 -> ErrorCode.INVALID_REQUEST;
-            case 401 -> ErrorCode.UNAUTHORIZED;
-            case 403 -> ErrorCode.FORBIDDEN;
-            case 404 -> ErrorCode.NOT_FOUND;
-            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
-            default -> ErrorCode.INTERNAL_SERVER_ERROR;
-        };
-        return ResponseEntity.status(e.getStatusCode()).body(ErrorResponse.of(errorCode));
-    }
-
-    /** 필수 파라미터 누락과 타입 불일치는 400으로 응답한다. */
-    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    /** 필수 파라미터 누락, 타입 불일치, 읽을 수 없는 body(잘못된 JSON·enum 값)는 400으로 응답한다. */
+    @ExceptionHandler({
+            MissingServletRequestParameterException.class,
+            MethodArgumentTypeMismatchException.class,
+            HttpMessageNotReadableException.class
+    })
     public ResponseEntity<ErrorResponse> handleBadRequest(Exception e) {
         return toResponse(ErrorCode.INVALID_REQUEST);
     }
@@ -91,11 +77,35 @@ public class GlobalExceptionHandler {
         return toResponse(errorCode);
     }
 
-    /** 처리하지 못한 예외는 스택을 로그에만 남기고 500으로 응답한다. */
+    /**
+     * 위에서 처리하지 못한 예외.
+     *
+     * <p>Spring MVC 기본 예외(415·406 등)와 {@link ResponseStatusException}은 Spring의
+     * {@link org.springframework.web.ErrorResponse}를 구현하므로 원래 상태 코드를 유지한다.
+     * 그 밖의 예외는 스택을 로그에만 남기고 500으로 응답한다.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
+        if (e instanceof org.springframework.web.ErrorResponse springError) {
+            HttpStatusCode status = springError.getStatusCode();
+            if (status.is5xxServerError()) {
+                log.error("Unhandled exception", e);
+            }
+            return ResponseEntity.status(status).body(ErrorResponse.of(errorCodeOf(status)));
+        }
         log.error("Unhandled exception", e);
         return toResponse(ErrorCode.INTERNAL_SERVER_ERROR);
+    }
+
+    /** 상태 코드에 맞는 공통 {@link ErrorCode}. 따로 없는 4xx는 {@code INVALID_REQUEST}로 본다. */
+    private static ErrorCode errorCodeOf(HttpStatusCode status) {
+        return switch (status.value()) {
+            case 401 -> ErrorCode.UNAUTHORIZED;
+            case 403 -> ErrorCode.FORBIDDEN;
+            case 404 -> ErrorCode.NOT_FOUND;
+            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
+            default -> status.is4xxClientError() ? ErrorCode.INVALID_REQUEST : ErrorCode.INTERNAL_SERVER_ERROR;
+        };
     }
 
     private ResponseEntity<ErrorResponse> toResponse(ErrorCode errorCode) {
