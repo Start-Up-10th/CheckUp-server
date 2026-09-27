@@ -21,7 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
 import team.themoment.datagsm.sdk.oauth.exception.UnauthorizedException;
@@ -105,6 +107,18 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("DATAGSM_ERROR"))
+                .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
+    }
+
+    @Test
+    @DisplayName("교체 전 ResponseStatusException은 500이 아니라 원래 상태 코드로 응답하고 사유를 노출하지 않는다")
+    void responseStatusExceptionKeepsStatus() throws Exception {
+        given(authService.completeLogin(anyString(), anyString()))
+                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, UPSTREAM_MESSAGE));
+
+        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
     }
 

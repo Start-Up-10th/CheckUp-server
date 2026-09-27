@@ -9,6 +9,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.DataGsmException;
@@ -36,6 +37,26 @@ public class GlobalExceptionHandler {
                 .toList();
         ErrorCode errorCode = ErrorCode.INVALID_REQUEST;
         return ResponseEntity.status(errorCode.getStatus()).body(ErrorResponse.of(errorCode, errors));
+    }
+
+    /**
+     * 아직 {@link CustomException}으로 바꾸지 않은 코드의 {@link ResponseStatusException}을 처리한다.
+     * 이 핸들러가 없으면 아래 {@code Exception} 핸들러가 잡아 모두 500이 된다.
+     * 상태 코드는 유지하고, 코드·메시지는 같은 상태의 공통 {@link ErrorCode}를 쓴다.
+     *
+     * <p>임시 처리다. 모든 {@code ResponseStatusException}을 교체하면 삭제한다.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException e) {
+        ErrorCode errorCode = switch (e.getStatusCode().value()) {
+            case 400 -> ErrorCode.INVALID_REQUEST;
+            case 401 -> ErrorCode.UNAUTHORIZED;
+            case 403 -> ErrorCode.FORBIDDEN;
+            case 404 -> ErrorCode.NOT_FOUND;
+            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
+            default -> ErrorCode.INTERNAL_SERVER_ERROR;
+        };
+        return ResponseEntity.status(e.getStatusCode()).body(ErrorResponse.of(errorCode));
     }
 
     /** 필수 파라미터 누락과 타입 불일치는 400으로 응답한다. */
