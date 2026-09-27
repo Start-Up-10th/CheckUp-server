@@ -41,4 +41,4 @@ checkup:
     token-ttl: 15m
     lease-ttl: 60s
     rotate-before: 30s
-    base-url: ${PUBLIC_ORIGIN:http://localhost:3000}
+    base-url: ${PUBLIC_ORIGIN}
