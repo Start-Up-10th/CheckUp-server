@@ -3,11 +3,15 @@ package com.checkup.checkup.domain.qr.repository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Repository;
 
 import com.checkup.checkup.domain.qr.entity.QrPurpose;
@@ -33,6 +37,19 @@ public class QrSessionRepository {
     private static final String TOKEN_KEY = "qr:token:";
     private static final String ADMIN_KEY = "qr:admin:";
 
+    private static final RedisScript<Long> SAVE_IF_PRESENT = new DefaultRedisScript<>("""
+            if redis.call('EXISTS', KEYS[1]) == 0 then
+                return 0
+            end
+            for i = 3, #ARGV, 2 do
+                redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
+            end
+            redis.call('PEXPIRE', KEYS[1], ARGV[1])
+            redis.call('SADD', KEYS[2], ARGV[2])
+            redis.call('PEXPIRE', KEYS[2], ARGV[1])
+            return 1
+            """, Long.class);
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -42,19 +59,36 @@ public class QrSessionRepository {
      */
     public void save(QrSession session, Duration ttl) {
         String key = SESSION_KEY + session.id();
-        redisTemplate.opsForHash().putAll(key, Map.of(
-                "adminId", session.adminId().toString(),
-                "purpose", session.purpose().name(),
-                "operatingDay", session.operatingDay().toString(),
-                "token", session.token(),
-                "tokenExpiresAt", String.valueOf(session.tokenExpiresAt().toEpochMilli()),
-                "leaseExpiresAt", String.valueOf(session.leaseExpiresAt().toEpochMilli())
-        ));
+        redisTemplate.opsForHash().putAll(key, fields(session));
         redisTemplate.expire(key, ttl);
 
         String adminKey = ADMIN_KEY + session.adminId();
         redisTemplate.opsForSet().add(adminKey, session.id());
         redisTemplate.expire(adminKey, ttl);
+    }
+
+    /**
+     * 세션 키가 아직 있을 때만 저장한다. 확인과 저장을 Redis에서 한 번에 처리해,
+     * heartbeat 도중 close된 세션이 다시 살아나지 않게 한다.
+     *
+     * @param ttl 세션 키가 Redis에 남는 시간
+     * @return 저장했으면 true, 세션이 이미 없어 저장하지 않았으면 false
+     */
+    public boolean saveIfPresent(QrSession session, Duration ttl) {
+        Map<String, String> fields = fields(session);
+        List<String> args = new ArrayList<>();
+        args.add(String.valueOf(ttl.toMillis()));
+        args.add(session.id());
+        fields.forEach((field, value) -> {
+            args.add(field);
+            args.add(value);
+        });
+        Long saved = redisTemplate.execute(
+                SAVE_IF_PRESENT,
+                List.of(SESSION_KEY + session.id(), ADMIN_KEY + session.adminId()),
+                args.toArray()
+        );
+        return Long.valueOf(1).equals(saved);
     }
 
     /**
@@ -74,6 +108,17 @@ public class QrSessionRepository {
                 Instant.ofEpochMilli(Long.parseLong((String) hash.get("tokenExpiresAt"))),
                 Instant.ofEpochMilli(Long.parseLong((String) hash.get("leaseExpiresAt")))
         ));
+    }
+
+    private static Map<String, String> fields(QrSession session) {
+        return Map.of(
+                "adminId", session.adminId().toString(),
+                "purpose", session.purpose().name(),
+                "operatingDay", session.operatingDay().toString(),
+                "token", session.token(),
+                "tokenExpiresAt", String.valueOf(session.tokenExpiresAt().toEpochMilli()),
+                "leaseExpiresAt", String.valueOf(session.leaseExpiresAt().toEpochMilli())
+        );
     }
 
     /**

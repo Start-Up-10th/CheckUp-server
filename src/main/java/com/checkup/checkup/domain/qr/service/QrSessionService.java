@@ -61,7 +61,7 @@ public class QrSessionService {
      * lease를 연장하고 현재 토큰을 반환한다.
      * 토큰 만료가 가까웠거나 운영일이 바뀌었으면 새 토큰으로 교체한다.
      *
-     * @throws ResponseStatusException 세션이 없거나 lease가 끝났거나 다른 관리자의 세션이면 404
+     * @throws ResponseStatusException 세션이 없거나 lease가 끝났거나 다른 관리자의 세션이거나, 처리 중에 종료됐으면 404
      */
     public QrSessionIssue heartbeat(Long adminId, String sessionId) {
         Instant now = clock.instant();
@@ -74,7 +74,9 @@ public class QrSessionService {
         if (needsRotation(session, now)) {
             session = issueToken(session, now);
         }
-        qrSessionRepository.save(session, qrProperties.leaseTtl());
+        if (!qrSessionRepository.saveIfPresent(session, qrProperties.leaseTtl())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "QR 세션을 찾을 수 없습니다.");
+        }
         return QrSessionIssue.of(session, now);
     }
 
