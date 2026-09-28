@@ -210,6 +210,22 @@ class AttendanceServiceTest {
     }
 
     @Test
+    void 서버_시각보다_5초_넘게_늦은_인증은_기록하지_않는다() {
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(6), AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.FUTURE);
+        assertThat(rowCount()).isZero();
+    }
+
+    @Test
+    void 서버_시각보다_5초_이내로_늦은_인증은_기록한다() {
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(5), AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
+        assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT.plusSeconds(5));
+    }
+
+    @Test
     void 학생을_삭제하면_출석도_함께_삭제된다() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
