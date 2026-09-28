@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,15 +29,26 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
+import com.checkup.checkup.global.time.OperatingDayCalculator;
+import com.checkup.checkup.support.MutableClock;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import(AttendanceService.class)
+@Import({AttendanceService.class, OperatingDayCalculator.class, AttendanceServiceTest.ClockTestConfig.class})
 class AttendanceServiceTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 9, 27);
     private static final Instant AT = Instant.parse("2026-09-27T12:00:00Z");
+
+    @TestConfiguration
+    static class ClockTestConfig {
+        @Bean
+        MutableClock clock() {
+            return new MutableClock(AT);
+        }
+    }
 
     @Autowired
     private AttendanceService attendanceService;
@@ -43,11 +56,15 @@ class AttendanceServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private MutableClock clock;
+
     private Long memberId;
     private Long studentId;
 
     @BeforeEach
     void setUp() {
+        clock.setInstant(AT);
         long datagsmId = ThreadLocalRandom.current().nextLong(1_000_000_000L, Long.MAX_VALUE);
         memberId = jdbcTemplate.queryForObject(
                 "INSERT INTO member (datagsm_id, name, role) VALUES (?, '테스트학생', 'STUDENT') RETURNING id",
@@ -66,9 +83,9 @@ class AttendanceServiceTest {
 
     @Test
     void 처음_인증하면_출석으로_기록한다() {
-        boolean recorded = attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
-        assertThat(recorded).isTrue();
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
         assertThat(method(AttendancePurpose.DORMITORY, DAY)).isEqualTo("QR");
@@ -76,34 +93,36 @@ class AttendanceServiceTest {
 
     @Test
     void 이미_출석이면_다시_기록하지_않고_최초_시각을_유지한다() {
-        attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        clock.setInstant(AT.plusSeconds(60));
 
-        boolean recorded = attendanceService.markAttended(
-                studentId, AttendancePurpose.DORMITORY, DAY, AT.plusSeconds(60), AttendanceMethod.FACE);
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(60), AttendanceMethod.FACE);
 
-        assertThat(recorded).isFalse();
+        assertThat(result).isEqualTo(AttendanceRecordResult.ALREADY_ATTENDED);
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
         assertThat(method(AttendancePurpose.DORMITORY, DAY)).isEqualTo("QR");
     }
 
     @Test
     void 용도가_다르면_따로_기록한다() {
-        boolean dormitory = attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
-        boolean studyRoom = attendanceService.markAttended(studentId, AttendancePurpose.STUDY_ROOM, DAY, AT, AttendanceMethod.QR);
+        AttendanceRecordResult dormitory = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        AttendanceRecordResult studyRoom = mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
 
-        assertThat(dormitory).isTrue();
-        assertThat(studyRoom).isTrue();
+        assertThat(dormitory).isEqualTo(AttendanceRecordResult.RECORDED);
+        assertThat(studyRoom).isEqualTo(AttendanceRecordResult.RECORDED);
         assertThat(rowCount()).isEqualTo(2);
     }
 
     @Test
-    void 운영일이_다르면_따로_기록한다() {
-        boolean today = attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
-        boolean nextDay = attendanceService.markAttended(
-                studentId, AttendancePurpose.DORMITORY, DAY.plusDays(1), AT.plusSeconds(86_400), AttendanceMethod.QR);
+    void 운영일이_바뀌면_새_운영일에_따로_기록한다() {
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        Instant nextDay = AT.plusSeconds(86_400);
+        clock.setInstant(nextDay);
 
-        assertThat(today).isTrue();
-        assertThat(nextDay).isTrue();
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, nextDay, AttendanceMethod.QR);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
+        assertThat(attended(AttendancePurpose.DORMITORY, DAY.plusDays(1))).isTrue();
         assertThat(rowCount()).isEqualTo(2);
     }
 
@@ -112,19 +131,19 @@ class AttendanceServiceTest {
         int requests = 10;
         ExecutorService executor = Executors.newFixedThreadPool(requests);
         CountDownLatch start = new CountDownLatch(1);
-        List<Future<Boolean>> results = new ArrayList<>();
+        List<Future<AttendanceRecordResult>> results = new ArrayList<>();
         for (int i = 0; i < requests; i++) {
-            Callable<Boolean> task = () -> {
+            Callable<AttendanceRecordResult> task = () -> {
                 start.await();
-                return attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
+                return mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
             };
             results.add(executor.submit(task));
         }
         start.countDown();
 
         int recorded = 0;
-        for (Future<Boolean> result : results) {
-            if (result.get()) {
+        for (Future<AttendanceRecordResult> result : results) {
+            if (result.get() == AttendanceRecordResult.RECORDED) {
                 recorded++;
             }
         }
@@ -140,9 +159,9 @@ class AttendanceServiceTest {
         Instant manualAt = AT.minusSeconds(600);
         insertManualAbsent(firstAt, manualAt);
 
-        boolean recorded = attendanceService.markAttended(studentId, AttendancePurpose.DORMITORY, DAY, AT, AttendanceMethod.QR);
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
-        assertThat(recorded).isTrue();
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(firstAt);
         assertThat(method(AttendancePurpose.DORMITORY, DAY)).isEqualTo("FACE");
@@ -150,14 +169,16 @@ class AttendanceServiceTest {
 
     @Test
     void 수동_미출석_전에_발생해_늦게_도착한_인증은_무시한다() {
-        Instant manualAt = AT;
-        insertManualAbsent(AT.minusSeconds(3600), manualAt);
+        insertManualAbsent(AT.minusSeconds(3600), AT);
 
-        boolean recorded = attendanceService.markAttended(
-                studentId, AttendancePurpose.DORMITORY, DAY, manualAt.minusSeconds(60), AttendanceMethod.QR);
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.minusSeconds(60), AttendanceMethod.FACE);
 
-        assertThat(recorded).isFalse();
+        assertThat(result).isEqualTo(AttendanceRecordResult.SUPERSEDED_BY_MANUAL);
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isFalse();
+    }
+
+    private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {
+        return attendanceService.markAttended(studentId, purpose, verifiedAt, method);
     }
 
     private void insertManualAbsent(Instant firstVerifiedAt, Instant manualUpdatedAt) {
