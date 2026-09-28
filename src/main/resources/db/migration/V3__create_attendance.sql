@@ -11,3 +11,5 @@ CREATE TABLE attendance (
     CONSTRAINT ck_attendance_purpose CHECK (purpose IN ('DORMITORY', 'STUDY_ROOM')),
     CONSTRAINT ck_attendance_method CHECK (method IN ('QR', 'FACE', 'MANUAL'))
 );
+
+CREATE INDEX idx_attendance_operating_day ON attendance (operating_day);
