@@ -209,6 +209,15 @@ class AttendanceServiceTest {
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
     }
 
+    @Test
+    void 학생을_삭제하면_출석도_함께_삭제된다() {
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+
+        jdbcTemplate.update("DELETE FROM student WHERE id = ?", studentId);
+
+        assertThat(rowCount()).isZero();
+    }
+
     private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {
         return attendanceService.markAttended(studentId, purpose, verifiedAt, method);
     }
