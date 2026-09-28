@@ -23,11 +23,9 @@ import lombok.RequiredArgsConstructor;
 /**
  * QR 세션·토큰을 Redis에 저장한다. 모든 키는 TTL로 스스로 사라진다.
  *
- * <ul>
- *     <li>{@code qr:session:{id}}: 세션 해시</li>
- *     <li>{@code qr:token:{token}}: 토큰 해시(세션 ID, 만료 시각)</li>
- *     <li>{@code qr:admin:{adminId}}: 관리자가 만든 세션 ID 집합</li>
- * </ul>
+ * - {@code qr:session:{id}}: 세션 해시
+ * - {@code qr:token:{token}}: 토큰 해시(세션 ID, 만료 시각)
+ * - {@code qr:admin:{adminId}}: 관리자가 만든 세션 ID 집합
  */
 @Repository
 @RequiredArgsConstructor

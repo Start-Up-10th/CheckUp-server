@@ -6,9 +6,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.checkup.checkup.domain.qr.config.QrProperties;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
@@ -16,6 +14,8 @@ import com.checkup.checkup.domain.qr.entity.QrPurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 import com.checkup.checkup.domain.qr.entity.QrToken;
 import com.checkup.checkup.domain.qr.repository.QrSessionRepository;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 관리자 QR 페이지별 세션과 토큰을 관리한다(REQ-ATT-003·004, DEC-007).
  *
- * <p>세션은 페이지마다 독립적이며 다른 관리자·탭의 세션에 영향을 주지 않는다.
+ * 세션은 페이지마다 독립적이며 다른 관리자·탭의 세션에 영향을 주지 않는다.
  * 토큰은 발급 때 정한 만료 시각을 바꾸지 않고, 새 토큰으로 교체만 한다.
  */
 @Service
@@ -61,21 +61,22 @@ public class QrSessionService {
      * lease를 연장하고 현재 토큰을 반환한다.
      * 토큰 만료가 가까웠거나 운영일이 바뀌었으면 새 토큰으로 교체한다.
      *
-     * @throws ResponseStatusException 세션이 없거나 lease가 끝났거나 다른 관리자의 세션이거나, 처리 중에 종료됐으면 404
+     * @throws CustomException 세션이 없거나 lease가 끝났거나 다른 관리자의 세션이거나, 처리 중에 종료됐으면
+     *                         {@link ErrorCode#QR_SESSION_NOT_FOUND}(404)
      */
     public QrSessionIssue heartbeat(Long adminId, String sessionId) {
         Instant now = clock.instant();
         QrSession session = qrSessionRepository.findById(sessionId)
                 .filter(found -> found.isOwnedBy(adminId))
                 .filter(found -> found.isLeaseActive(now))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "QR 세션을 찾을 수 없습니다."))
+                .orElseThrow(() -> new CustomException(ErrorCode.QR_SESSION_NOT_FOUND))
                 .withLease(now.plus(qrProperties.leaseTtl()));
 
         if (needsRotation(session, now)) {
             session = issueToken(session, now);
         }
         if (!qrSessionRepository.saveIfPresent(session, qrProperties.leaseTtl())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "QR 세션을 찾을 수 없습니다.");
+            throw new CustomException(ErrorCode.QR_SESSION_NOT_FOUND);
         }
         return QrSessionIssue.of(session, now);
     }
