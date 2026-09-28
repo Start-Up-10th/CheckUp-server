@@ -218,11 +218,11 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 서버_시각보다_5초_이내로_늦은_인증은_기록한다() {
+    void 서버_시각보다_5초_이내로_늦은_인증은_현재_시각으로_기록한다() {
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(5), AttendanceMethod.FACE);
 
         assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
-        assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT.plusSeconds(5));
+        assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
     }
 
     @Test

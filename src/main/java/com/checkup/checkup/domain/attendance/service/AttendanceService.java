@@ -34,7 +34,8 @@ public class AttendanceService {
      *
      * <p>운영일은 호출하는 쪽이 넘기지 않고 인증 시각으로 계산한다. 그 운영일이 오늘이 아니면
      * 늦게 도착한 지난 인증이라 기록하지 않는다(REQ-ATT-007). 인증 시각이 서버 현재 시각보다
-     * 5초 넘게 늦으면 기기 시계 오차로 보고 기록하지 않는다(REQ-ATT-002 시계 보정).
+     * 5초 넘게 늦으면 기기 시계 오차로 보고 기록하지 않고, 5초 이내로 늦으면 서버 현재 시각으로 낮춰 기록한다
+     * (REQ-ATT-002 시계 보정). 미래 시각이 {@code first_verified_at}에 남거나 수동 수정을 덮어쓰지 않게 하기 위해서다.
      *
      * <p>기록하지 못했을 때 {@code ALREADY_ATTENDED}와 {@code SUPERSEDED_BY_MANUAL}을 가르는 조회는
      * 저장 쿼리와 같은 트랜잭션에서 실행된다. {@code ON CONFLICT DO UPDATE}는 조건이 거짓이라 수정하지 않은
@@ -53,16 +54,18 @@ public class AttendanceService {
             Instant verifiedAt,
             AttendanceMethod method
     ) {
-        if (verifiedAt.isAfter(clock.instant().plus(MAX_CLOCK_SKEW))) {
+        Instant now = clock.instant();
+        if (verifiedAt.isAfter(now.plus(MAX_CLOCK_SKEW))) {
             return AttendanceRecordResult.FUTURE;
         }
-        LocalDate operatingDay = operatingDayCalculator.of(verifiedAt);
+        Instant recordedAt = verifiedAt.isAfter(now) ? now : verifiedAt;
+        LocalDate operatingDay = operatingDayCalculator.of(recordedAt);
         if (!operatingDay.equals(operatingDayCalculator.today())) {
             return AttendanceRecordResult.STALE;
         }
 
         int changed = attendanceRepository.markAttended(
-                studentId, purpose.name(), operatingDay, verifiedAt, method.name());
+                studentId, purpose.name(), operatingDay, recordedAt, method.name());
         if (changed == 1) {
             return AttendanceRecordResult.RECORDED;
         }
