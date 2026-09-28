@@ -123,7 +123,19 @@ class QrAttendanceFlowTest {
                         .with(loginAs(studentMemberId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"purpose\":\"DORMITORY\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ADMIN_ONLY"));
+    }
+
+    @Test
+    void 닫힌_QR_세션의_heartbeat는_404와_오류_코드다() throws Exception {
+        CreatedQr qr = createQr("DORMITORY");
+        mockMvc.perform(post("/api/v1/qr/" + qr.sessionId() + "/close").with(loginAs(adminId)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/qr/" + qr.sessionId() + "/heartbeat").with(loginAs(adminId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("QR_SESSION_NOT_FOUND"));
     }
 
     private CreatedQr createQr(String purpose) throws Exception {
