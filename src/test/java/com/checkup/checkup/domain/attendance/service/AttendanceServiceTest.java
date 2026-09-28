@@ -226,6 +226,16 @@ class AttendanceServiceTest {
     }
 
     @Test
+    void 조금_미래인_인증도_현재_시각_이전의_수동_미출석은_덮어쓰지_않는다() {
+        insertManualAbsent(AT.minusSeconds(3600), AT);
+
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(3), AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.SUPERSEDED_BY_MANUAL);
+        assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isFalse();
+    }
+
+    @Test
     void 학생을_삭제하면_출석도_함께_삭제된다() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
