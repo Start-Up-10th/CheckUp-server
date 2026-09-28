@@ -11,7 +11,6 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.qr.entity.QrScanResult;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 import com.checkup.checkup.domain.qr.entity.QrToken;
@@ -35,7 +34,6 @@ public class QrScanService {
 
     private final QrSessionRepository qrSessionRepository;
     private final AttendanceService attendanceService;
-    private final MemberService memberService;
     private final StudentRepository studentRepository;
     private final Clock clock;
 
@@ -86,7 +84,7 @@ public class QrScanService {
     }
 
     private Student findStudent(Long memberId) {
-        return studentRepository.findByMember(memberService.getById(memberId))
+        return studentRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
     }
 }

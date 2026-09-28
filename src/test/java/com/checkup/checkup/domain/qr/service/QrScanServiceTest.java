@@ -22,11 +22,8 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
-import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.qr.entity.QrScanResult;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 import com.checkup.checkup.domain.qr.entity.QrToken;
@@ -45,31 +42,26 @@ class QrScanServiceTest {
 
     private final QrSessionRepository qrSessionRepository = mock(QrSessionRepository.class);
     private final AttendanceService attendanceService = mock(AttendanceService.class);
-    private final MemberService memberService = mock(MemberService.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final MutableClock clock = new MutableClock(kst(2026, 9, 27, 21, 0));
 
     private final QrScanService qrScanService = new QrScanService(
             qrSessionRepository,
             attendanceService,
-            memberService,
             studentRepository,
             clock
     );
-
-    private final Member member = Member.create(100L, "학생", MemberRole.STUDENT);
 
     @BeforeEach
     void setUp() {
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_ID);
-        given(memberService.getById(MEMBER_ID)).willReturn(member);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(student));
+        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
     }
 
     @Test
     void 학생이_아니면_403이고_토큰을_확인하지_않는다() {
-        given(studentRepository.findByMember(member)).willReturn(Optional.empty());
+        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
                 .isInstanceOfSatisfying(CustomException.class,
