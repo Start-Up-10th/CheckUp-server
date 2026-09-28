@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.checkup.checkup.domain.qr.config.QrConfig;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.service.QrSessionService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -51,7 +51,7 @@ class QrControllerTest {
 
     private final QrSessionIssue issue = new QrSessionIssue(
             "session-1",
-            QrPurpose.DORMITORY,
+            AttendancePurpose.DORMITORY,
             TOKEN,
             Instant.parse("2026-09-27T03:15:00Z"),
             Instant.parse("2026-09-27T03:01:00Z"),
@@ -60,7 +60,7 @@ class QrControllerTest {
 
     @Test
     void 관리자는_QR_세션을_만들고_201과_qrUrl을_받는다() throws Exception {
-        given(qrSessionService.create(ADMIN_ID, QrPurpose.DORMITORY)).willReturn(issue);
+        given(qrSessionService.create(ADMIN_ID, AttendancePurpose.DORMITORY)).willReturn(issue);
 
         mockMvc.perform(post("/api/v1/qr")
                         .with(loginAs(ADMIN_ID))

@@ -14,7 +14,7 @@ import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 
 @DataRedisTest
@@ -32,7 +32,7 @@ class QrSessionRepositoryTest {
     private final QrSession session = new QrSession(
             "session-1",
             1L,
-            QrPurpose.DORMITORY,
+            AttendancePurpose.DORMITORY,
             LocalDate.of(2026, 9, 27),
             "token-1",
             Instant.parse("2026-09-27T03:15:00Z"),

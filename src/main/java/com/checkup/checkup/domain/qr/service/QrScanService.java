@@ -72,7 +72,7 @@ public class QrScanService {
 
         AttendanceRecordResult recorded = attendanceService.markAttended(
                 student.getId(),
-                session.get().purpose().toAttendancePurpose(),
+                session.get().purpose(),
                 now,
                 AttendanceMethod.QR
         );

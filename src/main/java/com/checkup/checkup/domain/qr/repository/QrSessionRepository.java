@@ -14,7 +14,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Repository;
 
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 import com.checkup.checkup.domain.qr.entity.QrToken;
 
@@ -100,7 +100,7 @@ public class QrSessionRepository {
         return Optional.of(new QrSession(
                 id,
                 Long.valueOf((String) hash.get("adminId")),
-                QrPurpose.valueOf((String) hash.get("purpose")),
+                AttendancePurpose.valueOf((String) hash.get("purpose")),
                 LocalDate.parse((String) hash.get("operatingDay")),
                 (String) hash.get("token"),
                 Instant.ofEpochMilli(Long.parseLong((String) hash.get("tokenExpiresAt"))),

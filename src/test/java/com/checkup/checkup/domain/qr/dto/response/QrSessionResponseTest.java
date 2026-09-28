@@ -7,7 +7,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
 class QrSessionResponseTest {
 
@@ -15,7 +15,7 @@ class QrSessionResponseTest {
 
     private final QrSessionIssue issue = new QrSessionIssue(
             "session-1",
-            QrPurpose.DORMITORY,
+            AttendancePurpose.DORMITORY,
             TOKEN,
             Instant.parse("2026-09-27T03:15:00Z"),
             Instant.parse("2026-09-27T03:01:00Z"),
@@ -41,7 +41,7 @@ class QrSessionResponseTest {
         QrSessionResponse response = QrSessionResponse.of(issue, "http://localhost:3000");
 
         assertThat(response.sessionId()).isEqualTo("session-1");
-        assertThat(response.purpose()).isEqualTo(QrPurpose.DORMITORY);
+        assertThat(response.purpose()).isEqualTo(AttendancePurpose.DORMITORY);
         assertThat(response.tokenExpiresAt()).isEqualTo(issue.tokenExpiresAt());
         assertThat(response.leaseExpiresAt()).isEqualTo(issue.leaseExpiresAt());
         assertThat(response.serverTime()).isEqualTo(issue.serverTime());

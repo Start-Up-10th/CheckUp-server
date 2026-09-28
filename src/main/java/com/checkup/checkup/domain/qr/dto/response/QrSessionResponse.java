@@ -3,7 +3,7 @@ package com.checkup.checkup.domain.qr.dto.response;
 import java.time.Instant;
 
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
 /**
  * QR 세션 생성·heartbeat 응답. 토큰 원문은 {@code qrUrl} 안에만 담는다.
@@ -17,7 +17,7 @@ import com.checkup.checkup.domain.qr.entity.QrPurpose;
  */
 public record QrSessionResponse(
         String sessionId,
-        QrPurpose purpose,
+        AttendancePurpose purpose,
         String qrUrl,
         Instant tokenExpiresAt,
         Instant leaseExpiresAt,
