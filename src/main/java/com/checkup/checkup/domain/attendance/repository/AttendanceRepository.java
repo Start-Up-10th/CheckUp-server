@@ -24,9 +24,12 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
      *     최초 인증 시각과 방식은 가장 이른 값을 유지한다.</li>
      * </ul>
      *
+     * <p>호출하는 쪽 트랜잭션에서 로딩한 엔티티를 비우지 않도록 영속성 컨텍스트는 clear하지 않는다.
+     * 이 쿼리로 바뀐 행은 영속성 컨텍스트에 캐시돼 있지 않으므로 이후 조회는 DB에서 읽는다.
+     *
      * @return 출석으로 새로 기록했으면 1, 이미 출석이었거나 수동 수정 이전 인증이라 무시했으면 0
      */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             INSERT INTO attendance (student_id, purpose, operating_day, attended, first_verified_at, method)
             VALUES (:studentId, :purpose, :operatingDay, TRUE, :verifiedAt, :method)
