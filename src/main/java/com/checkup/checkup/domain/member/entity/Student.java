@@ -38,7 +38,7 @@ public class Student {
     private Integer dormitoryRoom;
 
     /**
-     * Assigned floor derived from the student's room number. A missing room has no floor.
+     * 호실 번호를 100으로 나눈 정수 값으로 층을 계산한다. 호실이 미배정이면 null을 반환한다.
      */
     public Integer getDormitoryFloor() {
         return dormitoryRoom == null ? null : dormitoryRoom / 100;

@@ -15,6 +15,7 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.GlobalExceptionHandler;
 import com.checkup.checkup.global.security.SecurityConfig;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -37,6 +38,7 @@ class RoomControllerTest {
     private RoomService roomService;
 
     @Test
+    @DisplayName("호실 학생 명단을 계약에 정의된 JSON 필드의 배열로 반환한다")
     void 호실_학생_명단을_요청된_JSON_필드로_반환한다() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301))
                 .willReturn(List.of(new RoomStudentResponse("학생", 1, 1101)));
@@ -52,6 +54,7 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("미인증 요청은 서비스를 호출하지 않고 401을 반환한다")
     void 로그인하지_않으면_401이고_서비스를_호출하지_않는다() throws Exception {
         mockMvc.perform(get("/api/v1/room/student").param("dormitoryRoom", "301"))
                 .andExpect(status().isUnauthorized());
@@ -60,6 +63,7 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("호실 파라미터가 누락되거나 숫자가 아니거나 0 이하이면 400을 반환한다")
     void 호실_파라미터_누락과_숫자오류_및_0이하는_400이다() throws Exception {
         mockMvc.perform(get("/api/v1/room/student").with(loginAs(MEMBER_ID)))
                 .andExpect(status().isBadRequest());
@@ -78,6 +82,7 @@ class RoomControllerTest {
     }
 
     @Test
+    @DisplayName("서비스의 권한 오류를 기존 오류 응답 형식으로 반환한다")
     void 서비스_권한_오류를_기존_오류_응답으로_반환한다() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301))
                 .willThrow(new CustomException(ErrorCode.FORBIDDEN));
