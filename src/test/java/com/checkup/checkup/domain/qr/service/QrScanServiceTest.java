@@ -158,6 +158,14 @@ class QrScanServiceTest {
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.EXPIRED);
     }
 
+    @Test
+    void 미래_시각으로_판정되면_INVALID다() {
+        activeToken(QrPurpose.DORMITORY);
+        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.FUTURE);
+
+        assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.INVALID);
+    }
+
     private void activeToken(QrPurpose purpose) {
         given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(60))));
         given(qrSessionRepository.findById(SESSION_ID))

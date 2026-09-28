@@ -84,6 +84,7 @@ public class QrScanService {
             case RECORDED -> QrScanResult.APPROVED;
             case ALREADY_ATTENDED, SUPERSEDED_BY_MANUAL -> QrScanResult.DUPLICATE;
             case STALE -> QrScanResult.EXPIRED;
+            case FUTURE -> QrScanResult.INVALID;
         };
     }
 
