@@ -25,7 +25,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
      * </ul>
      *
      * <p>호출하는 쪽 트랜잭션에서 로딩한 엔티티를 비우지 않도록 영속성 컨텍스트는 clear하지 않는다.
-     * 이 쿼리로 바뀐 행은 영속성 컨텍스트에 캐시돼 있지 않으므로 이후 조회는 DB에서 읽는다.
+     * 그래서 이 쿼리 뒤의 상태 확인은 엔티티가 아닌 {@link #findAttendedStatus}로 DB에서 직접 읽는다.
      *
      * @return 출석으로 새로 기록했으면 1, 이미 출석이었거나 수동 수정 이전 인증이라 무시했으면 0
      */
@@ -55,11 +55,15 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     );
 
     /**
-     * 학생·용도·운영일의 출석을 조회한다.
+     * 학생·용도·운영일의 현재 출석 여부만 DB에서 읽는다. 영속성 컨텍스트에 캐시된 엔티티를 거치지 않는다.
      */
-    Optional<Attendance> findByStudentIdAndPurposeAndOperatingDay(
-            Long studentId,
-            AttendancePurpose purpose,
-            LocalDate operatingDay
+    @Query("""
+            SELECT a.attended FROM Attendance a
+            WHERE a.student.id = :studentId AND a.purpose = :purpose AND a.operatingDay = :operatingDay
+            """)
+    Optional<Boolean> findAttendedStatus(
+            @Param("studentId") Long studentId,
+            @Param("purpose") AttendancePurpose purpose,
+            @Param("operatingDay") LocalDate operatingDay
     );
 }

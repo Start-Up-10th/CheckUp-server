@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.checkup.checkup.domain.attendance.entity.Attendance;
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
@@ -54,9 +53,7 @@ public class AttendanceService {
         if (changed == 1) {
             return AttendanceRecordResult.RECORDED;
         }
-        boolean attended = attendanceRepository.findByStudentIdAndPurposeAndOperatingDay(studentId, purpose, operatingDay)
-                .map(Attendance::isAttended)
-                .orElse(false);
+        boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
     }
 }
