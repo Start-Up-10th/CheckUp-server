@@ -177,6 +177,38 @@ class AttendanceServiceTest {
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isFalse();
     }
 
+    @Test
+    void 어제_운영일_인증이_오늘_도착하면_기록하지_않는다() {
+        clock.setInstant(AT.plusSeconds(86_400));
+
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.STALE);
+        assertThat(rowCount()).isZero();
+    }
+
+    @Test
+    void 오전_8시_전_인증이_8시_뒤에_도착하면_기록하지_않는다() {
+        Instant before8 = Instant.parse("2026-09-27T22:59:00Z");
+        clock.setInstant(Instant.parse("2026-09-27T23:01:00Z"));
+
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, before8, AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.STALE);
+        assertThat(rowCount()).isZero();
+    }
+
+    @Test
+    void 오전_8시_전_인증은_전날_운영일로_기록한다() {
+        Instant before8 = Instant.parse("2026-09-27T22:59:00Z");
+        clock.setInstant(before8);
+
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, before8, AttendanceMethod.QR);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
+        assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
+    }
+
     private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {
         return attendanceService.markAttended(studentId, purpose, verifiedAt, method);
     }
