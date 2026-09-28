@@ -3,7 +3,6 @@ package com.checkup.checkup.domain.qr.service;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 
@@ -34,8 +33,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class QrScanService {
 
-    private static final Pattern TOKEN_FORMAT = Pattern.compile("[A-Za-z0-9_-]{43}");
-
     private final QrSessionRepository qrSessionRepository;
     private final AttendanceService attendanceService;
     private final MemberService memberService;
@@ -54,7 +51,7 @@ public class QrScanService {
         Student student = findStudent(memberId);
         Instant now = clock.instant();
 
-        Optional<QrToken> qrToken = TOKEN_FORMAT.matcher(token).matches()
+        Optional<QrToken> qrToken = QrTokenGenerator.isWellFormed(token)
                 ? qrSessionRepository.findToken(token)
                 : Optional.empty();
         if (qrToken.isEmpty()) {
