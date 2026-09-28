@@ -8,6 +8,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
+import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -18,7 +19,6 @@ import com.checkup.checkup.domain.qr.entity.QrToken;
 import com.checkup.checkup.domain.qr.repository.QrSessionRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
-import com.checkup.checkup.global.time.OperatingDayCalculator;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +27,7 @@ import lombok.RequiredArgsConstructor;
  *
  * <p>판정 순서: 모르는 토큰({@code INVALID}) → 토큰 만료({@code EXPIRED})
  * → 세션 종료·lease 만료({@code CLOSED}) → 출석 저장({@code APPROVED}/{@code DUPLICATE}).
+ * 운영일은 출석 서비스가 스캔 시각으로 계산한다.
  * 출석할 학생은 요청 값이 아니라 로그인 세션의 회원으로 정한다.
  */
 @Service
@@ -39,7 +40,6 @@ public class QrScanService {
     private final AttendanceService attendanceService;
     private final MemberService memberService;
     private final StudentRepository studentRepository;
-    private final OperatingDayCalculator operatingDayCalculator;
     private final Clock clock;
 
     /**
@@ -70,14 +70,21 @@ public class QrScanService {
             return QrScanResult.CLOSED;
         }
 
-        boolean recorded = attendanceService.markAttended(
+        AttendanceRecordResult recorded = attendanceService.markAttended(
                 student.getId(),
                 session.get().purpose().toAttendancePurpose(),
-                operatingDayCalculator.of(now),
                 now,
                 AttendanceMethod.QR
         );
-        return recorded ? QrScanResult.APPROVED : QrScanResult.DUPLICATE;
+        return toScanResult(recorded);
+    }
+
+    private static QrScanResult toScanResult(AttendanceRecordResult recorded) {
+        return switch (recorded) {
+            case RECORDED -> QrScanResult.APPROVED;
+            case ALREADY_ATTENDED, SUPERSEDED_BY_MANUAL -> QrScanResult.DUPLICATE;
+            case STALE -> QrScanResult.EXPIRED;
+        };
     }
 
     private Student findStudent(Long memberId) {

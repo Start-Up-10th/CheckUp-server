@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
@@ -54,7 +55,6 @@ class QrScanServiceTest {
             attendanceService,
             memberService,
             studentRepository,
-            new OperatingDayCalculator(clock),
             clock
     );
 
@@ -124,33 +124,38 @@ class QrScanServiceTest {
     @Test
     void 처음_출석하면_세션_용도와_현재_운영일로_기록하고_APPROVED다() {
         activeToken(QrPurpose.STUDY_ROOM);
-        given(attendanceService.markAttended(any(), any(), any(), any(), any())).willReturn(true);
+        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.RECORDED);
 
         QrScanResult result = qrScanService.scan(MEMBER_ID, TOKEN);
 
         assertThat(result).isEqualTo(QrScanResult.APPROVED);
         verify(attendanceService).markAttended(
-                STUDENT_ID, AttendancePurpose.STUDY_ROOM, LocalDate.of(2026, 9, 27), clock.instant(), AttendanceMethod.QR);
+                STUDENT_ID, AttendancePurpose.STUDY_ROOM, clock.instant(), AttendanceMethod.QR);
     }
 
     @Test
     void 이미_출석했으면_DUPLICATE다() {
         activeToken(QrPurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any(), any())).willReturn(false);
+        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.DUPLICATE);
     }
 
     @Test
-    void 오전_8시_전_스캔은_전날_운영일로_기록한다() {
-        clock.setInstant(kst(2026, 9, 28, 7, 59));
+    void 수동_수정에_밀린_인증은_DUPLICATE다() {
         activeToken(QrPurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any(), any())).willReturn(true);
+        given(attendanceService.markAttended(any(), any(), any(), any()))
+                .willReturn(AttendanceRecordResult.SUPERSEDED_BY_MANUAL);
 
-        qrScanService.scan(MEMBER_ID, TOKEN);
+        assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.DUPLICATE);
+    }
 
-        verify(attendanceService).markAttended(
-                STUDENT_ID, AttendancePurpose.DORMITORY, LocalDate.of(2026, 9, 27), clock.instant(), AttendanceMethod.QR);
+    @Test
+    void 지난_운영일로_판정되면_EXPIRED다() {
+        activeToken(QrPurpose.DORMITORY);
+        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.STALE);
+
+        assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.EXPIRED);
     }
 
     private void activeToken(QrPurpose purpose) {
