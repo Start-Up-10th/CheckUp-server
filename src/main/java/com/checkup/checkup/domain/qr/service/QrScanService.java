@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 학생의 QR 스캔을 판정하고 출석을 기록한다(REQ-ATT-002·005, 하네스 DEC-018).
  *
- * <p>판정 순서: 모르는 토큰({@code INVALID}) → 토큰 만료({@code EXPIRED})
+ * 판정 순서: 모르는 토큰({@code INVALID}) → 토큰 만료({@code EXPIRED})
  * → 세션 종료·lease 만료({@code CLOSED}) → 출석 저장({@code APPROVED}/{@code DUPLICATE}).
  * 운영일은 출석 서비스가 스캔 시각으로 계산한다.
  * 출석할 학생은 요청 값이 아니라 로그인 세션의 회원으로 정한다.
