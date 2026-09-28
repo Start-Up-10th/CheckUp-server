@@ -16,12 +16,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.checkup.checkup.domain.qr.config.QrConfig;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
 import com.checkup.checkup.domain.qr.entity.QrPurpose;
 import com.checkup.checkup.domain.qr.repository.QrSessionRepository;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
 
@@ -152,7 +153,8 @@ class QrSessionServiceTest {
         clock.advance(Duration.ofSeconds(60));
 
         assertThatThrownBy(() -> qrSessionService.heartbeat(ADMIN_A, created.sessionId()))
-                .isInstanceOf(ResponseStatusException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.QR_SESSION_NOT_FOUND));
     }
 
     @Test
@@ -160,7 +162,8 @@ class QrSessionServiceTest {
         QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
 
         assertThatThrownBy(() -> qrSessionService.heartbeat(ADMIN_B, created.sessionId()))
-                .isInstanceOf(ResponseStatusException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.QR_SESSION_NOT_FOUND));
 
         qrSessionService.close(ADMIN_B, created.sessionId());
 
@@ -177,7 +180,8 @@ class QrSessionServiceTest {
         qrSessionService.close(ADMIN_A, closed.sessionId());
 
         assertThatThrownBy(() -> qrSessionService.heartbeat(ADMIN_A, closed.sessionId()))
-                .isInstanceOf(ResponseStatusException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.QR_SESSION_NOT_FOUND));
         assertThat(qrSessionService.heartbeat(ADMIN_A, otherTab.sessionId()).sessionId())
                 .isEqualTo(otherTab.sessionId());
         assertThat(qrSessionService.heartbeat(ADMIN_B, otherAdmin.sessionId()).sessionId())

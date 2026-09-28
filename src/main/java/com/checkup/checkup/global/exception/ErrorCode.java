@@ -25,11 +25,15 @@ public enum ErrorCode {
     MISSING_STUDENT_INFO(HttpStatus.FORBIDDEN, "학생 정보가 없습니다."),
     UNSUPPORTED_ACCOUNT(HttpStatus.FORBIDDEN, "이용 권한이 없는 계정입니다."),
     MEMBER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
+    ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있습니다."),
 
     // DataGSM
     DATAGSM_INVALID_CODE(HttpStatus.BAD_REQUEST, "인가 코드가 유효하지 않거나 만료되었습니다."),
     DATAGSM_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "DataGSM에 일시적으로 연결할 수 없습니다."),
-    DATAGSM_ERROR(HttpStatus.BAD_GATEWAY, "DataGSM 요청을 처리하지 못했습니다.");
+    DATAGSM_ERROR(HttpStatus.BAD_GATEWAY, "DataGSM 요청을 처리하지 못했습니다."),
+
+    // QR
+    QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다.");
 
     private final HttpStatus status;
     private final String message;
