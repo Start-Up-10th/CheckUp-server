@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 /**
  * 학생·용도·운영일별 현재 출석 상태. 한 조합에 한 행만 있다(REQ-ATT-002).
  *
- * <p>현재 상태({@code attended})와 최초 유효 인증 시각({@code firstVerifiedAt})을 따로 둔다(REQ-ATT-006).
+ * 현재 상태({@code attended})와 최초 유효 인증 시각({@code firstVerifiedAt})을 따로 둔다(REQ-ATT-006).
  * 자동 인증 저장은 {@link com.checkup.checkup.domain.attendance.repository.AttendanceRepository}의 원자적 쿼리로 한다.
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
