@@ -1,6 +1,6 @@
 CREATE TABLE attendance (
     id BIGSERIAL PRIMARY KEY,
-    student_id BIGINT NOT NULL REFERENCES student(id),
+    student_id BIGINT NOT NULL REFERENCES student(id) ON DELETE CASCADE,
     purpose VARCHAR(20) NOT NULL,
     operating_day DATE NOT NULL,
     attended BOOLEAN NOT NULL,
