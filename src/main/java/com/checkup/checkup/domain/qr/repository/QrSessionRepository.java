@@ -26,6 +26,9 @@ import lombok.RequiredArgsConstructor;
  * - {@code qr:session:{id}}: 세션 해시
  * - {@code qr:token:{token}}: 토큰 해시(세션 ID, 만료 시각)
  * - {@code qr:admin:{adminId}}: 관리자가 만든 세션 ID 집합
+ *
+ * 키가 TTL보다 먼저 사라지면 세션은 종료된 것으로, 토큰은 발급하지 않은 것으로 판정되므로
+ * Redis는 메모리 축출이 없는 {@code maxmemory-policy noeviction}으로 운영한다.
  */
 @Repository
 @RequiredArgsConstructor
