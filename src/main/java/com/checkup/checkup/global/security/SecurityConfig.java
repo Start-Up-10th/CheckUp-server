@@ -14,6 +14,8 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
  *
  * <ul>
  *     <li>인증되지 않은 요청은 401, 권한이 없는 요청은 403을 반환한다.</li>
+ *     <li>인증 실패 요청을 세션에 저장하지 않는다(RequestCache 끔). 로그인 후 복귀는 로그인 콜백이 직접 처리하므로
+ *     필요 없고, 저장하면 로그인하지 않은 요청마다 빈 세션이 Redis에 생긴다.</li>
  *     <li>{@code POST /api/v1/auth/logout}은 세션을 무효화하고 {@code SESSION} 쿠키를 지운 뒤 204를 반환한다.</li>
  *     <li>{@code /api/v1/auth/me}를 제외한 {@code /api/v1/auth/**}는 로그인 없이 접근할 수 있다.</li>
  *     <li>{@code /api/v1/webhook}은 DataGSM이 로그인 없이 호출하며, 컨트롤러에서 서명으로 검증한다.</li>
@@ -30,6 +32,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
+                .requestCache(AbstractHttpConfigurer::disable)
                 .logout(l -> l
                         .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.NO_CONTENT))
                         .logoutUrl("/api/v1/auth/logout")
