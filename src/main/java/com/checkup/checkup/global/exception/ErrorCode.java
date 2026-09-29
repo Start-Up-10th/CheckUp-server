@@ -31,6 +31,8 @@ public enum ErrorCode {
     DATAGSM_INVALID_CODE(HttpStatus.BAD_REQUEST, "인가 코드가 유효하지 않거나 만료되었습니다."),
     DATAGSM_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "DataGSM에 일시적으로 연결할 수 없습니다."),
     DATAGSM_ERROR(HttpStatus.BAD_GATEWAY, "DataGSM 요청을 처리하지 못했습니다."),
+    INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "웹훅 서명이 올바르지 않습니다."),
+    INVALID_WEBHOOK_PAYLOAD(HttpStatus.BAD_REQUEST, "웹훅 본문 형식이 올바르지 않습니다."),
 
     // QR
     QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다.");

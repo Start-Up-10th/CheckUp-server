@@ -10,6 +10,7 @@ import com.checkup.checkup.global.config.WebProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +50,7 @@ public class AuthController {
      *                 없거나 안전하지 않으면 웹 로그인 완료 화면({@code /login/complete})으로 돌아간다.
      * @return state·PKCE가 포함된 DataGSM 인가 URL로의 302 응답
      */
+    @SecurityRequirements
     @GetMapping("/login")
     public ResponseEntity<Void> login(@RequestParam(required = false) String redirect) {
         String url = authService.createLoginUrl(redirect);
@@ -65,6 +67,7 @@ public class AuthController {
      * @param state 로그인 시작 때 발급한 state
      * @return 성공이면 로그인 시작 때 정한 웹 경로(기본 {@code /login/complete}), 실패면 웹 로그인 화면으로의 302 응답
      */
+    @SecurityRequirements
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
             @RequestParam(required = false) String code,
