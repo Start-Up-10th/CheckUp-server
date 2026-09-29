@@ -90,6 +90,7 @@ checkup:
 
 운영 서버에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` 환경변수로 값을 넣습니다.
 `PUBLIC_ORIGIN`(QR 링크의 학생 웹 주소)도 반드시 넣습니다. 비어 있으면 서버가 기동하지 않습니다.
+운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
 ## 명세·문서
 

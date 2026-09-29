@@ -19,7 +19,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import com.checkup.checkup.domain.qr.config.QrConfig;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.repository.QrSessionRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -74,10 +74,10 @@ class QrSessionServiceTest {
     void 세션을_만들면_15분짜리_토큰과_lease를_발급한다() {
         Instant now = clock.instant();
 
-        QrSessionIssue issue = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue issue = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         assertThat(issue.sessionId()).isNotBlank();
-        assertThat(issue.purpose()).isEqualTo(QrPurpose.DORMITORY);
+        assertThat(issue.purpose()).isEqualTo(AttendancePurpose.DORMITORY);
         assertThat(issue.token()).isNotBlank();
         assertThat(issue.tokenExpiresAt()).isEqualTo(now.plus(Duration.ofMinutes(15)));
         assertThat(issue.leaseExpiresAt()).isEqualTo(now.plus(Duration.ofSeconds(60)));
@@ -85,9 +85,20 @@ class QrSessionServiceTest {
     }
 
     @Test
+    void 토큰_기록은_만료_뒤에도_보관_시간만큼_남는다() {
+        QrSessionIssue issue = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+
+        Long ttlSeconds = redisTemplate.getExpire("qr:token:" + issue.token());
+
+        assertThat(ttlSeconds).isBetween(
+                Duration.ofMinutes(15).plusHours(1).minusSeconds(5).toSeconds(),
+                Duration.ofMinutes(15).plusHours(1).toSeconds());
+    }
+
+    @Test
     void 페이지마다_다른_세션과_토큰을_만든다() {
-        QrSessionIssue first = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
-        QrSessionIssue second = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue first = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+        QrSessionIssue second = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         assertThat(first.sessionId()).isNotEqualTo(second.sessionId());
         assertThat(first.token()).isNotEqualTo(second.token());
@@ -95,7 +106,7 @@ class QrSessionServiceTest {
 
     @Test
     void 만료가_멀면_heartbeat는_같은_토큰을_유지하고_lease만_연장한다() {
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
         clock.advance(HEARTBEAT_INTERVAL);
 
         QrSessionIssue beat = qrSessionService.heartbeat(ADMIN_A, created.sessionId());
@@ -107,7 +118,7 @@ class QrSessionServiceTest {
 
     @Test
     void 만료가_가까우면_새_토큰을_발급하고_이전_토큰의_만료는_그대로_둔다() {
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         QrSessionIssue beat = heartbeatUntil(created.sessionId(), created.tokenExpiresAt().minusSeconds(30));
 
@@ -121,7 +132,7 @@ class QrSessionServiceTest {
     void 오전_8시_직전에_발급한_토큰은_8시에_만료된다() {
         clock.setInstant(kst(2026, 9, 26, 7, 55));
 
-        QrSessionIssue issue = qrSessionService.create(ADMIN_A, QrPurpose.STUDY_ROOM);
+        QrSessionIssue issue = qrSessionService.create(ADMIN_A, AttendancePurpose.STUDY_ROOM);
 
         assertThat(issue.tokenExpiresAt()).isEqualTo(kst(2026, 9, 26, 8, 0));
     }
@@ -129,7 +140,7 @@ class QrSessionServiceTest {
     @Test
     void 오전_8시_직전에는_같은_만료의_토큰을_다시_발급하지_않는다() {
         clock.setInstant(kst(2026, 9, 26, 7, 55));
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         QrSessionIssue beat = heartbeatUntil(created.sessionId(), kst(2026, 9, 26, 7, 59, 50));
 
@@ -139,7 +150,7 @@ class QrSessionServiceTest {
     @Test
     void 오전_8시가_지나면_새_운영일_토큰으로_교체한다() {
         clock.setInstant(kst(2026, 9, 26, 7, 55));
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         QrSessionIssue beat = heartbeatUntil(created.sessionId(), kst(2026, 9, 26, 8, 0));
 
@@ -149,7 +160,7 @@ class QrSessionServiceTest {
 
     @Test
     void heartbeat가_끊겨_lease가_지나면_세션을_찾을_수_없다() {
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
         clock.advance(Duration.ofSeconds(60));
 
         assertThatThrownBy(() -> qrSessionService.heartbeat(ADMIN_A, created.sessionId()))
@@ -159,7 +170,7 @@ class QrSessionServiceTest {
 
     @Test
     void 다른_관리자는_세션을_유지하거나_종료할_수_없다() {
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         assertThatThrownBy(() -> qrSessionService.heartbeat(ADMIN_B, created.sessionId()))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -173,9 +184,9 @@ class QrSessionServiceTest {
 
     @Test
     void 세션을_종료해도_다른_탭과_다른_관리자의_세션은_유지된다() {
-        QrSessionIssue closed = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
-        QrSessionIssue otherTab = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
-        QrSessionIssue otherAdmin = qrSessionService.create(ADMIN_B, QrPurpose.DORMITORY);
+        QrSessionIssue closed = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+        QrSessionIssue otherTab = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+        QrSessionIssue otherAdmin = qrSessionService.create(ADMIN_B, AttendancePurpose.DORMITORY);
 
         qrSessionService.close(ADMIN_A, closed.sessionId());
 
@@ -190,7 +201,7 @@ class QrSessionServiceTest {
 
     @Test
     void 이미_종료된_세션을_다시_종료해도_오류가_없다() {
-        QrSessionIssue created = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
+        QrSessionIssue created = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
 
         qrSessionService.close(ADMIN_A, created.sessionId());
         qrSessionService.close(ADMIN_A, created.sessionId());
@@ -200,9 +211,9 @@ class QrSessionServiceTest {
 
     @Test
     void 전체_종료는_그_관리자의_세션만_모두_끝낸다() {
-        QrSessionIssue first = qrSessionService.create(ADMIN_A, QrPurpose.DORMITORY);
-        QrSessionIssue second = qrSessionService.create(ADMIN_A, QrPurpose.STUDY_ROOM);
-        QrSessionIssue otherAdmin = qrSessionService.create(ADMIN_B, QrPurpose.DORMITORY);
+        QrSessionIssue first = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+        QrSessionIssue second = qrSessionService.create(ADMIN_A, AttendancePurpose.STUDY_ROOM);
+        QrSessionIssue otherAdmin = qrSessionService.create(ADMIN_B, AttendancePurpose.DORMITORY);
 
         qrSessionService.closeAll(ADMIN_A);
 

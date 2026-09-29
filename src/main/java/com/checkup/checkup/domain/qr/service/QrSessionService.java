@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.checkup.checkup.domain.qr.config.QrProperties;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 import com.checkup.checkup.domain.qr.entity.QrToken;
 import com.checkup.checkup.domain.qr.repository.QrSessionRepository;
@@ -42,7 +42,7 @@ public class QrSessionService {
      * @param adminId 세션을 만드는 관리자의 member id
      * @param purpose 출석 용도
      */
-    public QrSessionIssue create(Long adminId, QrPurpose purpose) {
+    public QrSessionIssue create(Long adminId, AttendancePurpose purpose) {
         Instant now = clock.instant();
         QrSession session = issueToken(new QrSession(
                 UUID.randomUUID().toString(),
@@ -111,7 +111,7 @@ public class QrSessionService {
         LocalDate operatingDay = operatingDayCalculator.today();
         Instant expiresAt = earlier(now.plus(qrProperties.tokenTtl()), operatingDayCalculator.nextBoundary());
         QrToken token = new QrToken(qrTokenGenerator.generate(), session.id(), expiresAt);
-        qrSessionRepository.saveToken(token, Duration.between(now, expiresAt));
+        qrSessionRepository.saveToken(token, Duration.between(now, expiresAt).plus(qrProperties.tokenRetention()));
         return session.withToken(operatingDay, token.token(), expiresAt);
     }
 
