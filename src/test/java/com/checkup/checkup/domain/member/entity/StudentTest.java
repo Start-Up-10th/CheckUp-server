@@ -46,6 +46,18 @@ class StudentTest {
         assertThat(student.isStale(synced.plusSeconds(1))).isFalse();
     }
 
+    @Test
+    @DisplayName("호실을 비우면 호실과 층은 null이 되고 학년·학번은 그대로다")
+    void leaveDormitoryClearsRoomOnly() {
+        Student student = student(301);
+
+        student.leaveDormitory();
+
+        assertThat(student.getDormitoryRoom()).isNull();
+        assertThat(student.getDormitoryFloor()).isNull();
+        assertThat(student.getStudentNumber()).isEqualTo(1101);
+    }
+
     private static Student student(Integer dormitoryRoom) {
         return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, 1, 1, 1, 1101,
                 dormitoryRoom);
