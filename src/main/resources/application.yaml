@@ -37,6 +37,13 @@ server:
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
 
+# API 문서(/swagger-ui/index.html, /v3/api-docs). 노출하지 않을 환경에서는 SWAGGER_ENABLED=false로 끈다.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
 checkup:
   qr:
     token-ttl: 15m

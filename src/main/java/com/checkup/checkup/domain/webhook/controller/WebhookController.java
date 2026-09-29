@@ -4,13 +4,16 @@ import com.checkup.checkup.domain.webhook.service.WebhookService;
 import com.checkup.checkup.domain.webhook.service.WebhookSignatureVerifier;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * DataGSM 웹훅 수신 API. 로그인 없이 호출되며 {@code X-DataGSM-Signature} 서명으로 요청을 검증한다.
+ * DataGSM만 호출하는 API라 Swagger 문서에서는 숨긴다.
  */
+@Hidden
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/webhook")

@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.auth.service.AuthService;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.service.MemberService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class AuthController {
      *
      * @return state·PKCE가 포함된 DataGSM 인가 URL로의 302 응답
      */
+    @SecurityRequirements
     @GetMapping("/login")
     public ResponseEntity<Void> login() {
         String url = authService.createLoginUrl();
@@ -51,6 +53,7 @@ public class AuthController {
      * @param request DataGSM이 넘겨준 code와 state
      * @return 로그인한 회원의 이름과 역할
      */
+    @SecurityRequirements
     @GetMapping("/callback")
     public OAuthLoginResponse callback(@Valid OAuthCallbackRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         Member member = authService.completeLogin(request.code(), request.state());
