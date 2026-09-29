@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.checkup.checkup.domain.member.dto.StudentLeftEvent;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
@@ -27,13 +29,15 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * DataGSM 문서의 {@code student.updated} 예시가 DTO로 읽히고,
  * 처리하지 않는 이벤트와 이미 처리한 이벤트 ID는 무시하며, 읽을 수 없거나 필수값이 없는 본문은 400으로 거부하는지 검증한다.
- * 저장된 학생의 정보·권한 동기화, 졸업 처리, 오래된 이벤트와 부분 데이터 건너뛰기도 검증한다.
+ * 저장된 학생의 정보·권한 동기화, 졸업·자퇴 처리와 이벤트 발행, 오래된 이벤트와 부분 데이터 건너뛰기도 검증한다.
  */
 class WebhookServiceTest {
 
@@ -82,8 +86,10 @@ class WebhookServiceTest {
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final WebhookEventLogRepository webhookEventLogRepository = mock(WebhookEventLogRepository.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final WebhookService webhookService = new WebhookService(
-            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC), studentRepository);
+            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC), studentRepository,
+            eventPublisher);
 
     @BeforeEach
     void setUp() {
@@ -222,6 +228,7 @@ class WebhookServiceTest {
         assertThat(student.getStudentNumber()).isEqualTo(3207);
         assertThat(student.getDormitoryRoom()).isEqualTo(301);
         assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -247,8 +254,8 @@ class WebhookServiceTest {
     }
 
     @Test
-    @DisplayName("졸업하면 관리자 권한만 빼고 학년·호실·이름은 그대로 둔다")
-    void graduationRemovesAdminOnly() {
+    @DisplayName("졸업하면 관리자 권한을 빼고 호실을 비우며 학년·이름은 그대로 두고 떠남 이벤트를 한 번 발행한다")
+    void graduationRemovesAdminClearsRoomAndPublishesEvent() {
         Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
 
         handle(EVENT_TIME, studentJson(42, "학생", null, null, null, null, null, "GRADUATE"));
@@ -256,19 +263,33 @@ class WebhookServiceTest {
         assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
         assertThat(student.getMember().getName()).isEqualTo("학생");
         assertThat(student.getGrade()).isEqualTo(2);
-        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDormitoryRoom()).isNull();
         assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+        assertThat(publishedLeftEvent()).isEqualTo(new StudentLeftEvent(student.getId(), "GRADUATE"));
     }
 
     @Test
-    @DisplayName("자퇴도 졸업과 같이 관리자 권한만 뺀다")
-    void withdrawalRemovesAdminOnly() {
+    @DisplayName("자퇴도 졸업과 같이 관리자 권한을 빼고 호실을 비우며 떠남 이벤트를 발행한다")
+    void withdrawalRemovesAdminClearsRoomAndPublishesEvent() {
         Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
 
         handle(EVENT_TIME, studentJson(42, "학생", null, null, null, null, null, "WITHDRAWN"));
 
         assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
-        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDormitoryRoom()).isNull();
+        assertThat(publishedLeftEvent().reason()).isEqualTo("WITHDRAWN");
+    }
+
+    @Test
+    @DisplayName("이미 반영한 졸업 이벤트가 다시 오면 떠남 이벤트를 또 발행하지 않는다")
+    void staleGraduationDoesNotPublishAgain() {
+        storedStudent(42L, "학생", MemberRole.STUDENT, 301);
+        String graduated = studentJson(42, "학생", null, null, null, null, null, "GRADUATE");
+
+        handle(EVENT_TIME, graduated);
+        handle(EVENT_TIME, graduated);
+
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
     }
 
     @Test
@@ -290,6 +311,7 @@ class WebhookServiceTest {
 
         assertThat(student.getDormitoryRoom()).isEqualTo(301);
         assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -306,6 +328,7 @@ class WebhookServiceTest {
         assertThat(incomplete.getDormitoryRoom()).isEqualTo(301);
         assertThat(incomplete.getDatagsmSyncedAt()).isNull();
         assertThat(complete.getDormitoryRoom()).isEqualTo(401);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -326,6 +349,13 @@ class WebhookServiceTest {
         Student student = Student.create(member, datagsmStudentId, 2, 1, 5, 2105, dormitoryRoom);
         given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(student));
         return student;
+    }
+
+    /** 한 번 발행된 떠남 이벤트를 꺼낸다. 발행되지 않았거나 여러 번 발행됐으면 실패한다. */
+    private StudentLeftEvent publishedLeftEvent() {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        return (StudentLeftEvent) captor.getValue();
     }
 
     /** 이벤트 ID가 매번 다른 student.updated 본문으로 처리한다. */
