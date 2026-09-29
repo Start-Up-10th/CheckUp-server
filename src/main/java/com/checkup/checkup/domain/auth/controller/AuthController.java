@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -37,11 +38,13 @@ public class AuthController {
     /**
      * DataGSM 로그인 페이지로 보낸다.
      *
+     * @param redirect 로그인 후 돌아갈 웹 경로(예: {@code /admin/qr}). 같은 웹 안의 상대 경로만 쓰고,
+     *                 없거나 안전하지 않으면 웹 로그인 완료 화면({@code /login/complete})으로 돌아간다.
      * @return state·PKCE가 포함된 DataGSM 인가 URL로의 302 응답
      */
     @GetMapping("/login")
-    public ResponseEntity<Void> login() {
-        String url = authService.createLoginUrl(null);
+    public ResponseEntity<Void> login(@RequestParam(required = false) String redirect) {
+        String url = authService.createLoginUrl(redirect);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
     }
 
