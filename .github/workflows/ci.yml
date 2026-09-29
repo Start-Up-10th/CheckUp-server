@@ -51,4 +51,5 @@ jobs:
         env:
           DATAGSM_CLIENT_ID: ci-test-client-id
           DATAGSM_CLIENT_SECRET: ci-test-client-secret
+          DATAGSM_API_KEY: ci-test-api-key
         run: ./gradlew build

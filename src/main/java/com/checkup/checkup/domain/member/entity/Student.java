@@ -37,6 +37,19 @@ public class Student {
     @Column(nullable = true)
     private Integer roomNumber;
 
+    @Column(nullable = true)
+    private String email;
+
+    @Column(nullable = true)
+    @Enumerated(EnumType.STRING)
+    private Sex sex;
+
+    @Column(nullable = true)
+    private Integer dormitoryFloor;
+
+    @Column(nullable = true)
+    private String specialty;
+
     public static Student create(
             Member member,
             Long datagsmStudentId,
@@ -55,6 +68,13 @@ public class Student {
         student.roomNumber = roomNumber;
 
         return student;
+    }
+
+    public void updateProfile(String email, Sex sex, Integer dormitoryFloor, String specialty) {
+        this.email = email;
+        this.sex = sex;
+        this.dormitoryFloor = dormitoryFloor;
+        this.specialty = specialty;
     }
 
     public void update(
