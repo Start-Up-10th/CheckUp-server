@@ -37,6 +37,8 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
 
 checkup:
+  web:
+    base-url: ${PUBLIC_ORIGIN}
   qr:
     token-ttl: 15m
     lease-ttl: 60s
