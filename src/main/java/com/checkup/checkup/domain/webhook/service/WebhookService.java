@@ -3,14 +3,17 @@ package com.checkup.checkup.domain.webhook.service;
 import com.checkup.checkup.domain.webhook.dto.request.Change;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
+import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.util.List;
 
 /**
@@ -26,13 +29,17 @@ public class WebhookService {
     private static final String STUDENT_UPDATED = "student.updated";
 
     private final ObjectMapper objectMapper;
+    private final WebhookEventLogRepository webhookEventLogRepository;
+    private final Clock clock;
 
     /**
-     * 웹훅 본문을 처리한다. {@code student.updated}가 아닌 이벤트는 무시한다.
+     * 웹훅 본문을 처리한다. {@code student.updated}가 아닌 이벤트와 이미 처리한 이벤트 ID는 무시한다.
+     * 이벤트 ID 기록과 학생 반영은 한 트랜잭션이라, 반영이 실패하면 기록도 취소돼 재전송 때 다시 처리된다.
      *
      * @param body 서명 검증을 통과한 요청 본문 원문
      * @throws CustomException 본문을 읽을 수 없거나 필수값이 없으면 {@link ErrorCode#INVALID_WEBHOOK_PAYLOAD}(400)
      */
+    @Transactional
     public void handle(byte[] body) {
         WebhookEvent event = parse(body);
 
@@ -46,6 +53,11 @@ public class WebhookService {
 
         if (!STUDENT_UPDATED.equals(event.event())) {
             log.info("Ignored webhook event: id={}, event={}", event.id(), event.event());
+            return;
+        }
+
+        if (webhookEventLogRepository.record(event.id(), clock.instant()) == 0) {
+            log.info("Duplicate webhook event ignored: id={}", event.id());
             return;
         }
 
