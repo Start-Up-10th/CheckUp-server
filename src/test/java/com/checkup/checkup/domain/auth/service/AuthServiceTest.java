@@ -34,6 +34,7 @@ class AuthServiceTest {
     private static final String STATE = "state";
     private static final String CODE_VERIFIER = "verifier";
     private static final String ACCESS_TOKEN = "test-access-token";
+    private static final String REDIRECT_PATH = "/login/complete";
 
     @Mock
     private DataGsmOAuthClient dataGsmOAuthClient;
@@ -165,7 +166,7 @@ class AuthServiceTest {
     private void givenLoginReturns(UserInfo userInfo) {
         TokenResponse token = new TokenResponse();
         token.setAccessToken(ACCESS_TOKEN);
-        given(oAuthStateService.consume(STATE)).willReturn(Optional.of(CODE_VERIFIER));
+        given(oAuthStateService.consume(STATE)).willReturn(Optional.of(new OAuthState(CODE_VERIFIER, REDIRECT_PATH)));
         given(dataGsmOAuthClient.exchangeCodeForToken(CODE, REDIRECT_URI, CODE_VERIFIER)).willReturn(token);
         given(dataGsmOAuthClient.getUserInfo(ACCESS_TOKEN)).willReturn(userInfo);
     }

@@ -3,8 +3,7 @@ package com.checkup.checkup.global.exception;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,11 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.checkup.checkup.domain.auth.controller.AuthController;
-import com.checkup.checkup.domain.auth.service.AuthService;
-import com.checkup.checkup.domain.auth.service.LoginSessionService;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.security.SecurityConfig;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,11 +36,12 @@ import team.themoment.datagsm.sdk.oauth.exception.UnauthorizedException;
  * 검증 실패·서비스 예외·DataGSM SDK 예외가 공통 오류 응답으로 변환되고,
  * 응답 본문에 예외 메시지가 노출되지 않는지 검증한다.
  */
-@WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandlerTest.BodyController.class})
+@WebMvcTest(controllers = {GlobalExceptionHandlerTest.ThrowingController.class, GlobalExceptionHandlerTest.BodyController.class})
+@Import({SecurityConfig.class, GlobalExceptionHandlerTest.ThrowingController.class, GlobalExceptionHandlerTest.BodyController.class})
 class GlobalExceptionHandlerTest {
 
-    private static final String CALLBACK = "/api/v1/auth/callback";
+    private static final String THROW = "/test/throw";
+    private static final String PARAMS = "/test/params";
     private static final String BODY = "/test/body";
     private static final String UPSTREAM_MESSAGE = "upstream-body-must-not-leak";
 
@@ -50,18 +49,12 @@ class GlobalExceptionHandlerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private AuthService authService;
-
-    @MockitoBean
-    private LoginSessionService loginSessionService;
-
-    @MockitoBean
-    private MemberService memberService;
+    private ExceptionSource exceptionSource;
 
     @Test
     @DisplayName("code·state가 모두 없으면 400과 필드별 오류를 모두 반환한다")
     void missingParamsReturnsAllFieldErrors() throws Exception {
-        mockMvc.perform(get(CALLBACK))
+        mockMvc.perform(get(PARAMS).with(user("admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.errors.length()").value(2))
@@ -71,10 +64,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("서비스 예외는 ErrorCode의 상태·코드·메시지로 응답하고 errors를 생략한다")
     void customExceptionUsesErrorCode() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new CustomException(ErrorCode.INVALID_OAUTH_STATE));
+        willThrow(new CustomException(ErrorCode.INVALID_OAUTH_STATE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_OAUTH_STATE"))
                 .andExpect(jsonPath("$.message").value(ErrorCode.INVALID_OAUTH_STATE.getMessage()))
@@ -84,10 +76,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("DataGSM 잘못된 요청은 400 DATAGSM_INVALID_CODE로 응답하고 SDK 메시지를 노출하지 않는다")
     void dataGsmBadRequestIsInvalidCode() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new BadRequestException(UPSTREAM_MESSAGE));
+        willThrow(new BadRequestException(UPSTREAM_MESSAGE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("DATAGSM_INVALID_CODE"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
@@ -96,10 +87,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("DataGSM 서버 오류는 503 DATAGSM_UNAVAILABLE로 응답한다")
     void dataGsmServerErrorIsUnavailable() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new ServerErrorException(UPSTREAM_MESSAGE));
+        willThrow(new ServerErrorException(UPSTREAM_MESSAGE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("DATAGSM_UNAVAILABLE"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
@@ -108,10 +98,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("DataGSM 인증 실패는 서버 설정 문제라 401이 아닌 502 DATAGSM_ERROR로 응답한다")
     void dataGsmUnauthorizedIsBadGateway() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new UnauthorizedException(UPSTREAM_MESSAGE));
+        willThrow(new UnauthorizedException(UPSTREAM_MESSAGE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("DATAGSM_ERROR"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
@@ -120,10 +109,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("교체 전 ResponseStatusException은 500이 아니라 원래 상태 코드로 응답하고 사유를 노출하지 않는다")
     void responseStatusExceptionKeepsStatus() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, UPSTREAM_MESSAGE));
+        willThrow(new ResponseStatusException(HttpStatus.FORBIDDEN, UPSTREAM_MESSAGE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
@@ -132,10 +120,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("예상하지 못한 예외는 500으로 응답하고 예외 메시지를 노출하지 않는다")
     void unexpectedExceptionIsInternalError() throws Exception {
-        given(authService.completeLogin(anyString(), anyString()))
-                .willThrow(new IllegalStateException(UPSTREAM_MESSAGE));
+        willThrow(new IllegalStateException(UPSTREAM_MESSAGE)).given(exceptionSource).run();
 
-        mockMvc.perform(get(CALLBACK).param("code", "c").param("state", "s"))
+        mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
                 .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
@@ -159,6 +146,33 @@ class GlobalExceptionHandlerTest {
                         .content("purpose=DORMITORY"))
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    /** 테스트 전용 컨트롤러가 던질 예외를 정한다. */
+    interface ExceptionSource {
+        void run();
+    }
+
+    record ParamsRequest(@NotBlank String code, @NotBlank String state) {}
+
+    /** 서비스 예외·SDK 예외·요청 값 검증 실패를 재현하는 테스트 전용 컨트롤러. */
+    @RestController
+    static class ThrowingController {
+
+        private final ExceptionSource exceptionSource;
+
+        ThrowingController(ExceptionSource exceptionSource) {
+            this.exceptionSource = exceptionSource;
+        }
+
+        @GetMapping(THROW)
+        void throwConfigured() {
+            exceptionSource.run();
+        }
+
+        @GetMapping(PARAMS)
+        void params(@Valid ParamsRequest request) {
+        }
     }
 
     enum Purpose { DORMITORY }

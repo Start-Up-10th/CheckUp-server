@@ -13,10 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.DataGsmException;
-import team.themoment.datagsm.sdk.oauth.exception.RateLimitException;
-import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
 
 /**
  * 예외를 {@link ErrorResponse}로 변환한다. 응답과 로그에는 예외 메시지 대신 {@link ErrorCode}만 쓴다.
@@ -66,12 +63,7 @@ public class GlobalExceptionHandler {
     /** DataGSM 401·403은 서버 설정 문제라 클라이언트 인증 실패로 돌려주지 않는다. */
     @ExceptionHandler(DataGsmException.class)
     public ResponseEntity<ErrorResponse> handleDataGsm(DataGsmException e) {
-        ErrorCode errorCode = switch (e) {
-            case BadRequestException ignored -> ErrorCode.DATAGSM_INVALID_CODE;
-            case ServerErrorException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
-            case RateLimitException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
-            default -> ErrorCode.DATAGSM_ERROR;
-        };
+        ErrorCode errorCode = DataGsmErrorCodes.of(e);
         // SDK 메시지에 외부 응답이 섞일 수 있어 클래스 이름만 남긴다.
         log.warn("DataGSM request failed: {}", e.getClass().getSimpleName());
         return toResponse(errorCode);

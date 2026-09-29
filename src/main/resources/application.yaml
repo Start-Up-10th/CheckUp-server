@@ -45,6 +45,8 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:true}
 
 checkup:
+  web:
+    base-url: ${PUBLIC_ORIGIN}
   qr:
     token-ttl: 15m
     lease-ttl: 60s
