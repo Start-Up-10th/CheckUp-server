@@ -1,15 +1,53 @@
 spring:
   application:
     name: checkup
+  # 개인 설정·secret은 커밋하지 않는 application-local.yaml에 둔다. 파일이 없으면 무시한다.
+  config:
+    import: optional:classpath:application-local.yaml
+  # 기본값은 로컬 compose.yaml·CI와 같은 개발용 값이다. 운영 서버는 환경변수로 덮어쓴다.
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/checkup}
+    username: ${DB_USERNAME:checkup}
+    password: ${DB_PASSWORD:checkup}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  session:
+    data:
+      redis:
+        namespace: checkup:session
+
+datagsm:
+  client-id: ${DATAGSM_CLIENT_ID}
+  client-secret: ${DATAGSM_CLIENT_SECRET}
+  webhook-secret: ${DATAGSM_WEBHOOK_SECRET}
+  redirect-uri: ${DATAGSM_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}
+
+server:
+  servlet:
+    session:
+      timeout: ${SESSION_TIMEOUT:7d} # 요청이 없을 때 세션 유지 시간
+      cookie:
+        http-only: true # JS가 쿠키 못 읽음, XSS 방지
+        same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
+        secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
+
+# API 문서(/swagger-ui/index.html, /v3/api-docs). 노출하지 않을 환경에서는 SWAGGER_ENABLED=false로 끈다.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
+checkup:
+  qr:
+    token-ttl: 15m
+    lease-ttl: 60s
+    rotate-before: 30s
+    token-retention: 1h
+    base-url: ${PUBLIC_ORIGIN}
