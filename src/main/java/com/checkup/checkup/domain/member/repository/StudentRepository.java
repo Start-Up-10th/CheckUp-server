@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByMember(Member member);
 
+    Optional<Student> findByMemberId(Long memberId);
+
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(Integer dormitoryRoom);
 }

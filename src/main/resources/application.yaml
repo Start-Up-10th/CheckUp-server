@@ -41,4 +41,5 @@ checkup:
     token-ttl: 15m
     lease-ttl: 60s
     rotate-before: 30s
+    token-retention: 1h
     base-url: ${PUBLIC_ORIGIN}

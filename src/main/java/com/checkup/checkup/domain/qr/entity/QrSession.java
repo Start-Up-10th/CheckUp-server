@@ -3,6 +3,8 @@ package com.checkup.checkup.domain.qr.entity;
 import java.time.Instant;
 import java.time.LocalDate;
 
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+
 /**
  * 관리자 QR 페이지 하나의 세션. Redis에만 두며 발급 이력으로 남기지 않는다.
  *
@@ -17,7 +19,7 @@ import java.time.LocalDate;
 public record QrSession(
         String id,
         Long adminId,
-        QrPurpose purpose,
+        AttendancePurpose purpose,
         LocalDate operatingDay,
         String token,
         Instant tokenExpiresAt,

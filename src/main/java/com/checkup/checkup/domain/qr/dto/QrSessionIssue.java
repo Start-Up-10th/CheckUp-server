@@ -2,7 +2,7 @@ package com.checkup.checkup.domain.qr.dto;
 
 import java.time.Instant;
 
-import com.checkup.checkup.domain.qr.entity.QrPurpose;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 
 /**
@@ -17,7 +17,7 @@ import com.checkup.checkup.domain.qr.entity.QrSession;
  */
 public record QrSessionIssue(
         String sessionId,
-        QrPurpose purpose,
+        AttendancePurpose purpose,
         String token,
         Instant tokenExpiresAt,
         Instant leaseExpiresAt,
