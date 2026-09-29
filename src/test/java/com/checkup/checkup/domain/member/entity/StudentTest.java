@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.member.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,24 @@ class StudentTest {
 
         assertThat(unassigned.getDormitoryRoom()).isNull();
         assertThat(unassigned.getDormitoryFloor()).isNull();
+    }
+
+    @Test
+    @DisplayName("웹훅을 반영한 적 없으면 어떤 이벤트도 오래되지 않았다")
+    void neverSyncedIsNotStale() {
+        assertThat(student(301).isStale(Instant.parse("2026-06-23T05:00:00Z"))).isFalse();
+    }
+
+    @Test
+    @DisplayName("마지막 반영 시각과 같거나 이전인 이벤트는 오래됐고 이후 이벤트는 새롭다")
+    void staleComparedToLastSyncedTime() {
+        Instant synced = Instant.parse("2026-06-23T05:00:00Z");
+        Student student = student(301);
+        student.markSynced(synced);
+
+        assertThat(student.isStale(synced.minusSeconds(1))).isTrue();
+        assertThat(student.isStale(synced)).isTrue();
+        assertThat(student.isStale(synced.plusSeconds(1))).isFalse();
     }
 
     private static Student student(Integer dormitoryRoom) {
