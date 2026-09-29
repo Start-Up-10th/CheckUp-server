@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.webhook.controller;
 
+import com.checkup.checkup.domain.webhook.service.WebhookService;
 import com.checkup.checkup.domain.webhook.service.WebhookSignatureVerifier;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -17,6 +18,7 @@ public class WebhookController {
 
     private static final String SIGNATURE_HEADER = "X-DataGSM-Signature";
     private final WebhookSignatureVerifier verifier;
+    private final WebhookService webhookService;
 
     /**
      * DataGSM 이벤트를 받는다. 서명은 JSON 파싱 전의 본문 원문으로 검증한다.
@@ -32,5 +34,6 @@ public class WebhookController {
             @RequestHeader(value = SIGNATURE_HEADER, required = false) String signature
     ) {
         if (!verifier.verify(body, signature)) throw new CustomException(ErrorCode.INVALID_WEBHOOK_SIGNATURE);
+        webhookService.handle(body);
     }
 }
