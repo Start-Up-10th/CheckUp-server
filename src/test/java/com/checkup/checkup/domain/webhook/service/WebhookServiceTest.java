@@ -3,13 +3,23 @@ package com.checkup.checkup.domain.webhook.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
+import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -17,7 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * DataGSM 문서의 {@code student.updated} 예시가 DTO로 읽히고,
- * 처리하지 않는 이벤트는 무시하며, 읽을 수 없거나 필수값이 없는 본문은 400으로 거부하는지 검증한다.
+ * 처리하지 않는 이벤트와 이미 처리한 이벤트 ID는 무시하며, 읽을 수 없거나 필수값이 없는 본문은 400으로 거부하는지 검증한다.
  */
 class WebhookServiceTest {
 
@@ -61,8 +71,17 @@ class WebhookServiceTest {
             }
             """;
 
+    private static final Instant NOW = Instant.parse("2026-06-23T05:22:00Z");
+
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
-    private final WebhookService webhookService = new WebhookService(objectMapper);
+    private final WebhookEventLogRepository webhookEventLogRepository = mock(WebhookEventLogRepository.class);
+    private final WebhookService webhookService = new WebhookService(
+            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+
+    @BeforeEach
+    void setUp() {
+        given(webhookEventLogRepository.record(anyString(), any())).willReturn(1);
+    }
 
     @Test
     @DisplayName("문서 예시의 student.updated 본문을 DTO로 읽는다")
@@ -93,10 +112,25 @@ class WebhookServiceTest {
     }
 
     @Test
-    @DisplayName("student.updated 본문은 예외 없이 처리한다")
-    void studentUpdatedIsHandled() {
+    @DisplayName("student.updated 본문은 이벤트 ID를 현재 시각으로 기록하고 처리한다")
+    void studentUpdatedIsRecordedAndHandled() {
         assertThatCode(() -> webhookService.handle(bytes(STUDENT_UPDATED))).doesNotThrowAnyException();
+
+        verify(webhookEventLogRepository).record("evt_3f9a2c1b8e0d4a7f9c2e1b6d5a4f3c2e", NOW);
+    }
+
+    @Test
+    @DisplayName("졸업 본문도 예외 없이 처리한다")
+    void graduationIsHandled() {
         assertThatCode(() -> webhookService.handle(bytes(GRADUATED))).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("이미 처리한 이벤트 ID면 오류 없이 무시한다")
+    void duplicateEventIsIgnored() {
+        given(webhookEventLogRepository.record(anyString(), any())).willReturn(0);
+
+        assertThatCode(() -> webhookService.handle(bytes(STUDENT_UPDATED))).doesNotThrowAnyException();
     }
 
     @Test
@@ -107,6 +141,7 @@ class WebhookServiceTest {
                 """;
 
         assertThatCode(() -> webhookService.handle(bytes(clubUpdated))).doesNotThrowAnyException();
+        verify(webhookEventLogRepository, never()).record(anyString(), any());
     }
 
     @Test
@@ -154,6 +189,7 @@ class WebhookServiceTest {
         assertThatThrownBy(() -> webhookService.handle(bytes(body)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_WEBHOOK_PAYLOAD));
+        verify(webhookEventLogRepository, never()).record(anyString(), any());
     }
 
     private static byte[] bytes(String body) {
