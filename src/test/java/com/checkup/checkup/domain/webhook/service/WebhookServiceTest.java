@@ -10,6 +10,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.checkup.checkup.domain.member.entity.Member;
+import com.checkup.checkup.domain.member.entity.MemberRole;
+import com.checkup.checkup.domain.member.entity.Student;
+import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
 import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
@@ -19,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * DataGSM 문서의 {@code student.updated} 예시가 DTO로 읽히고,
  * 처리하지 않는 이벤트와 이미 처리한 이벤트 ID는 무시하며, 읽을 수 없거나 필수값이 없는 본문은 400으로 거부하는지 검증한다.
+ * 저장된 학생의 정보·권한 동기화, 졸업 처리, 오래된 이벤트와 부분 데이터 건너뛰기도 검증한다.
  */
 class WebhookServiceTest {
 
@@ -75,12 +81,14 @@ class WebhookServiceTest {
 
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final WebhookEventLogRepository webhookEventLogRepository = mock(WebhookEventLogRepository.class);
+    private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final WebhookService webhookService = new WebhookService(
-            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC), studentRepository);
 
     @BeforeEach
     void setUp() {
         given(webhookEventLogRepository.record(anyString(), any())).willReturn(1);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of());
     }
 
     @Test
@@ -194,5 +202,145 @@ class WebhookServiceTest {
 
     private static byte[] bytes(String body) {
         return body.getBytes(StandardCharsets.UTF_8);
+    }
+
+    // --- 학생 동기화 ---
+
+    private static final Instant EVENT_TIME = Instant.parse("2026-06-23T05:21:48Z");
+
+    @Test
+    @DisplayName("저장된 학생의 이름·학년·반·번호·학번·호실을 반영하고 이벤트 시각을 기록한다")
+    void storedStudentIsSynced() {
+        Student student = storedStudent(42L, "옛이름", MemberRole.STUDENT, 201);
+
+        handle(EVENT_TIME, studentJson(42, "새이름", 3, 2, 7, 3207, 301, "GENERAL_STUDENT"));
+
+        assertThat(student.getMember().getName()).isEqualTo("새이름");
+        assertThat(student.getGrade()).isEqualTo(3);
+        assertThat(student.getClassNumber()).isEqualTo(2);
+        assertThat(student.getNumber()).isEqualTo(7);
+        assertThat(student.getStudentNumber()).isEqualTo(3207);
+        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+    }
+
+    @Test
+    @DisplayName("기숙사 자치위원이 되면 ADMIN, 일반 학생으로 돌아가면 STUDENT가 된다")
+    void dormitoryManagerRoleIsSynced() {
+        Student student = storedStudent(42L, "학생", MemberRole.STUDENT, 301);
+
+        handle(EVENT_TIME, studentJson(42, "학생", 2, 1, 5, 2105, 301, "DORMITORY_MANAGER"));
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.ADMIN);
+
+        handle(EVENT_TIME.plusSeconds(60), studentJson(42, "학생", 2, 1, 5, 2105, 301, "GENERAL_STUDENT"));
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
+    }
+
+    @Test
+    @DisplayName("학생회는 관리자가 아니라 STUDENT다")
+    void studentCouncilIsStudent() {
+        Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
+
+        handle(EVENT_TIME, studentJson(42, "학생", 2, 1, 5, 2105, 301, "STUDENT_COUNCIL"));
+
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
+    }
+
+    @Test
+    @DisplayName("졸업하면 관리자 권한만 빼고 학년·호실·이름은 그대로 둔다")
+    void graduationRemovesAdminOnly() {
+        Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
+
+        handle(EVENT_TIME, studentJson(42, "학생", null, null, null, null, null, "GRADUATE"));
+
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
+        assertThat(student.getMember().getName()).isEqualTo("학생");
+        assertThat(student.getGrade()).isEqualTo(2);
+        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+    }
+
+    @Test
+    @DisplayName("자퇴도 졸업과 같이 관리자 권한만 뺀다")
+    void withdrawalRemovesAdminOnly() {
+        Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
+
+        handle(EVENT_TIME, studentJson(42, "학생", null, null, null, null, null, "WITHDRAWN"));
+
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
+        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+    }
+
+    @Test
+    @DisplayName("저장되지 않은 학생은 오류 없이 건너뛴다")
+    void unknownStudentIsSkipped() {
+        assertThatCode(() -> handle(EVENT_TIME,
+                studentJson(99, "학생", 2, 1, 5, 2105, 301, "GENERAL_STUDENT")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("이미 반영한 시각과 같거나 이전인 이벤트는 반영하지 않는다")
+    void staleEventIsSkipped() {
+        Student student = storedStudent(42L, "학생", MemberRole.STUDENT, 301);
+        student.markSynced(EVENT_TIME);
+
+        handle(EVENT_TIME, studentJson(42, "학생", 2, 1, 5, 2105, 401, "GENERAL_STUDENT"));
+        handle(EVENT_TIME.minusSeconds(60), studentJson(42, "학생", 2, 1, 5, 2105, 201, "GENERAL_STUDENT"));
+
+        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDatagsmSyncedAt()).isEqualTo(EVENT_TIME);
+    }
+
+    @Test
+    @DisplayName("재학생인데 학년이 없으면 그 학생만 건너뛰고 반영 시각도 남기지 않는다")
+    void incompleteStudentIsSkippedOthersAreSynced() {
+        Student incomplete = storedStudent(42L, "학생1", MemberRole.STUDENT, 301);
+        Student complete = storedStudent(43L, "학생2", MemberRole.STUDENT, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(incomplete, complete));
+
+        handle(EVENT_TIME,
+                studentJson(42, "학생1", null, 1, 5, 2105, 401, "GENERAL_STUDENT"),
+                studentJson(43, "학생2", 2, 1, 6, 2106, 401, "GENERAL_STUDENT"));
+
+        assertThat(incomplete.getDormitoryRoom()).isEqualTo(301);
+        assertThat(incomplete.getDatagsmSyncedAt()).isNull();
+        assertThat(complete.getDormitoryRoom()).isEqualTo(401);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 role이면 권한과 정보를 바꾸지 않는다")
+    void unknownRoleIsSkipped() {
+        Student student = storedStudent(42L, "학생", MemberRole.ADMIN, 301);
+
+        handle(EVENT_TIME, studentJson(42, "학생", 2, 1, 5, 2105, 401, "SOMETHING_NEW"));
+
+        assertThat(student.getMember().getRole()).isEqualTo(MemberRole.ADMIN);
+        assertThat(student.getDormitoryRoom()).isEqualTo(301);
+        assertThat(student.getDatagsmSyncedAt()).isNull();
+    }
+
+    /** DataGSM 학생 ID로 저장된 학생 한 명을 만들고 저장소가 돌려주게 한다. 학년 2, 반 1, 번호 5, 학번 2105. */
+    private Student storedStudent(Long datagsmStudentId, String name, MemberRole role, Integer dormitoryRoom) {
+        Member member = Member.create(datagsmStudentId + 1000, name, role);
+        Student student = Student.create(member, datagsmStudentId, 2, 1, 5, 2105, dormitoryRoom);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(student));
+        return student;
+    }
+
+    /** 이벤트 ID가 매번 다른 student.updated 본문으로 처리한다. */
+    private void handle(Instant timestamp, String... students) {
+        String body = """
+                {"id":"evt_%s","event":"student.updated","timestamp":"%s","data":{"new":[%s]}}
+                """.formatted(timestamp.toEpochMilli(), timestamp, String.join(",", students));
+        webhookService.handle(bytes(body));
+    }
+
+    private static String studentJson(int studentId, String name, Integer grade, Integer classNum,
+            Integer number, Integer studentNumber, Integer dormitoryRoom, String role) {
+        return """
+                {"index":0,"object":{"student_id":%d,"name":"%s","grade":%s,"class_num":%s,"number":%s,
+                "student_number":%s,"dormitory_room":%s,"role":"%s"}}
+                """.formatted(studentId, name, grade, classNum, number, studentNumber, dormitoryRoom, role);
     }
 }
