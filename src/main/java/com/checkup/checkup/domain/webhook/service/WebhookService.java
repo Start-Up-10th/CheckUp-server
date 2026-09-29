@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.webhook.service;
 
+import com.checkup.checkup.domain.member.dto.StudentLeftEvent;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
@@ -12,6 +13,7 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -41,6 +43,7 @@ public class WebhookService {
     private final WebhookEventLogRepository webhookEventLogRepository;
     private final Clock clock;
     private final StudentRepository studentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 웹훅 본문을 처리한다. {@code student.updated}가 아닌 이벤트와 이미 처리한 이벤트 ID는 무시한다.
@@ -98,7 +101,8 @@ public class WebhookService {
     /**
      * 학생 한 명의 변경을 반영한다. 관리자 권한은 요청마다 DB 역할로 확인하므로 기존 로그인 세션에도 바로 반영된다.
      *
-     * <p>졸업·자퇴는 학년·호실 등이 {@code null}로 오므로 학생 정보는 그대로 두고 관리자 권한만 뺀다.
+     * <p>졸업·자퇴는 학년 등이 {@code null}로 오므로 학년·반·번호는 그대로 두고, 관리자 권한을 빼고 호실을 비운 뒤
+     * {@link StudentLeftEvent}를 발행한다.
      * 재학생인데 필요한 값이 없으면 부분 데이터로 보고 건너뛴다.
      *
      * @return 반영했으면 {@code true}, 건너뛰었으면 {@code false}
@@ -108,8 +112,9 @@ public class WebhookService {
 
         if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
             member.update(member.getName(), MemberRole.STUDENT);
+            student.leaveDormitory();
+            eventPublisher.publishEvent(new StudentLeftEvent(student.getId(), changed.role()));
             log.info("Student left: studentId={}, role={}", changed.studentId(), changed.role());
-            // TODO(#25 5단계): 확인된 졸업·자퇴 학생의 얼굴 벡터·캐시 삭제 연계
             return true;
         }
 
