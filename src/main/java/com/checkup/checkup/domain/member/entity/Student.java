@@ -106,4 +106,11 @@ public class Student {
     public void markSynced(Instant eventTime) {
         this.datagsmSyncedAt = eventTime;
     }
+
+    /**
+     * 졸업·자퇴한 학생의 호실 배정을 비워 호실 명단에서 빠지게 한다. 학년·반·번호는 그대로 둔다.
+     */
+    public void leaveDormitory() {
+        this.dormitoryRoom = null;
+    }
 }
