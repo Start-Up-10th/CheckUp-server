@@ -36,18 +36,19 @@ public class AuthService {
     }
 
     /**
-     * state와 PKCE code verifier를 만들어 Redis에 저장하고 DataGSM 인가 URL을 반환한다.
+     * state와 PKCE code verifier를 만들어 로그인 후 돌아갈 경로와 함께 Redis에 저장하고 DataGSM 인가 URL을 반환한다.
      *
+     * @param redirectPath 로그인 후 돌아갈 웹 경로. 안전하지 않거나 없으면 로그인 완료 화면으로 바뀐다.
      * @return DataGSM 인가 URL
      */
-    public String createLoginUrl() {
+    public String createLoginUrl(String redirectPath) {
         String state = UUID.randomUUID().toString();
         AuthorizationUrlBuilder builder = dataGsmOAuthClient
                 .createAuthorizationUrl(redirectUri)
                 .state(state)
                 .enablePkce();
         String codeVerifier = builder.getCodeVerifier();
-        oAuthStateService.save(state, codeVerifier);
+        oAuthStateService.save(state, codeVerifier, LoginRedirectPath.sanitize(redirectPath));
         return builder.build();
     }
 
@@ -56,17 +57,17 @@ public class AuthService {
      *
      * @param code  DataGSM 인가 코드
      * @param state 로그인 요청 때 발급한 state
-     * @return 저장·갱신된 회원
+     * @return 저장·갱신된 회원과 로그인 시작 때 정한 돌아갈 경로
      * @throws CustomException state가 없거나 만료되면 INVALID_OAUTH_STATE, 이용 권한이 없는 계정이면 403 계열 코드
      */
-    public Member completeLogin(String code, String state) {
-        String codeVerifier = oAuthStateService.consume(state)
+    public LoginResult completeLogin(String code, String state) {
+        OAuthState saved = oAuthStateService.consume(state)
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_OAUTH_STATE));
 
-        TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, codeVerifier);
+        TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, saved.codeVerifier());
         UserInfo userInfo = dataGsmOAuthClient.getUserInfo(token.getAccessToken());
         MemberRole role = resolveRole(userInfo);
-        return memberService.saveOrUpdate(userInfo, role);
+        return new LoginResult(memberService.saveOrUpdate(userInfo, role), saved.redirectPath());
     }
 
     /**

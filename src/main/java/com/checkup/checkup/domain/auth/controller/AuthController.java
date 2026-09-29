@@ -41,7 +41,7 @@ public class AuthController {
      */
     @GetMapping("/login")
     public ResponseEntity<Void> login() {
-        String url = authService.createLoginUrl();
+        String url = authService.createLoginUrl(null);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
     }
 
@@ -53,7 +53,7 @@ public class AuthController {
      */
     @GetMapping("/callback")
     public OAuthLoginResponse callback(@Valid OAuthCallbackRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        Member member = authService.completeLogin(request.code(), request.state());
+        Member member = authService.completeLogin(request.code(), request.state()).member();
         loginSessionService.login(member, httpRequest, httpResponse);
         return OAuthLoginResponse.from(member);
     }
