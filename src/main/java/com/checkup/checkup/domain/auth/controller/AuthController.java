@@ -3,9 +3,11 @@ package com.checkup.checkup.domain.auth.controller;
 import com.checkup.checkup.domain.auth.dto.request.OAuthCallbackRequest;
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.auth.service.AuthService;
+import com.checkup.checkup.domain.auth.service.LoginResult;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.config.WebProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -34,6 +36,7 @@ public class AuthController {
     private final AuthService authService;
     private final LoginSessionService loginSessionService;
     private final MemberService memberService;
+    private final WebProperties webProperties;
 
     /**
      * DataGSM 로그인 페이지로 보낸다.
@@ -49,16 +52,16 @@ public class AuthController {
     }
 
     /**
-     * DataGSM 인가 후 돌아오는 콜백. 토큰을 교환해 회원을 저장하고 로그인 세션을 만든다.
+     * DataGSM 인가 후 돌아오는 콜백. 토큰을 교환해 회원을 저장하고 로그인 세션을 만든 뒤 웹으로 돌려보낸다.
      *
      * @param request DataGSM이 넘겨준 code와 state
-     * @return 로그인한 회원의 이름과 역할
+     * @return 로그인 시작 때 정한 웹 경로(기본 {@code /login/complete})로의 302 응답
      */
     @GetMapping("/callback")
-    public OAuthLoginResponse callback(@Valid OAuthCallbackRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        Member member = authService.completeLogin(request.code(), request.state()).member();
-        loginSessionService.login(member, httpRequest, httpResponse);
-        return OAuthLoginResponse.from(member);
+    public ResponseEntity<Void> callback(@Valid OAuthCallbackRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        LoginResult result = authService.completeLogin(request.code(), request.state());
+        loginSessionService.login(result.member(), httpRequest, httpResponse);
+        return redirectToWeb(result.redirectPath());
     }
 
     /**
@@ -73,4 +76,9 @@ public class AuthController {
         return OAuthLoginResponse.from(member);
     }
 
+    private ResponseEntity<Void> redirectToWeb(String path) {
+        String baseUrl = webProperties.baseUrl();
+        String origin = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(origin + path)).build();
+    }
 }
