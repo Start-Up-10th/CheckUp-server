@@ -6,14 +6,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 세션 기반 Spring Security 설정.
  *
  * <ul>
- *     <li>인증되지 않은 요청은 401, 권한이 없는 요청은 403을 반환한다.</li>
+ *     <li>인증되지 않은 요청은 401, 권한이 없는 요청은 403을 다른 API 오류와 같은 {@code code}·{@code message} 형식으로 반환한다.</li>
  *     <li>인증 실패 요청을 세션에 저장하지 않는다(RequestCache 끔). 로그인 후 복귀는 로그인 콜백이 직접 처리하므로
  *     필요 없고, 저장하면 로그인하지 않은 요청마다 빈 세션이 Redis에 생긴다.</li>
  *     <li>{@code POST /api/v1/auth/logout}은 세션을 무효화하고 {@code SESSION} 쿠키를 지운 뒤 204를 반환한다.</li>
@@ -26,9 +27,13 @@ import org.springframework.security.web.authentication.logout.HttpStatusReturnin
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+        SecurityErrorHandler errorHandler = new SecurityErrorHandler(objectMapper);
         http
-                .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler)
+                )
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
