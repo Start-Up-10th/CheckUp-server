@@ -1,9 +1,13 @@
 package com.checkup.checkup.domain.webhook.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.checkup.checkup.domain.webhook.service.WebhookService;
 import com.checkup.checkup.domain.webhook.service.WebhookSignatureVerifier;
 import com.checkup.checkup.global.security.SecurityConfig;
 import java.nio.charset.StandardCharsets;
@@ -16,10 +20,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * 웹훅 API가 로그인 없이 호출되고, 서명이 맞으면 204, 틀리거나 없으면 401로 응답하는지 검증한다.
+ * 웹훅 API가 로그인 없이 호출되고, 서명이 맞으면 본문을 서비스로 넘겨 204,
+ * 틀리거나 없으면 서비스를 호출하지 않고 401로 응답하는지 검증한다.
  */
 @WebMvcTest(controllers = WebhookController.class, properties = "datagsm.webhook-secret=" + WebhookControllerTest.SECRET)
 @Import({SecurityConfig.class, WebhookSignatureVerifier.class})
@@ -33,6 +39,9 @@ class WebhookControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @MockitoBean
+    private WebhookService webhookService;
+
     @Test
     @DisplayName("로그인하지 않아도 서명이 맞으면 204로 응답한다")
     void validSignatureWithoutLoginReturnsNoContent() throws Exception {
@@ -41,6 +50,8 @@ class WebhookControllerTest {
                         .header(SIGNATURE_HEADER, sign(BODY))
                         .content(BODY))
                 .andExpect(status().isNoContent());
+
+        verify(webhookService).handle(BODY.getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -52,6 +63,8 @@ class WebhookControllerTest {
                         .content(BODY))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_WEBHOOK_SIGNATURE"));
+
+        verify(webhookService, never()).handle(any());
     }
 
     @Test
@@ -62,6 +75,8 @@ class WebhookControllerTest {
                         .content(BODY))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_WEBHOOK_SIGNATURE"));
+
+        verify(webhookService, never()).handle(any());
     }
 
     @Test
@@ -73,6 +88,8 @@ class WebhookControllerTest {
                         .content(BODY.replace("evt_1", "evt_2")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_WEBHOOK_SIGNATURE"));
+
+        verify(webhookService, never()).handle(any());
     }
 
     private static String sign(String body) throws Exception {
