@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.notification.controller;
 
 import com.checkup.checkup.domain.notification.dto.response.NotificationListResponse;
+import com.checkup.checkup.domain.notification.dto.response.UnreadResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +25,16 @@ public class NotificationController {
     @GetMapping
     public NotificationListResponse getNotifications(@AuthenticationPrincipal Long memberId) {
         return notificationService.getNotifications(memberId);
+    }
+
+    /**
+     * 본인에게 읽지 않은 알림이 있는지 조회한다.
+     *
+     * @param memberId 세션의 회원 id
+     */
+    @GetMapping("/unread")
+    public UnreadResponse hasUnread(@AuthenticationPrincipal Long memberId) {
+        return notificationService.hasUnread(memberId);
     }
 
 }
