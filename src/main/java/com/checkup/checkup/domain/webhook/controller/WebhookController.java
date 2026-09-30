@@ -11,9 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * DataGSM 웹훅 수신 API. 로그인 없이 호출되며 {@code X-DataGSM-Signature} 서명으로 요청을 검증한다.
- * DataGSM만 호출하는 API라 Swagger 문서에서는 숨긴다.
+ * DataGSM만 호출하는 API라 수신 메서드만 Swagger 문서에서 숨긴다.
  */
-@Hidden
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/webhook")
@@ -30,6 +29,7 @@ public class WebhookController {
      * @param signature {@code X-DataGSM-Signature} 헤더 값
      * @throws CustomException 헤더가 없거나 서명이 일치하지 않으면 {@link ErrorCode#INVALID_WEBHOOK_SIGNATURE}(401)
      */
+    @Hidden
     @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void receive(
