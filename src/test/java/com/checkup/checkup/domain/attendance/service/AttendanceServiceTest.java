@@ -32,11 +32,13 @@ import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
+import com.checkup.checkup.domain.notification.service.NotificationService;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({AttendanceService.class, OperatingDayCalculator.class, AttendanceServiceTest.ClockTestConfig.class})
+@Import({AttendanceService.class, NotificationService.class, OperatingDayCalculator.class,
+        AttendanceServiceTest.ClockTestConfig.class})
 class AttendanceServiceTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 9, 27);
