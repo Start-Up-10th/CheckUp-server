@@ -78,4 +78,8 @@ public class Notification {
         return notification;
     }
 
+    /** 읽은 시각이 있으면 읽은 알림이다. */
+    public boolean isRead() {
+        return readAt != null;
+    }
 }
