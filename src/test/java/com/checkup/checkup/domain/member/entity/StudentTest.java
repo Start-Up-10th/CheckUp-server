@@ -58,6 +58,43 @@ class StudentTest {
         assertThat(student.getStudentNumber()).isEqualTo(1101);
     }
 
+    @Test
+    @DisplayName("동의하기 전에는 필수 동의가 없고 공지 알림도 받지 않는다")
+    void noConsentByDefault() {
+        Student student = student(301);
+
+        assertThat(student.hasRequiredConsent()).isFalse();
+        assertThat(student.isNoticeAlarmAgreed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("동의하면 필수 두 항목의 동의 시각과 공지 알림 수신 여부를 기록한다")
+    void agreeRecordsRequiredConsentAndNoticeAlarm() {
+        Student student = student(301);
+        Instant now = Instant.parse("2026-09-30T00:00:00Z");
+
+        student.agree(true, now);
+
+        assertThat(student.hasRequiredConsent()).isTrue();
+        assertThat(student.getPrivacyAgreedAt()).isEqualTo(now);
+        assertThat(student.getFaceAgreedAt()).isEqualTo(now);
+        assertThat(student.isNoticeAlarmAgreed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다시 동의하면 처음 동의 시각은 유지하고 공지 알림 수신만 바꾼다")
+    void agreeAgainKeepsFirstTimeAndUpdatesNoticeAlarm() {
+        Student student = student(301);
+        Instant first = Instant.parse("2026-09-30T00:00:00Z");
+        student.agree(true, first);
+
+        student.agree(false, first.plusSeconds(60));
+
+        assertThat(student.getPrivacyAgreedAt()).isEqualTo(first);
+        assertThat(student.getFaceAgreedAt()).isEqualTo(first);
+        assertThat(student.isNoticeAlarmAgreed()).isFalse();
+    }
+
     private static Student student(Integer dormitoryRoom) {
         return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, 1, 1, 1, 1101,
                 dormitoryRoom);

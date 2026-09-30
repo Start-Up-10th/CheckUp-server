@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.auth.controller;
 
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
+import com.checkup.checkup.domain.consent.service.ConsentService;
 import com.checkup.checkup.domain.auth.service.AuthService;
 import com.checkup.checkup.domain.auth.service.LoginResult;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
@@ -29,7 +30,7 @@ import java.net.URI;
 /**
  * DataGSM OAuth 로그인과 세션 사용자 조회 API.
  *
- * <p>로그아웃({@code POST /api/v1/auth/logout})은 컨트롤러가 아니라
+ * 로그아웃({@code POST /api/v1/auth/logout})은 컨트롤러가 아니라
  * {@link com.checkup.checkup.global.security.SecurityConfig}의 Spring Security 로그아웃 필터가 처리한다.
  */
 @Slf4j
@@ -41,6 +42,7 @@ public class AuthController {
     private final AuthService authService;
     private final LoginSessionService loginSessionService;
     private final MemberService memberService;
+    private final ConsentService consentService;
     private final WebProperties webProperties;
 
     /**
@@ -94,12 +96,12 @@ public class AuthController {
      * 세션 쿠키로 현재 로그인한 회원을 조회한다. 로그인하지 않았으면 401을 반환한다.
      *
      * @param memberId 세션에 저장된 회원 id
-     * @return 현재 회원의 이름과 역할
+     * @return 현재 회원의 이름, 역할, 필수 동의 여부
      */
     @GetMapping("/me")
     public OAuthLoginResponse me(@AuthenticationPrincipal Long memberId) {
         Member member = memberService.getById(memberId);
-        return OAuthLoginResponse.from(member);
+        return OAuthLoginResponse.from(member, consentService.hasRequiredConsent(memberId));
     }
 
     private ResponseEntity<Void> redirectToLoginFailure(ErrorCode errorCode) {

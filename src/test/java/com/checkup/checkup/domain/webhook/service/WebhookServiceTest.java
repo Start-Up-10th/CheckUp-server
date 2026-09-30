@@ -88,8 +88,8 @@ class WebhookServiceTest {
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final WebhookService webhookService = new WebhookService(
-            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC), studentRepository,
-            eventPublisher);
+            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC),
+            new StudentSyncService(studentRepository, eventPublisher));
 
     @BeforeEach
     void setUp() {

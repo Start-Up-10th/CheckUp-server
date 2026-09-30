@@ -67,6 +67,18 @@ public class Student {
     @Column(nullable = false)
     private int volunteerCount;
 
+    /** 개인정보 수집 및 이용에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant privacyAgreedAt;
+
+    /** 얼굴 정보 처리에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant faceAgreedAt;
+
+    /** 기숙사 공지 알림 수신 여부(선택, 기본 해제). */
+    @Column(nullable = false)
+    private boolean noticeAlarmAgreed;
+
     public static Student create(
             Member member,
             Long datagsmStudentId,
@@ -136,5 +148,29 @@ public class Student {
      */
     public void leaveDormitory() {
         this.dormitoryRoom = null;
+    }
+
+    /**
+     * 필수 동의 두 항목을 기록하고 공지 알림 수신 여부를 정한다.
+     * 이미 동의한 필수 항목은 처음 동의한 시각을 유지하고, 공지 알림 수신은 이번 선택으로 바꾼다.
+     *
+     * @param noticeAlarm 기숙사 공지 알림 수신 여부
+     * @param now         동의 시각
+     */
+    public void agree(boolean noticeAlarm, Instant now) {
+        if (privacyAgreedAt == null) {
+            privacyAgreedAt = now;
+        }
+        if (faceAgreedAt == null) {
+            faceAgreedAt = now;
+        }
+        noticeAlarmAgreed = noticeAlarm;
+    }
+
+    /**
+     * 필수 동의 두 항목(개인정보, 얼굴 정보)에 모두 동의했는지 확인한다.
+     */
+    public boolean hasRequiredConsent() {
+        return privacyAgreedAt != null && faceAgreedAt != null;
     }
 }
