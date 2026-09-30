@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.member.service;
 
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.domain.webhook.dto.response.StudentSyncResponse;
+import com.checkup.checkup.domain.webhook.service.StudentSyncService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;

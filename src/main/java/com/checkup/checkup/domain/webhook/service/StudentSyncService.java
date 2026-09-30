@@ -1,11 +1,11 @@
-package com.checkup.checkup.domain.member.service;
+package com.checkup.checkup.domain.webhook.service;
 
 import com.checkup.checkup.domain.member.dto.StudentLeftEvent;
-import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

@@ -16,7 +16,6 @@ import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.StudentSyncService;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
 import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;

@@ -1,7 +1,6 @@
 package com.checkup.checkup.domain.webhook.service;
 
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
-import com.checkup.checkup.domain.member.service.StudentSyncService;
 import com.checkup.checkup.domain.webhook.dto.request.Change;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
