@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.notification.repository;
 
 import com.checkup.checkup.domain.notification.entity.Notification;
+import com.checkup.checkup.domain.notification.entity.NotificationType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,5 +51,17 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("sourceKey") String sourceKey,
             @Param("message") String message,
             @Param("createdAt") Instant createdAt
+    );
+
+    /**
+     * 주어진 시각 이전에 만든 해당 유형의 알림을 한 번에 지운다. 08:00 KST 출석 알림 폐기에 쓴다.
+     *
+     * @return 지운 알림 수
+     */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.type = :type AND n.createdAt < :before")
+    int deleteByTypeBefore(
+            @Param("type") NotificationType type,
+            @Param("before") Instant before
     );
 }
