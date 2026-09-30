@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Service
 @RequiredArgsConstructor
-public class DataGsmStudentSyncService {
+public class StudentManualSyncService {
     private final AdminVerifier adminVerifier;
     private final DataGsmOpenApiClient dataGsmOpenApiClient;
     private final StudentSyncService studentSyncService;
@@ -46,7 +46,7 @@ public class DataGsmStudentSyncService {
     public StudentSyncResponse sync(Long memberId) {
         adminVerifier.verify(memberId);
         List<Student> students = fetchAll();
-        List<StudentSyncData> data = students.stream().map(DataGsmStudentSyncService::toSyncData).toList();
+        List<StudentSyncData> data = students.stream().map(StudentManualSyncService::toSyncData).toList();
         int synced = studentSyncService.syncAll(data, clock.instant());
         return new StudentSyncResponse(data.size(), synced);
     }
