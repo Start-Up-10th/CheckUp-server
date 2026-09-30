@@ -5,6 +5,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.notification.dto.response.NotificationListResponse;
 import com.checkup.checkup.domain.notification.dto.response.NotificationResponse;
 import com.checkup.checkup.domain.notification.dto.response.UnreadResponse;
+import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.notification.repository.NotificationRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -68,6 +69,20 @@ public class NotificationService {
     public void readAll(Long memberId) {
         Long studentId = studentIdOf(memberId);
         notificationRepository.markAllRead(studentId, clock.instant());
+    }
+
+    /**
+     * 알림을 만든다. 같은 학생·유형·원본의 알림이 이미 있으면 아무것도 하지 않는다.
+     * 호출한 쪽 트랜잭션(출석 저장 등)에 합류하므로 원본 처리가 취소되면 알림도 남지 않는다.
+     *
+     * @param studentId 알림을 받는 학생 id
+     * @param type      알림 유형
+     * @param sourceKey 알림 원본. 출석은 {@code 용도:운영일}
+     * @param message   화면에 표시할 문구
+     */
+    @Transactional
+    public void create(Long studentId, NotificationType type, String sourceKey, String message) {
+        notificationRepository.insertIfAbsent(studentId, type.name(), sourceKey, message, clock.instant());
     }
 
     private Long studentIdOf(Long memberId) {
