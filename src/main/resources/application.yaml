@@ -26,6 +26,7 @@ datagsm:
   client-id: ${DATAGSM_CLIENT_ID}
   client-secret: ${DATAGSM_CLIENT_SECRET}
   api-key: ${DATAGSM_API_KEY} # DataGSM OpenAPI(학생 조회) 전용 키. OAuth client-id와 다른 값이다.
+  webhook-secret: ${DATAGSM_WEBHOOK_SECRET}
   redirect-uri: ${DATAGSM_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}
 
 server:
@@ -36,3 +37,20 @@ server:
         http-only: true # JS가 쿠키 못 읽음, XSS 방지
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
+
+# API 문서(/swagger-ui/index.html, /v3/api-docs). 노출하지 않을 환경에서는 SWAGGER_ENABLED=false로 끈다.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+
+checkup:
+  web:
+    base-url: ${PUBLIC_ORIGIN}
+  qr:
+    token-ttl: 15m
+    lease-ttl: 60s
+    rotate-before: 30s
+    token-retention: 1h
+    base-url: ${PUBLIC_ORIGIN}
