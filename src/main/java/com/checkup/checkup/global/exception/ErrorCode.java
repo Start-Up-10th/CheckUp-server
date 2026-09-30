@@ -34,6 +34,9 @@ public enum ErrorCode {
     INVALID_WEBHOOK_SIGNATURE(HttpStatus.UNAUTHORIZED, "웹훅 서명이 올바르지 않습니다."),
     INVALID_WEBHOOK_PAYLOAD(HttpStatus.BAD_REQUEST, "웹훅 본문 형식이 올바르지 않습니다."),
 
+    // 학생
+    STUDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다."),
+
     // QR
     QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다.");
 
