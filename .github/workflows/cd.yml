@@ -1,0 +1,71 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to school server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd ~/CheckUp-server
+
+            # .env 없으면 배포 중단 (실수로 지워졌을 때 대비)
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file missing. Aborting deploy."
+              exit 1
+            fi
+
+            # 이전 커밋 저장 (롤백용)
+            PREV_COMMIT=$(git rev-parse HEAD)
+
+            git fetch origin main
+            git reset --hard origin/main
+            git submodule sync --recursive
+            git submodule update --init --recursive
+
+            # MTU 문제 대비: docker 데몬 mtu 설정 확인
+            if ! grep -q '"mtu"' /etc/docker/daemon.json 2>/dev/null; then
+              echo "WARNING: Docker MTU not configured, build may fail on slow network"
+            fi
+
+            # 빌드 (실패하면 여기서 바로 중단)
+            if ! docker compose -f compose.prod.yaml up -d --build; then
+              echo "ERROR: docker compose build/up failed"
+              exit 1
+            fi
+
+            # 헬스체크: /actuator/health가 401(인증필요)이어도 "서버가 응답한다"는 뜻이므로 200/401 둘 다 성공으로 간주
+            SUCCESS=false
+            for i in $(seq 1 20); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator || echo "000")
+              if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+                echo "Health check passed (status: $STATUS)"
+                SUCCESS=true
+                break
+              fi
+              echo "Waiting for server... (attempt $i, status: $STATUS)"
+              sleep 6
+            done
+
+            if [ "$SUCCESS" != "true" ]; then
+              echo "ERROR: Health check failed after 120s. Rolling back to $PREV_COMMIT"
+              git reset --hard "$PREV_COMMIT"
+              git submodule update --init --recursive
+              docker compose -f compose.prod.yaml up -d --build
+              exit 1
+            fi
+
+            echo "Deploy successful."
