@@ -1,0 +1,60 @@
+name: checkup
+
+services:
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/checkup
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATAGSM_CLIENT_ID: ${DATAGSM_CLIENT_ID}
+      DATAGSM_CLIENT_SECRET: ${DATAGSM_CLIENT_SECRET}
+      DATAGSM_REDIRECT_URI: ${DATAGSM_REDIRECT_URI}
+      DATAGSM_WEBHOOK_SECRET: ${DATAGSM_WEBHOOK_SECRET}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: checkup
+      POSTGRES_USER: checkup
+      POSTGRES_PASSWORD: checkup
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkup -d checkup"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
