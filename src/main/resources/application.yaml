@@ -21,6 +21,10 @@ spring:
     data:
       redis:
         namespace: checkup:session
+  servlet:
+    multipart:
+      max-file-size: ${FACE_MAX_UPLOAD_SIZE:20MB}
+      max-request-size: ${FACE_MAX_REQUEST_SIZE:21MB}
 
 datagsm:
   client-id: ${DATAGSM_CLIENT_ID}
@@ -54,3 +58,15 @@ checkup:
     rotate-before: 30s
     token-retention: 1h
     base-url: ${PUBLIC_ORIGIN}
+  face:
+    ai-base-url: ${FACE_AI_BASE_URL:http://localhost:8000}
+    service-token: ${FACE_SERVICE_TOKEN}
+    connect-timeout: ${FACE_AI_CONNECT_TIMEOUT:2s}
+    response-timeout: ${FACE_AI_RESPONSE_TIMEOUT:30s}
+    max-upload-bytes: ${FACE_MAX_UPLOAD_BYTES:20971520}
+    max-frame-bytes: ${FACE_MAX_FRAME_BYTES:2097152}
+    min-frame-interval: ${FACE_MIN_FRAME_INTERVAL:200ms}
+    max-concurrent-frames: ${FACE_MAX_CONCURRENT_FRAMES:4}
+    session-idle-timeout: ${FACE_SESSION_IDLE_TIMEOUT:5m}
+    cleanup-interval-ms: ${FACE_CLEANUP_INTERVAL_MS:60000}
+    consent-version: ${FACE_CONSENT_VERSION:v1}

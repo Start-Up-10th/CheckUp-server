@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.consent.service;
 
 import java.time.Clock;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,8 +11,6 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * 학생의 서비스 이용 동의를 저장하고 조회한다(REQ-AUTH-004).
  *
@@ -19,11 +18,20 @@ import lombok.RequiredArgsConstructor;
  * 동의할 학생은 요청 값이 아니라 로그인 세션의 회원으로 정한다.
  */
 @Service
-@RequiredArgsConstructor
 public class ConsentService {
 
     private final StudentRepository studentRepository;
     private final Clock clock;
+    private final String faceConsentVersion;
+
+    public ConsentService(
+            StudentRepository studentRepository,
+            Clock clock,
+            @Value("${checkup.face.consent-version}") String faceConsentVersion) {
+        this.studentRepository = studentRepository;
+        this.clock = clock;
+        this.faceConsentVersion = faceConsentVersion;
+    }
 
     /**
      * 현재 학생의 필수 동의를 기록하고 공지 알림 수신 여부를 정한다.
@@ -36,7 +44,7 @@ public class ConsentService {
     public void agree(Long memberId, boolean noticeAlarm) {
         Student student = studentRepository.findByMemberId(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
-        student.agree(noticeAlarm, clock.instant());
+        student.agree(noticeAlarm, clock.instant(), faceConsentVersion);
     }
 
     /**

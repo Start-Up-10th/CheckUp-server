@@ -27,7 +27,7 @@ class ConsentServiceTest {
 
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final ConsentService consentService =
-            new ConsentService(studentRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            new ConsentService(studentRepository, Clock.fixed(NOW, ZoneOffset.UTC), "v1");
 
     @Test
     @DisplayName("로그인한 학생의 필수 동의 시각과 공지 알림 수신 여부를 기록한다")
@@ -39,6 +39,7 @@ class ConsentServiceTest {
 
         assertThat(student.getPrivacyAgreedAt()).isEqualTo(NOW);
         assertThat(student.getFaceAgreedAt()).isEqualTo(NOW);
+        assertThat(student.getFaceConsentVersion()).isEqualTo("v1");
         assertThat(student.isNoticeAlarmAgreed()).isTrue();
     }
 
@@ -60,7 +61,7 @@ class ConsentServiceTest {
 
         assertThat(consentService.hasRequiredConsent(MEMBER_ID)).isFalse();
 
-        student.agree(false, NOW);
+        student.agree(false, NOW, "v1");
 
         assertThat(consentService.hasRequiredConsent(MEMBER_ID)).isTrue();
     }

@@ -15,6 +15,8 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
 
+    boolean existsByIdAndDormitoryRoomIsNotNull(Long id);
+
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(Integer dormitoryRoom);
 

@@ -73,11 +73,12 @@ class StudentTest {
         Student student = student(301);
         Instant now = Instant.parse("2026-09-30T00:00:00Z");
 
-        student.agree(true, now);
+        student.agree(true, now, "v1");
 
         assertThat(student.hasRequiredConsent()).isTrue();
         assertThat(student.getPrivacyAgreedAt()).isEqualTo(now);
         assertThat(student.getFaceAgreedAt()).isEqualTo(now);
+        assertThat(student.getFaceConsentVersion()).isEqualTo("v1");
         assertThat(student.isNoticeAlarmAgreed()).isTrue();
     }
 
@@ -86,12 +87,13 @@ class StudentTest {
     void agreeAgainKeepsFirstTimeAndUpdatesNoticeAlarm() {
         Student student = student(301);
         Instant first = Instant.parse("2026-09-30T00:00:00Z");
-        student.agree(true, first);
+        student.agree(true, first, "v1");
 
-        student.agree(false, first.plusSeconds(60));
+        student.agree(false, first.plusSeconds(60), "v2");
 
         assertThat(student.getPrivacyAgreedAt()).isEqualTo(first);
         assertThat(student.getFaceAgreedAt()).isEqualTo(first);
+        assertThat(student.getFaceConsentVersion()).isEqualTo("v1");
         assertThat(student.isNoticeAlarmAgreed()).isFalse();
     }
 

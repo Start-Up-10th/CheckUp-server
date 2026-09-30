@@ -53,6 +53,18 @@ jobs:
           DATAGSM_CLIENT_ID: ci-test-client-id
           DATAGSM_CLIENT_SECRET: ci-test-client-secret
           DATAGSM_API_KEY: ci-test-api-key
+          FACE_SERVICE_TOKEN: ci-test-face-token
           PUBLIC_ORIGIN: http://localhost:3000
           DATAGSM_WEBHOOK_SECRET: ci-test-webhook-secret
         run: ./gradlew build
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: |
+            build/reports/tests/test/
+            build/test-results/test/
+          if-no-files-found: ignore
+          retention-days: 7

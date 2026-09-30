@@ -43,6 +43,9 @@ public class Student {
     @Column(nullable = true)
     private Instant datagsmSyncedAt;
 
+    @Column(name = "face_consent_version", length = 40)
+    private String faceConsentVersion;
+
     /**
      * 호실 번호를 100으로 나눈 정수 값으로 층을 계산한다. 호실이 미배정이면 null을 반환한다.
      */
@@ -156,13 +159,15 @@ public class Student {
      *
      * @param noticeAlarm 기숙사 공지 알림 수신 여부
      * @param now         동의 시각
+     * @param faceConsentVersion 얼굴 정보 처리 동의 문구 버전
      */
-    public void agree(boolean noticeAlarm, Instant now) {
+    public void agree(boolean noticeAlarm, Instant now, String faceConsentVersion) {
         if (privacyAgreedAt == null) {
             privacyAgreedAt = now;
         }
         if (faceAgreedAt == null) {
             faceAgreedAt = now;
+            this.faceConsentVersion = faceConsentVersion;
         }
         noticeAlarmAgreed = noticeAlarm;
     }

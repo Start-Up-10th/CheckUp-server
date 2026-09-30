@@ -38,7 +38,24 @@ public enum ErrorCode {
     STUDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다."),
 
     // QR
-    QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다.");
+    QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다."),
+
+    // 얼굴 인식
+    FACE_CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "얼굴 정보 처리 동의가 필요합니다."),
+    FACE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "얼굴 정보가 이미 등록되어 있습니다."),
+    FACE_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "얼굴 인식 세션이 없거나 종료되었습니다."),
+    FACE_NO_CANDIDATES(HttpStatus.UNPROCESSABLE_ENTITY, "현재 인식할 수 있는 등록 학생이 없습니다."),
+    FACE_TOO_MANY_CANDIDATES(HttpStatus.UNPROCESSABLE_ENTITY, "인식 대상 학생이 허용 인원을 초과했습니다."),
+    FACE_ENROLLMENT_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "얼굴 등록 영상의 품질이 기준에 맞지 않습니다."),
+    FACE_INVALID_MEDIA(HttpStatus.BAD_REQUEST, "지원하지 않거나 읽을 수 없는 영상·이미지입니다."),
+    FACE_UPLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 크기 제한을 초과했습니다."),
+    FACE_INVALID_FRAME(HttpStatus.UNPROCESSABLE_ENTITY, "얼굴 인식 프레임을 처리할 수 없습니다."),
+    FACE_FRAME_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "프레임 요청이 너무 빠릅니다."),
+    FACE_SERVICE_BUSY(HttpStatus.TOO_MANY_REQUESTS, "얼굴 인식 요청이 많습니다. 잠시 후 다시 시도해 주세요."),
+    FACE_AI_BAD_GATEWAY(HttpStatus.BAD_GATEWAY, "얼굴 인식 서버 응답을 처리하지 못했습니다."),
+    FACE_AI_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "얼굴 인식 서버를 사용할 수 없습니다."),
+    FACE_AI_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "얼굴 인식 서버 응답 시간이 초과되었습니다."),
+    FACE_FRAME_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "얼굴 인식 프레임을 처리할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
