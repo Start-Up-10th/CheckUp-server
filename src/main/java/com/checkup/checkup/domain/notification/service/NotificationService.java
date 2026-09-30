@@ -9,11 +9,13 @@ import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.notification.repository.NotificationRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import com.checkup.checkup.global.time.OperatingDayCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -29,6 +31,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final StudentRepository studentRepository;
     private final Clock clock;
+    private final OperatingDayCalculator operatingDayCalculator;
 
     /**
      * 본인 알림 최근 50개를 최신순으로 읽고 읽지 않은 알림이 있는지 함께 돌려준다. 읽음 상태는 바꾸지 않는다.
@@ -83,6 +86,15 @@ public class NotificationService {
     @Transactional
     public void create(Long studentId, NotificationType type, String sourceKey, String message) {
         notificationRepository.insertIfAbsent(studentId, type.name(), sourceKey, message, clock.instant());
+    }
+
+    /**
+     * 오늘 운영일 시작(08:00 KST) 전에 만든 출석 알림을 지운다. 출석 기록과 같은 경계로 폐기한다(DEC-009).
+     */
+    @Transactional
+    public void deleteExpiredAttendance() {
+        Instant todayStart = operatingDayCalculator.startOf(operatingDayCalculator.today());
+        notificationRepository.deleteByTypeBefore(NotificationType.ATTENDANCE, todayStart);
     }
 
     private Long studentIdOf(Long memberId) {
