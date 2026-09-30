@@ -13,7 +13,7 @@ import java.time.Instant;
 /**
  * 처리한 DataGSM 웹훅 이벤트 ID. 같은 이벤트의 재전송을 거른다.
  *
- * <p>저장은 {@link com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository#record}로만 한다.
+ * 저장은 {@link com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository#record}로만 한다.
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter

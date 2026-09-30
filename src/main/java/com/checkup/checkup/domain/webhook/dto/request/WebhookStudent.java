@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * {@code student.updated} 이벤트의 학생 정보. 동기화에 쓰는 필드만 받고 이메일·성별 등은 받지 않는다.
  *
- * <p>졸업·자퇴하면 학년·반·번호·학번·호실이 {@code null}로 온다.
+ * 졸업·자퇴하면 학년·반·번호·학번·호실이 {@code null}로 온다.
  *
  * @param studentId     DataGSM 학생 식별자({@code student.datagsm_student_id})
  * @param name          이름
