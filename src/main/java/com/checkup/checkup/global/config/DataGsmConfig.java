@@ -4,9 +4,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient;
+import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 
 /**
- * DataGSM OAuth SDK 클라이언트 설정. Client ID·Secret은 환경변수에서 읽는다.
+ * DataGSM SDK 클라이언트 설정. Client ID·Secret·API Key는 환경변수에서 읽는다.
  */
 @Configuration
 public class DataGsmConfig {
@@ -17,5 +18,10 @@ public class DataGsmConfig {
             @Value("${datagsm.client-secret}") String clientSecret
     ) {
         return DataGsmOAuthClient.builder(clientId, clientSecret).build();
+    }
+
+    @Bean(destroyMethod = "close")
+    public DataGsmOpenApiClient dataGsmOpenApiClient(@Value("${datagsm.api-key}") String apiKey) {
+        return DataGsmOpenApiClient.builder(apiKey).build();
     }
 }
