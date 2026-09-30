@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.checkup.checkup.domain.webhook.service.StudentManualSyncService;
 import com.checkup.checkup.domain.webhook.service.WebhookService;
 import com.checkup.checkup.domain.webhook.service.WebhookSignatureVerifier;
 import com.checkup.checkup.global.security.SecurityConfig;
@@ -41,6 +42,9 @@ class WebhookControllerTest {
 
     @MockitoBean
     private WebhookService webhookService;
+
+    @MockitoBean
+    private StudentManualSyncService studentManualSyncService;
 
     @Test
     @DisplayName("로그인하지 않아도 서명이 맞으면 204로 응답한다")
