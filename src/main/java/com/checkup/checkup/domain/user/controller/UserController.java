@@ -1,7 +1,9 @@
 package com.checkup.checkup.domain.user.controller;
 
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
-import com.checkup.checkup.domain.user.serivce.UserService;
+import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
+import com.checkup.checkup.domain.user.serivce.UserSearchService;
+import com.checkup.checkup.domain.user.serivce.UserVolunteerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,13 +16,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
+    private final UserSearchService userSearchService;
+    private final UserVolunteerService userVolunteerService;
 
     /**
      * DataGSM 학생 id로 학생 정보를 조회한다. 관리자 또는 본인만 조회할 수 있다.
      */
     @GetMapping("/{studentId}")
     public UserSearchResponse findUser(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
-        return userService.findUser(memberId, studentId);
+        return userSearchService.findUser(memberId, studentId);
+    }
+
+    /**
+     * DataGSM 학생 id로 누적 봉사 횟수를 조회한다. 관리자 또는 본인만 조회할 수 있다.
+     */
+    @GetMapping("/{studentId}/volunteer")
+    public UserVolunteerResponse findVolunteer(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+        return userVolunteerService.findVolunteer(memberId, studentId);
     }
 }

@@ -18,7 +18,7 @@ import team.themoment.datagsm.sdk.openapi.model.Student;
  */
 @Service
 @RequiredArgsConstructor
-public class UserService {
+public class UserSearchService {
 
     private final DataGsmOpenApiClient dataGsmOpenApiClient;
     private final MemberService memberService;
@@ -56,4 +56,5 @@ public class UserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "조회 권한이 없습니다.");
         }
     }
+
 }
