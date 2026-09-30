@@ -1,6 +1,6 @@
 package com.checkup.checkup.domain.webhook.dto.request;
 
-import com.checkup.checkup.domain.member.dto.StudentSyncData;
+import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**

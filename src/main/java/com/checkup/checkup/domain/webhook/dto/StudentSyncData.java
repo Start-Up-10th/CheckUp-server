@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.member.dto;
+package com.checkup.checkup.domain.webhook.dto;
 
 /**
  * DataGSM에서 받은 학생 한 명의 정보. 웹훅과 수동 동기화가 같은 반영 로직을 쓰도록 공통 형태로 바꾼 값이다.

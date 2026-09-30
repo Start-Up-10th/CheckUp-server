@@ -1,7 +1,7 @@
 package com.checkup.checkup.domain.member.service;
 
 import com.checkup.checkup.domain.member.dto.StudentLeftEvent;
-import com.checkup.checkup.domain.member.dto.StudentSyncData;
+import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
