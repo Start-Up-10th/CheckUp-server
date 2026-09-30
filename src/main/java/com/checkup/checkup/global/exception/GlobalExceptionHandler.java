@@ -72,7 +72,7 @@ public class GlobalExceptionHandler {
     /**
      * 위에서 처리하지 못한 예외.
      *
-     * <p>Spring MVC 기본 예외(415·406 등)와 {@link ResponseStatusException}은 Spring의
+     * Spring MVC 기본 예외(415·406 등)와 {@link ResponseStatusException}은 Spring의
      * {@link org.springframework.web.ErrorResponse}를 구현하므로 원래 상태 코드를 유지한다.
      * 그 밖의 예외는 스택을 로그에만 남기고 500으로 응답한다.
      */
