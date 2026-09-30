@@ -290,7 +290,7 @@ public class FaceRecognitionService {
 
     private List<FaceTemplate> eligibleTemplates() {
         return faceTemplateRepository.findAllByOrderByStudent_IdAsc().stream()
-                .filter(template -> template.getStudent().getFaceConsentAt() != null)
+                .filter(template -> template.getStudent().getFaceAgreedAt() != null)
                 .filter(template -> template.getStudent().getDormitoryRoom() != null)
                 .filter(template -> template.getStudent().getDatagsmStudentId() != null)
                 .toList();
@@ -311,7 +311,7 @@ public class FaceRecognitionService {
 
     private AiFaceSessionRequest candidateRequest(Set<Long> studentIds) {
         List<FaceTemplate> templates = faceTemplateRepository.findAllByStudent_IdIn(studentIds).stream()
-                .filter(template -> template.getStudent().getFaceConsentAt() != null)
+                .filter(template -> template.getStudent().getFaceAgreedAt() != null)
                 .filter(template -> template.getStudent().getDormitoryRoom() != null)
                 .filter(template -> template.getStudent().getDatagsmStudentId() != null)
                 .toList();

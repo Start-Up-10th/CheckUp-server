@@ -30,11 +30,11 @@ public class FaceController {
         return faceStudentService.getStatus(memberId);
     }
 
-    /** Called only after the signed-in student confirms the displayed consent text. */
+    /** Returns the face consent already recorded through the required consent flow. */
     @PostMapping("/consent")
     @ResponseStatus(HttpStatus.CREATED)
     public FaceConsentResponse consent(@AuthenticationPrincipal Long memberId) {
-        return faceStudentService.grantConsent(memberId);
+        return faceStudentService.consent(memberId);
     }
 
     @PostMapping(value = "/enrollments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

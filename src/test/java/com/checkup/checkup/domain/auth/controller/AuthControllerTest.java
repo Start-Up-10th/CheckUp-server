@@ -6,14 +6,19 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.checkup.checkup.domain.auth.service.AuthService;
 import com.checkup.checkup.domain.auth.service.LoginResult;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
+import com.checkup.checkup.domain.consent.service.ConsentService;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
@@ -49,6 +55,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private MemberService memberService;
+
+    @MockitoBean
+    private ConsentService consentService;
 
     private final Member member = Member.create(100L, "학생", MemberRole.STUDENT);
 
@@ -126,5 +135,29 @@ class AuthControllerTest {
                 .andExpect(header().string("Location", "https://web.test/login?error=INVALID_REQUEST"));
 
         verify(authService, never()).completeLogin(any(), any());
+    }
+
+    @Test
+    void 현재_회원은_이름_역할과_필수_동의_여부를_준다() throws Exception {
+        given(memberService.getById(7L)).willReturn(member);
+        given(consentService.hasRequiredConsent(7L)).willReturn(true);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(7L, null, List.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("학생"))
+                .andExpect(jsonPath("$.role").value("STUDENT"))
+                .andExpect(jsonPath("$.consented").value(true));
+    }
+
+    @Test
+    void 동의하지_않은_회원은_consented가_false다() throws Exception {
+        given(memberService.getById(7L)).willReturn(member);
+        given(consentService.hasRequiredConsent(7L)).willReturn(false);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .with(authentication(UsernamePasswordAuthenticationToken.authenticated(7L, null, List.of()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.consented").value(false));
     }
 }

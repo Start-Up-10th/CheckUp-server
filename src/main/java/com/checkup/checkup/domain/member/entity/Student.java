@@ -43,9 +43,6 @@ public class Student {
     @Column(nullable = true)
     private Instant datagsmSyncedAt;
 
-    @Column(name = "face_consent_at")
-    private Instant faceConsentAt;
-
     @Column(name = "face_consent_version", length = 40)
     private String faceConsentVersion;
 
@@ -68,6 +65,18 @@ public class Student {
 
     @Column(nullable = true)
     private String specialty;
+
+    /** 개인정보 수집 및 이용에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant privacyAgreedAt;
+
+    /** 얼굴 정보 처리에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant faceAgreedAt;
+
+    /** 기숙사 공지 알림 수신 여부(선택, 기본 해제). */
+    @Column(nullable = false)
+    private boolean noticeAlarmAgreed;
 
     public static Student create(
             Member member,
@@ -140,11 +149,29 @@ public class Student {
         this.dormitoryRoom = null;
     }
 
-    /** Records the versioned face-processing consent explicitly granted by this student. */
-    public void grantFaceConsent(String version, Instant consentedAt) {
-        if (faceConsentAt == null) {
-            this.faceConsentAt = consentedAt;
-            this.faceConsentVersion = version;
+    /**
+     * 필수 동의 두 항목을 기록하고 공지 알림 수신 여부를 정한다.
+     * 이미 동의한 필수 항목은 처음 동의한 시각을 유지하고, 공지 알림 수신은 이번 선택으로 바꾼다.
+     *
+     * @param noticeAlarm 기숙사 공지 알림 수신 여부
+     * @param now         동의 시각
+     * @param faceConsentVersion 얼굴 정보 처리 동의 문구 버전
+     */
+    public void agree(boolean noticeAlarm, Instant now, String faceConsentVersion) {
+        if (privacyAgreedAt == null) {
+            privacyAgreedAt = now;
         }
+        if (faceAgreedAt == null) {
+            faceAgreedAt = now;
+            this.faceConsentVersion = faceConsentVersion;
+        }
+        noticeAlarmAgreed = noticeAlarm;
+    }
+
+    /**
+     * 필수 동의 두 항목(개인정보, 얼굴 정보)에 모두 동의했는지 확인한다.
+     */
+    public boolean hasRequiredConsent() {
+        return privacyAgreedAt != null && faceAgreedAt != null;
     }
 }

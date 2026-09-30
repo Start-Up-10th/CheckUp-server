@@ -18,24 +18,26 @@ public class FaceEnrollmentStore {
     private final StudentRepository studentRepository;
     private final FaceTemplateRepository faceTemplateRepository;
 
-    @Transactional
-    public Student grantConsent(Long memberId, String consentVersion, java.time.Instant now) {
+    @Transactional(readOnly = true)
+    public Student consent(Long memberId) {
         Student student = findStudent(memberId);
-        student.grantFaceConsent(consentVersion, now);
+        if (student.getFaceAgreedAt() == null) {
+            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        }
         return student;
     }
 
     @Transactional(readOnly = true)
     public FaceStatusResponseData status(Long memberId) {
         Student student = findStudent(memberId);
-        return new FaceStatusResponseData(student.getFaceConsentAt() != null,
+        return new FaceStatusResponseData(student.getFaceAgreedAt() != null,
                 faceTemplateRepository.existsByStudent_Id(student.getId()));
     }
 
     @Transactional
     public void saveTemplate(Long memberId, AiFaceModel model, String vectorsJson) {
         Student student = findStudent(memberId);
-        if (student.getFaceConsentAt() == null) {
+        if (student.getFaceAgreedAt() == null) {
             throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
         }
         if (faceTemplateRepository.existsByStudent_Id(student.getId())) {

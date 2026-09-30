@@ -1,4 +1,3 @@
-ALTER TABLE student ADD COLUMN face_consent_at TIMESTAMPTZ;
 ALTER TABLE student ADD COLUMN face_consent_version VARCHAR(40);
 
 CREATE TABLE face_template (
