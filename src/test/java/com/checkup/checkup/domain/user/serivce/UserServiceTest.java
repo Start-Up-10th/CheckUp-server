@@ -50,11 +50,11 @@ class UserServiceTest {
     @Mock
     private StudentRepository studentRepository;
 
-    private UserService userService;
+    private UserSearchService userSearchService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(dataGsmOpenApiClient, memberService, studentRepository);
+        userSearchService = new UserSearchService(dataGsmOpenApiClient, memberService, studentRepository);
     }
 
     @Test
@@ -63,7 +63,7 @@ class UserServiceTest {
         givenMember(MemberRole.ADMIN);
         givenDataGsmStudent(sdkStudent());
 
-        UserSearchResponse response = userService.findUser(MEMBER_ID, STUDENT_ID);
+        UserSearchResponse response = userSearchService.findUser(MEMBER_ID, STUDENT_ID);
 
         assertThat(response.id()).isEqualTo(STUDENT_ID);
         assertThat(response.name()).isEqualTo("홍길동");
@@ -83,7 +83,7 @@ class UserServiceTest {
         givenOwnStudent(member, STUDENT_ID);
         givenDataGsmStudent(sdkStudent());
 
-        UserSearchResponse response = userService.findUser(MEMBER_ID, STUDENT_ID);
+        UserSearchResponse response = userSearchService.findUser(MEMBER_ID, STUDENT_ID);
 
         assertThat(response.id()).isEqualTo(STUDENT_ID);
     }
@@ -94,7 +94,7 @@ class UserServiceTest {
         Member member = givenMember(MemberRole.STUDENT);
         givenOwnStudent(member, 999L);
 
-        assertThatThrownBy(() -> userService.findUser(MEMBER_ID, STUDENT_ID))
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
         verify(dataGsmOpenApiClient, never()).students();
@@ -106,7 +106,7 @@ class UserServiceTest {
         Member member = givenMember(MemberRole.STUDENT);
         given(studentRepository.findByMember(member)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> userService.findUser(MEMBER_ID, STUDENT_ID))
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
@@ -117,7 +117,7 @@ class UserServiceTest {
         givenMember(MemberRole.ADMIN);
         givenDataGsmStudent(null);
 
-        assertThatThrownBy(() -> userService.findUser(MEMBER_ID, STUDENT_ID))
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
@@ -129,7 +129,7 @@ class UserServiceTest {
         given(dataGsmOpenApiClient.students()).willReturn(studentApi);
         given(studentApi.getStudent(anyLong())).willThrow(new DataGsmException("fail"));
 
-        assertThatThrownBy(() -> userService.findUser(MEMBER_ID, STUDENT_ID))
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
     }
