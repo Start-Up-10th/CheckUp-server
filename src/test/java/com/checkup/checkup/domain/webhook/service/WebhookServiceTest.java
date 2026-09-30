@@ -16,6 +16,7 @@ import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentSyncService;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
 import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
@@ -88,8 +89,8 @@ class WebhookServiceTest {
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final WebhookService webhookService = new WebhookService(
-            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC), studentRepository,
-            eventPublisher);
+            objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC),
+            new StudentSyncService(studentRepository, eventPublisher));
 
     @BeforeEach
     void setUp() {
