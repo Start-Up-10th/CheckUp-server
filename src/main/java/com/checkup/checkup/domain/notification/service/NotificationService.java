@@ -90,11 +90,13 @@ public class NotificationService {
 
     /**
      * 오늘 운영일 시작(08:00 KST) 전에 만든 출석 알림을 지운다. 출석 기록과 같은 경계로 폐기한다(DEC-009).
+     *
+     * @return 지운 알림 수
      */
     @Transactional
-    public void deleteExpiredAttendance() {
+    public int deleteExpiredAttendance() {
         Instant todayStart = operatingDayCalculator.startOf(operatingDayCalculator.today());
-        notificationRepository.deleteByTypeBefore(NotificationType.ATTENDANCE, todayStart);
+        return notificationRepository.deleteByTypeBefore(NotificationType.ATTENDANCE, todayStart);
     }
 
     private Long studentIdOf(Long memberId) {
