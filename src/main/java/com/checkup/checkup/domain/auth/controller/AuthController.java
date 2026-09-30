@@ -29,7 +29,7 @@ import java.net.URI;
 /**
  * DataGSM OAuth 로그인과 세션 사용자 조회 API.
  *
- * <p>로그아웃({@code POST /api/v1/auth/logout})은 컨트롤러가 아니라
+ * 로그아웃({@code POST /api/v1/auth/logout})은 컨트롤러가 아니라
  * {@link com.checkup.checkup.global.security.SecurityConfig}의 Spring Security 로그아웃 필터가 처리한다.
  */
 @Slf4j
