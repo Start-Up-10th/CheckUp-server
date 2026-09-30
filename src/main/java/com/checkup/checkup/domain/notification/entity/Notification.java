@@ -54,4 +54,28 @@ public class Notification {
 
     private Instant readAt;
 
+    /**
+     * 읽지 않은 새 알림을 만든다.
+     *
+     * @param student   알림을 받는 학생
+     * @param type      알림 유형
+     * @param sourceKey 알림 원본. 같은 학생·유형·원본의 알림은 하나만 저장된다.
+     * @param message   화면에 표시할 문구
+     * @param createdAt 만든 시각
+     */
+    public static Notification create(
+            Student student,
+            NotificationType type,
+            String sourceKey,
+            String message,
+            Instant createdAt) {
+        Notification notification = new Notification();
+        notification.student = student;
+        notification.type = type;
+        notification.sourceKey = sourceKey;
+        notification.message = message;
+        notification.createdAt = createdAt;
+        return notification;
+    }
+
 }
