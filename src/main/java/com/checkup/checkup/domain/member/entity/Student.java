@@ -43,6 +43,12 @@ public class Student {
     @Column(nullable = true)
     private Instant datagsmSyncedAt;
 
+    @Column(name = "face_consent_at")
+    private Instant faceConsentAt;
+
+    @Column(name = "face_consent_version", length = 40)
+    private String faceConsentVersion;
+
     /**
      * 호실 번호를 100으로 나눈 정수 값으로 층을 계산한다. 호실이 미배정이면 null을 반환한다.
      */
@@ -132,5 +138,13 @@ public class Student {
      */
     public void leaveDormitory() {
         this.dormitoryRoom = null;
+    }
+
+    /** Records the versioned face-processing consent explicitly granted by this student. */
+    public void grantFaceConsent(String version, Instant consentedAt) {
+        if (faceConsentAt == null) {
+            this.faceConsentAt = consentedAt;
+            this.faceConsentVersion = version;
+        }
     }
 }

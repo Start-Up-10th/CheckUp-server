@@ -1,5 +1,6 @@
 package com.checkup.checkup.global.exception;
 
+import com.checkup.checkup.domain.face.ai.AiFaceException;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -10,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.checkup.checkup.global.security.SecurityConfig;
 import jakarta.validation.Valid;
@@ -50,6 +52,22 @@ class GlobalExceptionHandlerTest {
 
     @MockitoBean
     private ExceptionSource exceptionSource;
+
+    @Test
+    void face_AI의_401_422_503은_사용자_로그인_오류와_분리한다() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        var unauthorized = handler.handleFaceAi(new AiFaceException(401, "frame", "unauthorized"));
+        var rejected = handler.handleFaceAi(new AiFaceException(422, "enrollment", "low_quality"));
+        var unavailable = handler.handleFaceAi(new AiFaceException(503, "frame", "not_ready"));
+
+        assertThat(unauthorized.getStatusCode().value()).isEqualTo(502);
+        assertThat(unauthorized.getBody().code()).isEqualTo("FACE_AI_BAD_GATEWAY");
+        assertThat(rejected.getStatusCode().value()).isEqualTo(422);
+        assertThat(rejected.getBody().code()).isEqualTo("FACE_ENROLLMENT_REJECTED");
+        assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
+        assertThat(unavailable.getBody().code()).isEqualTo("FACE_AI_UNAVAILABLE");
+    }
 
     @Test
     @DisplayName("code·state가 모두 없으면 400과 필드별 오류를 모두 반환한다")
