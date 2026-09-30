@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.member.dto.response;
+package com.checkup.checkup.domain.webhook.dto.response;
 
 /**
  * 관리자가 요청한 DataGSM 학생 수동 동기화의 결과.
