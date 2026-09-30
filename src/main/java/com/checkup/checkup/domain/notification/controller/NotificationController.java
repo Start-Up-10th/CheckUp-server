@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.notification.dto.response.NotificationListResp
 import com.checkup.checkup.domain.notification.dto.response.UnreadResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,4 +38,14 @@ public class NotificationController {
         return notificationService.hasUnread(memberId);
     }
 
+    /**
+     * 본인의 읽지 않은 알림을 모두 읽음으로 바꾼다. 웹이 알림 목록 화면에 들어올 때 호출한다.
+     *
+     * @param memberId 세션의 회원 id
+     */
+    @PostMapping("/read")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void readAll(@AuthenticationPrincipal Long memberId) {
+        notificationService.readAll(memberId);
+    }
 }
