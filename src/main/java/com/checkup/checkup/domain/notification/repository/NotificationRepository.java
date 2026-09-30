@@ -31,4 +31,24 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("studentId") Long studentId,
             @Param("readAt") Instant readAt
     );
+
+    /**
+     * 알림을 저장한다. 같은 학생·유형·원본의 알림이 이미 있으면 예외 없이 무시한다.
+     * {@code save()}로 중복을 넣으면 unique 위반으로 호출한 쪽 트랜잭션(출석 저장 등)까지 롤백되므로 이 쿼리를 쓴다.
+     *
+     * @return 새로 저장했으면 1, 이미 있어 무시했으면 0
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO notification (student_id, type, source_key, message, created_at)
+            VALUES (:studentId, :type, :sourceKey, :message, :createdAt)
+            ON CONFLICT (student_id, type, source_key) DO NOTHING
+            """, nativeQuery = true)
+    int insertIfAbsent(
+            @Param("studentId") Long studentId,
+            @Param("type") String type,
+            @Param("sourceKey") String sourceKey,
+            @Param("message") String message,
+            @Param("createdAt") Instant createdAt
+    );
 }
