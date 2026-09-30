@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.notification.dto.response.NotificationListResponse;
 import com.checkup.checkup.domain.notification.dto.response.NotificationResponse;
+import com.checkup.checkup.domain.notification.dto.response.UnreadResponse;
 import com.checkup.checkup.domain.notification.repository.NotificationRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -40,6 +41,18 @@ public class NotificationService {
                 .toList();
         boolean hasUnread = notificationRepository.existsByStudentIdAndReadAtIsNull(studentId);
         return new NotificationListResponse(hasUnread, result);
+    }
+
+    /**
+     * 본인에게 읽지 않은 알림이 있는지 돌려준다. 홈 헤더 벨·사이드바 강조에 쓴다.
+     *
+     * @param memberId 세션의 회원 id
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403)
+     */
+    @Transactional(readOnly = true)
+    public UnreadResponse hasUnread(Long memberId) {
+        Long studentId = studentIdOf(memberId);
+        return new UnreadResponse(notificationRepository.existsByStudentIdAndReadAtIsNull(studentId));
     }
 
     private Long studentIdOf(Long memberId) {
