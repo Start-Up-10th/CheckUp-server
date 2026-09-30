@@ -57,7 +57,10 @@ class FaceRecognitionServiceTest {
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any())).willReturn(true);
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
-                .willReturn(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+                .willAnswer(invocation -> {
+                    clock.advance(Duration.ofSeconds(1));
+                    return frame("KNOWN", DATAGSM_STUDENT_ID.toString());
+                });
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);

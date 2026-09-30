@@ -9,6 +9,7 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Owns short consent and template database transactions; AI network calls happen outside. */
@@ -46,7 +47,7 @@ public class FaceEnrollmentStore {
         faceTemplateRepository.save(FaceTemplate.create(student, model, vectorsJson));
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void deleteTemplate(Long studentId) {
         faceTemplateRepository.deleteByStudent_Id(studentId);
     }

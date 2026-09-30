@@ -11,6 +11,7 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -64,7 +65,7 @@ public class FaceSessionStore {
         return sessionRepository.claimFrame(sessionId, adminMemberId, now, cutoff) == 1;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markInactive(UUID sessionId, Long adminMemberId) {
         sessionRepository.markInactive(sessionId, adminMemberId);
     }
@@ -97,7 +98,7 @@ public class FaceSessionStore {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void delete(UUID sessionId) {
         if (sessionRepository.existsById(sessionId)) {
             candidateRepository.deleteAllForSession(sessionId);

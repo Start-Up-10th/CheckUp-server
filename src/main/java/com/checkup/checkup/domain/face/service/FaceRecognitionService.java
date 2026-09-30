@@ -174,7 +174,7 @@ public class FaceRecognitionService {
                 throw closed;
             }
             return new FaceFrameResponse(frameId, result.faces().stream()
-                    .map(face -> toPublicFace(currentSession, face)).toList());
+                    .map(face -> toPublicFace(currentSession, face, now)).toList());
         } catch (AiFaceException e) {
             if (e.getStatus() >= 500 || e.getStatus() == 404) {
                 faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwnedQuietly);
@@ -216,7 +216,11 @@ public class FaceRecognitionService {
         });
     }
 
-    private FaceFrameResponse.Face toPublicFace(FaceSessionView session, AiFaceFrameResponse.FaceResult face) {
+    private FaceFrameResponse.Face toPublicFace(
+            FaceSessionView session,
+            AiFaceFrameResponse.FaceResult face,
+            Instant verifiedAt
+    ) {
         if (face == null || face.trackId() == null || face.quality() == null || face.recognition() == null) {
             throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
         }
@@ -243,7 +247,7 @@ public class FaceRecognitionService {
                     && student.get().getDormitoryRoom() != null) {
                 studentId = dataGsmStudentId.toString();
                 AttendanceRecordResult recorded = attendanceService.markAttended(
-                        student.get().getId(), session.purpose(), clock.instant(), AttendanceMethod.FACE);
+                        student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
             } else {
                 // Never let AI nominate a student outside the Spring-owned, current session target list.
