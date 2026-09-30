@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.webhook.dto.request;
 
+import com.checkup.checkup.domain.member.dto.StudentSyncData;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -26,4 +27,8 @@ public record WebhookStudent(
         @JsonProperty("dormitory_room") Integer dormitoryRoom,
         String role
 ) {
+
+    public StudentSyncData toSyncData() {
+        return new StudentSyncData(studentId, name, grade, classNum, number, studentNumber, dormitoryRoom, role);
+    }
 }
