@@ -246,6 +246,59 @@ class AttendanceServiceTest {
         assertThat(rowCount()).isZero();
     }
 
+    @Test
+    void 새로_출석하면_용도와_운영일로_출석_완료_알림을_하나_만든다() {
+        mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
+
+        assertThat(notificationCount()).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT source_key FROM notification WHERE student_id = ? AND type = 'ATTENDANCE'",
+                String.class, studentId)).isEqualTo("STUDY_ROOM:2026-09-27");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT message FROM notification WHERE student_id = ?", String.class, studentId))
+                .isEqualTo("자습실 출석이 완료됐어요");
+    }
+
+    @Test
+    void 이미_출석한_뒤_다시_인증해도_출석_알림을_늘리지_않는다() {
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        clock.setInstant(AT.plusSeconds(60));
+
+        mark(AttendancePurpose.DORMITORY, AT.plusSeconds(60), AttendanceMethod.FACE);
+
+        assertThat(notificationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 동시에_여러_번_들어와도_출석_알림은_하나다() throws Exception {
+        int requests = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(requests);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<AttendanceRecordResult>> results = new ArrayList<>();
+        for (int i = 0; i < requests; i++) {
+            results.add(executor.submit(() -> {
+                start.await();
+                return mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+            }));
+        }
+        start.countDown();
+        for (Future<AttendanceRecordResult> result : results) {
+            result.get();
+        }
+        executor.shutdown();
+
+        assertThat(notificationCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 기록하지_않은_늦은_인증은_출석_알림을_만들지_않는다() {
+        clock.setInstant(AT.plusSeconds(86_400));
+
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE);
+
+        assertThat(notificationCount()).isZero();
+    }
+
     private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {
         return attendanceService.markAttended(studentId, purpose, verifiedAt, method);
     }
@@ -273,6 +326,10 @@ class AttendanceServiceTest {
         return jdbcTemplate.queryForObject(
                 "SELECT method FROM attendance WHERE student_id = ? AND purpose = ? AND operating_day = ?",
                 String.class, studentId, purpose.name(), day);
+    }
+
+    private int notificationCount() {
+        return jdbcTemplate.queryForObject("SELECT count(*) FROM notification WHERE student_id = ?", Integer.class, studentId);
     }
 
     private int rowCount() {
