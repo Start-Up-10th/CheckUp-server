@@ -72,4 +72,12 @@ public class AttendanceService {
         boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
     }
+
+    /** 출석 완료 알림 문구. */
+    private static String attendanceMessage(AttendancePurpose purpose) {
+        return switch (purpose) {
+            case DORMITORY -> "기숙사 출석이 완료됐어요";
+            case STUDY_ROOM -> "자습실 출석이 완료됐어요";
+        };
+    }
 }
