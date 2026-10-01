@@ -1,9 +1,19 @@
 package com.checkup.checkup.domain.volunteer.service;
 
 /**
- * 한글 이름 검색에 쓰는 도우미. 외부 검색 엔진 없이 학생 수백 명 규모에서 쓴다.
+ * 한글 이름 검색어와 이름이 얼마나 비슷한지 판정한다. 외부 검색 엔진 없이 학생 수백 명 규모에서 쓴다.
+ *
+ * 순위가 낮을수록 더 잘 맞는다.
+ * - {@link #CONTAINS}: 이름에 검색어가 그대로 들어 있다.
+ * - {@link #INITIALS}: 검색어가 초성만으로 되어 있고 이름의 초성에 들어 있다. 예: {@code ㄱㅁㅇ} → 강민우
+ * - {@link #TYPO}: 자음·모음으로 쪼갰을 때 한 개만 다르다. 예: {@code 강민오} → 강민우
  */
 public final class KoreanNameMatcher {
+
+    public static final int CONTAINS = 0;
+    public static final int INITIALS = 1;
+    public static final int TYPO = 2;
+    public static final int NO_MATCH = -1;
 
     private static final char HANGUL_BEGIN = '가';
     private static final char HANGUL_END = '힣';
@@ -18,6 +28,24 @@ public final class KoreanNameMatcher {
             'ㄿ', 'ㅀ', 'ㅁ', 'ㅂ', 'ㅄ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'};
 
     private KoreanNameMatcher() {
+    }
+
+    /**
+     * @param name    학생 이름
+     * @param keyword 공백을 뺀 검색어
+     * @return {@link #CONTAINS}, {@link #INITIALS}, {@link #TYPO} 중 가장 잘 맞는 순위. 맞지 않으면 {@link #NO_MATCH}
+     */
+    public static int rank(String name, String keyword) {
+        if (name.contains(keyword)) {
+            return CONTAINS;
+        }
+        if (isInitialsOnly(keyword) && initials(name).contains(keyword)) {
+            return INITIALS;
+        }
+        if (keyword.length() >= 2 && distance(jamo(name), jamo(keyword)) <= 1) {
+            return TYPO;
+        }
+        return NO_MATCH;
     }
 
     /** 한글 음절을 초성으로 바꾼다. 한글 음절이 아닌 글자는 그대로 둔다. */
@@ -65,6 +93,15 @@ public final class KoreanNameMatcher {
             current = swap;
         }
         return previous[b.length()];
+    }
+
+    private static boolean isInitialsOnly(String keyword) {
+        for (char c : keyword.toCharArray()) {
+            if (c < 'ㄱ' || c > 'ㅎ') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isSyllable(char c) {
