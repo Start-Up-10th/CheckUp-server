@@ -146,6 +146,15 @@ class VolunteerControllerTest {
     }
 
     @Test
+    @DisplayName("오늘 봉사자만 보기 필터를 서비스로 넘긴다")
+    void onDutyIsPassed() throws Exception {
+        mockMvc.perform(get(BASE).param("onDuty", "true").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk());
+
+        verify(volunteerService).getVolunteers(MEMBER_ID, null, null, null, true);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null, null, null);
