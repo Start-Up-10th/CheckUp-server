@@ -45,6 +45,20 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("호실 → 이름 → 학번순으로 정렬하고 호실이 없는 학생은 맨 뒤에 둔다")
+    void sortedByRoomThenNameThenNumber() {
+        givenStudents(
+                student(1L, "나학생", 2102, 412),
+                student(2L, "가학생", 2101, null),
+                student(3L, "다학생", 2103, 301),
+                student(4L, "가학생", 2104, 412));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, null))
+                .extracting(VolunteerResponse::studentNumber)
+                .containsExactly(2103, 2104, 2102, 2101);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
@@ -53,5 +67,14 @@ class VolunteerServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
         verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();
+    }
+
+    private void givenStudents(Student... students) {
+        given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(students));
+    }
+
+    private static Student student(Long datagsmId, String name, int studentNumber, Integer room) {
+        return Student.create(Member.create(datagsmId + 1000, name, MemberRole.STUDENT), datagsmId, 2, 1, 1,
+                studentNumber, room);
     }
 }
