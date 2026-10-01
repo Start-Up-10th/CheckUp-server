@@ -31,6 +31,7 @@ public class VolunteerController {
      * 전체 학생의 봉사 횟수 명단을 호실·이름·학번순으로 조회한다. 웹은 같은 호실끼리 묶어 보여준다.
      *
      * @param memberId 세션의 회원 id
+     * @param floor    층(412호면 4). 없으면 전체 층
      * @param q        검색어. 숫자면 호실 번호·학번이 정확히 같은 학생, 그 밖에는 이름(포함·초성·오타 1개)
      * @param minCount 최소 봉사 횟수. 당일 봉사자 지정 후보는 {@code minCount=1}로 찾는다. 없으면 제한 없다.
      * @param onDuty   {@code true}면 오늘 당일 봉사자로 지정된 학생만 본다(자치위원의 완료 확인용).
@@ -38,11 +39,12 @@ public class VolunteerController {
     @GetMapping
     public List<VolunteerResponse> getVolunteers(
             @AuthenticationPrincipal Long memberId,
+            @RequestParam(required = false) Integer floor,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Integer minCount,
             @RequestParam(required = false) Boolean onDuty
     ) {
-        return volunteerService.getVolunteers(memberId, q, minCount, onDuty);
+        return volunteerService.getVolunteers(memberId, floor, q, minCount, onDuty);
     }
 
     /**
