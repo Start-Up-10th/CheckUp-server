@@ -125,9 +125,7 @@ public class VolunteerService {
      */
     private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int delta) {
         adminVerifier.verify(memberId);
-        Long id = studentRepository.findByDatagsmStudentId(studentId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND))
-                .getId();
+        Long id = findStudent(studentId).getId();
         String key = normalizeKey(requestKey);
 
         if (volunteerAdjustmentRepository.insertIfAbsent(id, delta, key, clock.instant()) == 1) {
@@ -139,6 +137,16 @@ public class VolunteerService {
             }
         }
 
+        return reload(id);
+    }
+
+    private Student findStudent(Long studentId) {
+        return studentRepository.findByDatagsmStudentId(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+    }
+
+    /** 일괄 수정 뒤 학생을 다시 읽어 명단 항목으로 만든다. */
+    private VolunteerResponse reload(Long id) {
         Student updated = studentRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
         return toResponse(updated);
