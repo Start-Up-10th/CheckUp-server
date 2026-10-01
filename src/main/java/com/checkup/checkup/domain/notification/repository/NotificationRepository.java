@@ -64,4 +64,17 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("type") NotificationType type,
             @Param("before") Instant before
     );
+
+    /**
+     * 학생의 특정 알림 하나를 지운다. 당일 봉사자 지정을 취소할 때 그 지정 알림을 지우는 데 쓴다.
+     *
+     * @return 지운 알림 수
+     */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.student.id = :studentId AND n.type = :type AND n.sourceKey = :sourceKey")
+    int deleteOne(
+            @Param("studentId") Long studentId,
+            @Param("type") NotificationType type,
+            @Param("sourceKey") String sourceKey
+    );
 }
