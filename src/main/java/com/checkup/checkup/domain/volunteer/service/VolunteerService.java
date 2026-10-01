@@ -148,6 +148,30 @@ public class VolunteerService {
         return toResponse(student);
     }
 
+    /**
+     * 오늘 당일 봉사자 지정을 취소하고 그 지정 알림을 지운다. 이미 완료한 지정은 취소할 수 없다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 취소 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         오늘 지정되지 않았으면 {@link ErrorCode#NOT_ON_DUTY}(404),
+     *                         이미 완료했으면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409)
+     */
+    @Transactional
+    public VolunteerResponse cancelDuty(Long memberId, Long studentId) {
+        adminVerifier.verify(memberId);
+        Student student = findStudent(studentId);
+        LocalDate today = operatingDayCalculator.today();
+        VolunteerDuty duty = findTodayDuty(student.getId(), today);
+        if (volunteerDutyRepository.cancel(duty.getId()) == 0) {
+            throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
+        }
+        notificationService.delete(student.getId(), NotificationType.VOLUNTEER, dutyKey(today));
+        return reload(student.getId());
+    }
+
     private VolunteerDuty findTodayDuty(Long studentId, LocalDate today) {
         return volunteerDutyRepository.findByStudentIdAndOperatingDay(studentId, today)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_ON_DUTY));
