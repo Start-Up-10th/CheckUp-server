@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -24,9 +25,13 @@ public class VolunteerController {
      * 전체 학생의 봉사 횟수 명단을 이름·학번순으로 조회한다.
      *
      * @param memberId 세션의 회원 id
+     * @param floor    층(412호면 4). 없으면 전체 층
      */
     @GetMapping
-    public List<VolunteerResponse> getVolunteers(@AuthenticationPrincipal Long memberId) {
-        return volunteerService.getVolunteers(memberId);
+    public List<VolunteerResponse> getVolunteers(
+            @AuthenticationPrincipal Long memberId,
+            @RequestParam(required = false) Integer floor
+    ) {
+        return volunteerService.getVolunteers(memberId, floor);
     }
 }

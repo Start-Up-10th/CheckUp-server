@@ -39,7 +39,7 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(student, "volunteerCount", 2);
         given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(student));
 
-        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID);
+        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null);
 
         assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null));
     }
@@ -49,7 +49,7 @@ class VolunteerServiceTest {
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
 
-        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID))
+        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
         verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();

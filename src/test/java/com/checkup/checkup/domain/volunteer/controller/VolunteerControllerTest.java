@@ -46,7 +46,7 @@ class VolunteerControllerTest {
     @Test
     @DisplayName("명단을 배열로 응답하고 최근 활동이 없으면 null이다")
     void listReturnsArray() throws Exception {
-        given(volunteerService.getVolunteers(MEMBER_ID))
+        given(volunteerService.getVolunteers(MEMBER_ID, null))
                 .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null)));
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
@@ -63,7 +63,7 @@ class VolunteerControllerTest {
     @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
-        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID);
+        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null);
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
                 .andExpect(status().isForbidden())
@@ -75,7 +75,7 @@ class VolunteerControllerTest {
     void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
 
-        verify(volunteerService, never()).getVolunteers(any());
+        verify(volunteerService, never()).getVolunteers(any(), any());
     }
 
     private static RequestPostProcessor loginAs(Long memberId) {
