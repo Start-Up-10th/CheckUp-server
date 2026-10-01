@@ -28,4 +28,10 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
      */
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDatagsmStudentIdIn(Collection<Long> datagsmStudentIds);
+
+    /**
+     * 저장된 모든 학생을 이름·학번순으로 회원 정보와 함께 조회한다. 봉사 관리 명단에 쓴다.
+     */
+    @EntityGraph(attributePaths = "member")
+    List<Student> findAllByOrderByMember_NameAscStudentNumberAsc();
 }
