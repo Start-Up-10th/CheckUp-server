@@ -57,4 +57,21 @@ public class VolunteerController {
     ) {
         return volunteerService.increase(memberId, studentId, idempotencyKey);
     }
+
+    /**
+     * 봉사 횟수를 1 줄인다. 봉사 완료나 사감의 감면에 쓴다. 횟수가 0이면 409다.
+     *
+     * @param memberId       세션의 회원 id
+     * @param studentId      DataGSM 학생 id
+     * @param idempotencyKey 재시도 방지 키(선택, 100자 이하)
+     * @return 조정 뒤 학생의 명단 항목
+     */
+    @PatchMapping("/{studentId}/count/decrease")
+    public VolunteerResponse decrease(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long studentId,
+            @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
+    ) {
+        return volunteerService.decrease(memberId, studentId, idempotencyKey);
+    }
 }
