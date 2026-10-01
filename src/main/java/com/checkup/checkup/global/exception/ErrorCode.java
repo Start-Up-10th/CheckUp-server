@@ -37,6 +37,9 @@ public enum ErrorCode {
     // 학생
     STUDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다."),
 
+    // 봉사
+    VOLUNTEER_COUNT_ZERO(HttpStatus.CONFLICT, "봉사 횟수가 0이라 차감할 수 없습니다."),
+
     // QR
     QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다."),
 
