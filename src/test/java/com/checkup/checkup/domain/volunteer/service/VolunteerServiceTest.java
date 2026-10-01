@@ -147,6 +147,57 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("증가는 기록을 남긴 뒤 횟수를 1 늘리고 바뀐 항목을 돌려준다")
+    void increaseRecordsThenIncreases() {
+        Student student = givenAdjustable(2);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, "key-1", NOW)).willReturn(1);
+        given(studentRepository.increaseVolunteerCount(10L)).willReturn(1);
+        given(volunteerAdjustmentRepository.findLastActivityAt(10L)).willReturn(NOW);
+
+        VolunteerResponse response = service.increase(MEMBER_ID, 200L, " key-1 ");
+
+        verify(studentRepository).increaseVolunteerCount(10L);
+        assertThat(response.studentId()).isEqualTo(200L);
+        assertThat(response.lastActivityAt()).isEqualTo(NOW);
+        assertThat(response.volunteerCount()).isEqualTo(student.getVolunteerCount());
+    }
+
+    @Test
+    @DisplayName("같은 키로 다시 오면 횟수를 바꾸지 않고 현재 상태만 돌려준다")
+    void retryWithSameKeyDoesNotChangeCount() {
+        givenAdjustable(2);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, "key-1", NOW)).willReturn(0);
+
+        service.increase(MEMBER_ID, 200L, "key-1");
+
+        verify(studentRepository, never()).increaseVolunteerCount(anyLong());
+    }
+
+    @Test
+    @DisplayName("키가 없거나 비어 있으면 null로 기록하고 매번 반영한다")
+    void blankKeyIsNull() {
+        givenAdjustable(2);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, null, NOW)).willReturn(1);
+        given(studentRepository.increaseVolunteerCount(10L)).willReturn(1);
+
+        service.increase(MEMBER_ID, 200L, "  ");
+
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, 1, null, NOW);
+        verify(studentRepository).increaseVolunteerCount(10L);
+    }
+
+    @Test
+    @DisplayName("100자를 넘는 키는 400 INVALID_REQUEST이고 기록하지 않는다")
+    void tooLongKeyIsRejected() {
+        givenAdjustable(2);
+
+        assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "k".repeat(101)))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
