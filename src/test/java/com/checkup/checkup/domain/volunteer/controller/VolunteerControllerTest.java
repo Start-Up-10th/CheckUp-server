@@ -101,6 +101,15 @@ class VolunteerControllerTest {
     }
 
     @Test
+    @DisplayName("당일 봉사자 후보 검색용 최소 봉사 횟수를 서비스로 넘긴다")
+    void minCountIsPassed() throws Exception {
+        mockMvc.perform(get(BASE).param("minCount", "1").param("q", "민우").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk());
+
+        verify(volunteerService).getVolunteers(MEMBER_ID, null, "민우", 1);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null, null);
