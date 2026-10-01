@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
@@ -16,7 +17,10 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.notification.service.NotificationService;
+import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
@@ -25,11 +29,13 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.BeanUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
@@ -258,6 +264,27 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("명단에 오늘 지정 상태를 채우고, 오늘 봉사자만 보기로 지정된 학생만 거른다")
+    void listFillsTodayDutyAndFiltersOnDuty() {
+        Student assigned = student(1L, "지정", 2101, 301);
+        Student free = student(2L, "미지정", 2102, 302);
+        ReflectionTestUtils.setField(assigned, "id", 11L);
+        ReflectionTestUtils.setField(free, "id", 12L);
+        givenStudents(assigned, free);
+        VolunteerDuty duty = BeanUtils.instantiateClass(VolunteerDuty.class);
+        ReflectionTestUtils.setField(duty, "student", assigned);
+        ReflectionTestUtils.setField(duty, "status", DutyStatus.ASSIGNED);
+        given(volunteerDutyRepository.findAllByOperatingDay(TODAY)).willReturn(List.of(duty));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null, null))
+                .extracting(VolunteerResponse::todayDuty)
+                .containsExactly(DutyStatus.ASSIGNED, null);
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null, true))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("지정");
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
@@ -302,5 +329,16 @@ class VolunteerServiceTest {
                 return at;
             }
         };
+    }
+
+    /** 2026-10-01 12:00 KST이므로 오늘 운영일은 2026-10-01이다. */
+    private static final LocalDate TODAY = LocalDate.of(2026, 10, 1);
+
+    private VolunteerDuty givenTodayDuty(DutyStatus status) {
+        VolunteerDuty duty = BeanUtils.instantiateClass(VolunteerDuty.class);
+        ReflectionTestUtils.setField(duty, "id", 50L);
+        ReflectionTestUtils.setField(duty, "status", status);
+        given(volunteerDutyRepository.findByStudentIdAndOperatingDay(10L, TODAY)).willReturn(Optional.of(duty));
+        return duty;
     }
 }
