@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -75,5 +76,17 @@ public class VolunteerController {
             @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
     ) {
         return volunteerService.decrease(memberId, studentId, idempotencyKey);
+    }
+
+    /**
+     * 학생을 오늘 당일 봉사자로 지정하고 봉사 알림을 보낸다. 봉사 횟수가 0이면 409 "봉사가 없습니다"다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 지정 뒤 학생의 명단 항목
+     */
+    @PostMapping("/{studentId}/duty")
+    public VolunteerResponse assignDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+        return volunteerService.assignDuty(memberId, studentId);
     }
 }
