@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 
 public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAdjustment, Long> {
 
@@ -28,4 +29,25 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
             @Param("requestKey") String requestKey,
             @Param("createdAt") Instant createdAt
     );
+
+    /**
+     * 학생별 마지막 조정 시각을 읽는다. 봉사 관리 명단의 "최근 활동"이다. 조정한 적 없는 학생은 결과에 없다.
+     */
+    @Query("""
+            SELECT a.student.id AS studentId, MAX(a.createdAt) AS lastActivityAt
+            FROM VolunteerAdjustment a
+            GROUP BY a.student.id
+            """)
+    List<LastActivity> findLastActivities();
+
+    /** 학생 한 명의 마지막 조정 시각. 조정한 적 없으면 {@code null}이다. */
+    @Query("SELECT MAX(a.createdAt) FROM VolunteerAdjustment a WHERE a.student.id = :studentId")
+    Instant findLastActivityAt(@Param("studentId") Long studentId);
+
+    /** 학생별 마지막 조정 시각 조회 결과. */
+    interface LastActivity {
+        Long getStudentId();
+
+        Instant getLastActivityAt();
+    }
 }
