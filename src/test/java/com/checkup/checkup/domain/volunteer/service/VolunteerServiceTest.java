@@ -59,7 +59,7 @@ class VolunteerServiceTest {
 
         List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null);
 
-        assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null, null));
+        assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 2, null, null));
     }
 
     @Test
