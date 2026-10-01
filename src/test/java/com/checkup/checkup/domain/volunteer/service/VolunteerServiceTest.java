@@ -198,6 +198,30 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("차감은 -1로 기록하고 횟수를 1 줄인다")
+    void decreaseRecordsThenDecreases() {
+        givenAdjustable(2);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, null, NOW)).willReturn(1);
+        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(1);
+
+        service.decrease(MEMBER_ID, 200L, null);
+
+        verify(studentRepository).decreaseVolunteerCount(10L);
+    }
+
+    @Test
+    @DisplayName("횟수가 0이면 409 VOLUNTEER_COUNT_ZERO다")
+    void decreaseAtZeroIsRejected() {
+        givenAdjustable(0);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, null, NOW)).willReturn(1);
+        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(0);
+
+        assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
