@@ -88,6 +88,23 @@ public class VolunteerService {
     }
 
     /**
+     * 봉사 횟수를 1 줄인다. 봉사를 마쳤거나 사감이 특별한 사정으로 감면할 때 쓴다. 0 미만으로는 줄이지 않는다.
+     *
+     * @param memberId   세션의 회원 id
+     * @param studentId  DataGSM 학생 id
+     * @param requestKey 재시도 방지 키(선택). 같은 키로 다시 오면 반영하지 않고 현재 상태만 돌려준다.
+     * @return 조정 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         횟수가 0이면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409),
+     *                         키가 100자를 넘으면 {@link ErrorCode#INVALID_REQUEST}(400)
+     */
+    @Transactional
+    public VolunteerResponse decrease(Long memberId, Long studentId, String requestKey) {
+        return adjust(memberId, studentId, requestKey, -1);
+    }
+
+    /**
      * 조정 기록을 먼저 남기고 횟수를 바꾼다. 같은 키의 기록이 이미 있으면 재시도로 보고 횟수를 바꾸지 않는다.
      * 차감할 수 없으면 예외로 트랜잭션이 취소돼 기록도 남지 않는다.
      */
