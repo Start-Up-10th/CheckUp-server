@@ -17,6 +17,9 @@ import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentReposi
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,12 +31,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 class VolunteerServiceTest {
 
     private static final Long MEMBER_ID = 1L;
+    private static final Instant NOW = Instant.parse("2026-10-01T03:00:00Z");
 
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final VolunteerAdjustmentRepository volunteerAdjustmentRepository = mock(VolunteerAdjustmentRepository.class);
     private final VolunteerService service = new VolunteerService(
-            adminVerifier, studentRepository, volunteerAdjustmentRepository);
+            adminVerifier, studentRepository, volunteerAdjustmentRepository, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     @DisplayName("전체 학생을 DataGSM id·이름·학번·호실·봉사 횟수로 응답하고 최근 활동은 비운다")
