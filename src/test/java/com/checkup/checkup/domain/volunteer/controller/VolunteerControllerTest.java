@@ -47,7 +47,7 @@ class VolunteerControllerTest {
     @DisplayName("명단을 배열로 응답하고 최근 활동이 없으면 null이다")
     void listReturnsArray() throws Exception {
         given(volunteerService.getVolunteers(MEMBER_ID))
-                .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 2, null)));
+                .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null)));
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
                 .andExpect(status().isOk())
@@ -55,6 +55,7 @@ class VolunteerControllerTest {
                 .andExpect(jsonPath("$[0].name").value("학생"))
                 .andExpect(jsonPath("$[0].studentNumber").value(2105))
                 .andExpect(jsonPath("$[0].dormitoryRoom").value(301))
+                .andExpect(jsonPath("$[0].dormitoryFloor").value(3))
                 .andExpect(jsonPath("$[0].volunteerCount").value(2))
                 .andExpect(jsonPath("$[0].lastActivityAt").isEmpty());
     }
