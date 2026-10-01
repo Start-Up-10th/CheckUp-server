@@ -74,6 +74,15 @@ class OpenApiConfigTest {
         assertThat(tags).contains("인증", "봉사 관리", "알림", "QR(관리자)");
     }
 
+    @Test
+    @DisplayName("Spring Security가 처리하는 로그아웃도 204 응답으로 문서에 있다")
+    void logoutIsDocumented() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.summary").value("로그아웃"))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.tags[0]").value("인증"))
+                .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['204']").exists());
+    }
+
     private String apiDocs() throws Exception {
         return mockMvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
     }
