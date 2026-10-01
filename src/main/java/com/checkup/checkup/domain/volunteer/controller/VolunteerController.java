@@ -5,6 +5,9 @@ import com.checkup.checkup.domain.volunteer.service.VolunteerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,6 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VolunteerController {
 
+    private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
     private final VolunteerService volunteerService;
 
     /**
@@ -35,5 +39,22 @@ public class VolunteerController {
             @RequestParam(required = false) String q
     ) {
         return volunteerService.getVolunteers(memberId, floor, q);
+    }
+
+    /**
+     * 봉사 횟수를 1 늘린다. 웹은 클릭마다 새 {@code Idempotency-Key}를 보내면 재시도가 중복 반영되지 않는다.
+     *
+     * @param memberId       세션의 회원 id
+     * @param studentId      DataGSM 학생 id
+     * @param idempotencyKey 재시도 방지 키(선택, 100자 이하)
+     * @return 조정 뒤 학생의 명단 항목
+     */
+    @PatchMapping("/{studentId}/count/increase")
+    public VolunteerResponse increase(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long studentId,
+            @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
+    ) {
+        return volunteerService.increase(memberId, studentId, idempotencyKey);
     }
 }
