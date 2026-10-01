@@ -22,7 +22,7 @@ public class VolunteerController {
     private final VolunteerService volunteerService;
 
     /**
-     * 전체 학생의 봉사 횟수 명단을 이름·학번순으로 조회한다.
+     * 전체 학생의 봉사 횟수 명단을 호실·이름·학번순으로 조회한다. 웹은 같은 호실끼리 묶어 보여준다.
      *
      * @param memberId 세션의 회원 id
      * @param floor    층(412호면 4). 없으면 전체 층

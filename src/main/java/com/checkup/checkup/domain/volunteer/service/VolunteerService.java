@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -26,11 +27,17 @@ public class VolunteerService {
 
     private static final Pattern DIGITS = Pattern.compile("\\d{1,9}");
 
+    /** 호실 → 이름 → 학번순. 호실이 없는 학생은 맨 뒤에 둔다. */
+    private static final Comparator<Student> ROOM_ORDER = Comparator
+            .comparing(Student::getDormitoryRoom, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(student -> student.getMember().getName())
+            .thenComparing(Student::getStudentNumber);
+
     private final AdminVerifier adminVerifier;
     private final StudentRepository studentRepository;
 
     /**
-     * 전체 학생의 봉사 횟수 명단을 이름·학번순으로 조회한다.
+     * 전체 학생의 봉사 횟수 명단을 호실·이름·학번순으로 조회한다.
      *
      * @param memberId 세션의 회원 id
      * @param floor    층(호실의 맨 앞자리). {@code null}이면 전체 층이고, 값이 있으면 호실 미배정 학생은 빠진다.
@@ -44,6 +51,7 @@ public class VolunteerService {
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(matches(query))
+                .sorted(ROOM_ORDER)
                 .map(VolunteerResponse::from)
                 .toList();
     }
