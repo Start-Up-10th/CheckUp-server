@@ -355,6 +355,46 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("완료하면 지정을 완료로 바꾸고 -1 기록을 남긴 뒤 봉사 횟수를 1 줄인다")
+    void completeDecreasesCount() {
+        givenAdjustable(2);
+        givenTodayDuty(DutyStatus.ASSIGNED);
+        given(volunteerDutyRepository.complete(50L, NOW)).willReturn(1);
+        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(1);
+
+        service.completeDuty(MEMBER_ID, 200L);
+
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -1, null, NOW);
+        verify(studentRepository).decreaseVolunteerCount(10L);
+    }
+
+    @Test
+    @DisplayName("이미 완료했으면 409 DUTY_ALREADY_COMPLETED이고 다시 차감하지 않는다")
+    void completeTwiceDoesNotDecreaseAgain() {
+        givenAdjustable(1);
+        givenTodayDuty(DutyStatus.COMPLETED);
+        given(volunteerDutyRepository.complete(50L, NOW)).willReturn(0);
+
+        assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_ALREADY_COMPLETED));
+        verify(studentRepository, never()).decreaseVolunteerCount(anyLong());
+    }
+
+    @Test
+    @DisplayName("그 사이 봉사 횟수가 0이 됐으면 409 VOLUNTEER_COUNT_ZERO다")
+    void completeAtZeroIsRejected() {
+        givenAdjustable(0);
+        givenTodayDuty(DutyStatus.ASSIGNED);
+        given(volunteerDutyRepository.complete(50L, NOW)).willReturn(1);
+        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(0);
+
+        assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
