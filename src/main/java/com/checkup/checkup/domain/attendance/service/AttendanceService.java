@@ -12,6 +12,8 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
+import com.checkup.checkup.domain.notification.entity.NotificationType;
+import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 
 import lombok.RequiredArgsConstructor;
@@ -28,9 +30,11 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final OperatingDayCalculator operatingDayCalculator;
     private final Clock clock;
+    private final NotificationService notificationService;
 
     /**
      * 자동 인증 성공을 출석으로 기록한다. 동시에 여러 요청이 와도 한 번만 기록된다.
+     * 새로 기록했을 때만 같은 트랜잭션에서 출석 완료 알림을 만든다. 중복·늦은 인증은 알림을 만들지 않는다(REQ-ATT-002).
      *
      * 운영일은 호출하는 쪽이 넘기지 않고 인증 시각으로 계산한다. 그 운영일이 오늘이 아니면
      * 늦게 도착한 지난 인증이라 기록하지 않는다(REQ-ATT-007). 인증 시각이 서버 현재 시각보다
@@ -67,9 +71,22 @@ public class AttendanceService {
         int changed = attendanceRepository.markAttended(
                 studentId, purpose.name(), operatingDay, recordedAt, method.name());
         if (changed == 1) {
+            notificationService.create(
+                    studentId,
+                    NotificationType.ATTENDANCE,
+                    purpose.name() + ":" + operatingDay,
+                    attendanceMessage(purpose));
             return AttendanceRecordResult.RECORDED;
         }
         boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
+    }
+
+    /** 출석 완료 알림 문구. */
+    private static String attendanceMessage(AttendancePurpose purpose) {
+        return switch (purpose) {
+            case DORMITORY -> "기숙사 출석이 완료됐어요";
+            case STUDY_ROOM -> "자습실 출석이 완료됐어요";
+        };
     }
 }

@@ -13,7 +13,7 @@ import java.util.HexFormat;
 /**
  * DataGSM 웹훅 요청의 {@code X-DataGSM-Signature}를 검증한다.
  *
- * <p>서명은 {@code sha256=<HMAC-SHA256(secret, 요청 본문 원문 바이트)의 소문자 hex>} 형식이다.
+ * 서명은 {@code sha256=<HMAC-SHA256(secret, 요청 본문 원문 바이트)의 소문자 hex>} 형식이다.
  * secret은 hex 디코딩하지 않고 UTF-8 문자열 그대로 키로 쓴다.
  */
 @Component

@@ -1,5 +1,6 @@
 package com.checkup.checkup.global.exception;
 
+import com.checkup.checkup.domain.face.ai.AiFaceException;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatusCode;
@@ -7,16 +8,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.DataGsmException;
-import team.themoment.datagsm.sdk.oauth.exception.RateLimitException;
-import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
 
 /**
  * 예외를 {@link ErrorResponse}로 변환한다. 응답과 로그에는 예외 메시지 대신 {@link ErrorCode}만 쓴다.
@@ -29,6 +28,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustom(CustomException e) {
         return toResponse(e.getErrorCode());
+    }
+
+    /** Maps private AI failures to stable Spring errors; upstream details stay in sanitized server logs. */
+    @ExceptionHandler(AiFaceException.class)
+    public ResponseEntity<ErrorResponse> handleFaceAi(AiFaceException e) {
+        log.warn("Face AI integration error: operation={}, status={}, errorCode={}",
+                e.getOperation(), e.getStatus(), e.getErrorCode());
+        ErrorCode code = switch (e.getStatus()) {
+            case 400 -> ErrorCode.FACE_INVALID_MEDIA;
+            case 413 -> ErrorCode.FACE_UPLOAD_TOO_LARGE;
+            case 422 -> switch (e.getOperation()) {
+                case "enrollment" -> ErrorCode.FACE_ENROLLMENT_REJECTED;
+                case "frame" -> ErrorCode.FACE_INVALID_FRAME;
+                default -> ErrorCode.FACE_AI_BAD_GATEWAY;
+            };
+            case 404 -> "frame".equals(e.getOperation())
+                    ? ErrorCode.FACE_SESSION_NOT_FOUND : ErrorCode.FACE_AI_BAD_GATEWAY;
+            case 503 -> ErrorCode.FACE_AI_UNAVAILABLE;
+            case 504 -> ErrorCode.FACE_AI_TIMEOUT;
+            default -> ErrorCode.FACE_AI_BAD_GATEWAY;
+        };
+        return toResponse(code);
     }
 
     /** {@code @Valid} 실패. MethodArgumentNotValidException도 BindException 하위라 함께 처리된다. */
@@ -51,6 +72,11 @@ public class GlobalExceptionHandler {
         return toResponse(ErrorCode.INVALID_REQUEST);
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException e) {
+        return toResponse(ErrorCode.FACE_UPLOAD_TOO_LARGE);
+    }
+
     /** 없는 경로는 404로 응답한다. */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NoResourceFoundException e) {
@@ -66,12 +92,7 @@ public class GlobalExceptionHandler {
     /** DataGSM 401·403은 서버 설정 문제라 클라이언트 인증 실패로 돌려주지 않는다. */
     @ExceptionHandler(DataGsmException.class)
     public ResponseEntity<ErrorResponse> handleDataGsm(DataGsmException e) {
-        ErrorCode errorCode = switch (e) {
-            case BadRequestException ignored -> ErrorCode.DATAGSM_INVALID_CODE;
-            case ServerErrorException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
-            case RateLimitException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
-            default -> ErrorCode.DATAGSM_ERROR;
-        };
+        ErrorCode errorCode = DataGsmErrorCodes.of(e);
         // SDK 메시지에 외부 응답이 섞일 수 있어 클래스 이름만 남긴다.
         log.warn("DataGSM request failed: {}", e.getClass().getSimpleName());
         return toResponse(errorCode);
@@ -80,7 +101,7 @@ public class GlobalExceptionHandler {
     /**
      * 위에서 처리하지 못한 예외.
      *
-     * <p>Spring MVC 기본 예외(415·406 등)와 {@link ResponseStatusException}은 Spring의
+     * Spring MVC 기본 예외(415·406 등)와 {@link ResponseStatusException}은 Spring의
      * {@link org.springframework.web.ErrorResponse}를 구현하므로 원래 상태 코드를 유지한다.
      * 그 밖의 예외는 스택을 로그에만 남기고 500으로 응답한다.
      */

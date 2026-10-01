@@ -53,6 +53,32 @@ class StudentRepositoryTest {
                 .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(301)).isEmpty();
     }
 
+    @Test
+    @DisplayName("DataGSM 학생 id로 학생을 조회하고 봉사 횟수는 0으로 저장된다")
+    void DataGSM_학생_id로_조회하고_봉사횟수_기본값은_0이다() {
+        saveStudent("홍길동", 1101, 301);
+        studentRepository.flush();
+
+        assertThat(studentRepository.findByDatagsmStudentId(1101L))
+                .hasValueSatisfying(student -> assertThat(student.getVolunteerCount()).isZero());
+        assertThat(studentRepository.findByDatagsmStudentId(9999L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DataGSM 학생 id가 있는 학생만 회원 정보와 함께 조회한다")
+    void DataGSM_학생_id가_있는_학생만_조회한다() {
+        saveStudent("홍길동", 1102, 301);
+        saveStudent("김학생", 1103, null);
+        Member noId = memberRepository.save(Member.create(88_888L, "아이디 없음", MemberRole.STUDENT));
+        studentRepository.saveAndFlush(Student.create(noId, null, 1, 1, 1, 1104, 301));
+
+        List<Student> students = studentRepository.findAllByDatagsmStudentIdIsNotNull();
+
+        assertThat(students).extracting(Student::getStudentNumber).contains(1102, 1103).doesNotContain(1104);
+        assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
+                .isLoaded(student, "member")).isTrue());
+    }
+
     private void saveStudent(String name, int studentNumber, Integer dormitoryRoom) {
         Long dataGsmId = Long.valueOf(studentNumber);
         Member member = memberRepository.save(Member.create(dataGsmId, name, MemberRole.STUDENT));

@@ -1,0 +1,1 @@
+ALTER TABLE student ADD COLUMN volunteer_count INT NOT NULL DEFAULT 0;

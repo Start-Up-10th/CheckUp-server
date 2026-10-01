@@ -47,11 +47,24 @@ jobs:
         run: chmod +x gradlew
 
       # DataGSM 클라이언트 빈 생성에 필요한 테스트용 값이다. 실제 DataGSM 호출은 하지 않으며 운영 자격증명이 아니다.
-      # PUBLIC_ORIGIN은 QR 링크의 학생 웹 주소이며 기본값이 없어 테스트에서도 넣어야 한다.
+      # PUBLIC_ORIGIN은 웹 주소(QR 링크·로그인 후 복귀)이며 기본값이 없어 테스트에서도 넣어야 한다.
       - name: Build and test
         env:
           DATAGSM_CLIENT_ID: ci-test-client-id
           DATAGSM_CLIENT_SECRET: ci-test-client-secret
+          DATAGSM_API_KEY: ci-test-api-key
+          FACE_SERVICE_TOKEN: ci-test-face-token
           PUBLIC_ORIGIN: http://localhost:3000
           DATAGSM_WEBHOOK_SECRET: ci-test-webhook-secret
         run: ./gradlew build
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_id }}
+          path: |
+            build/reports/tests/test/
+            build/test-results/test/
+          if-no-files-found: ignore
+          retention-days: 7

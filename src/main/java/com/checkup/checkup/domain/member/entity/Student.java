@@ -43,12 +43,44 @@ public class Student {
     @Column(nullable = true)
     private Instant datagsmSyncedAt;
 
+    @Column(name = "face_consent_version", length = 40)
+    private String faceConsentVersion;
+
     /**
      * 호실 번호를 100으로 나눈 정수 값으로 층을 계산한다. 호실이 미배정이면 null을 반환한다.
      */
     public Integer getDormitoryFloor() {
         return dormitoryRoom == null ? null : dormitoryRoom / 100;
     }
+
+    @Column(nullable = true)
+    private String email;
+
+    @Column(nullable = true)
+    @Enumerated(EnumType.STRING)
+    private Sex sex;
+
+    @Column(nullable = true)
+    private Integer dormitoryFloor;
+
+    @Column(nullable = true)
+    private String specialty;
+
+    /** 앞으로 해야 할 봉사 횟수(DEC-020). DataGSM 값이 아니라 우리 서버가 관리하므로 동기화 갱신에서 건드리지 않는다. */
+    @Column(nullable = false)
+    private int volunteerCount;
+
+    /** 개인정보 수집 및 이용에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant privacyAgreedAt;
+
+    /** 얼굴 정보 처리에 처음 동의한 시각. 동의하지 않았으면 null이다. */
+    @Column(nullable = true)
+    private Instant faceAgreedAt;
+
+    /** 기숙사 공지 알림 수신 여부(선택, 기본 해제). */
+    @Column(nullable = false)
+    private boolean noticeAlarmAgreed;
 
     public static Student create(
             Member member,
@@ -68,6 +100,13 @@ public class Student {
         student.dormitoryRoom = dormitoryRoom;
 
         return student;
+    }
+
+    public void updateProfile(String email, Sex sex, Integer dormitoryFloor, String specialty) {
+        this.email = email;
+        this.sex = sex;
+        this.dormitoryFloor = dormitoryFloor;
+        this.specialty = specialty;
     }
 
     public void update(
@@ -112,5 +151,31 @@ public class Student {
      */
     public void leaveDormitory() {
         this.dormitoryRoom = null;
+    }
+
+    /**
+     * 필수 동의 두 항목을 기록하고 공지 알림 수신 여부를 정한다.
+     * 이미 동의한 필수 항목은 처음 동의한 시각을 유지하고, 공지 알림 수신은 이번 선택으로 바꾼다.
+     *
+     * @param noticeAlarm 기숙사 공지 알림 수신 여부
+     * @param now         동의 시각
+     * @param faceConsentVersion 얼굴 정보 처리 동의 문구 버전
+     */
+    public void agree(boolean noticeAlarm, Instant now, String faceConsentVersion) {
+        if (privacyAgreedAt == null) {
+            privacyAgreedAt = now;
+        }
+        if (faceAgreedAt == null) {
+            faceAgreedAt = now;
+            this.faceConsentVersion = faceConsentVersion;
+        }
+        noticeAlarmAgreed = noticeAlarm;
+    }
+
+    /**
+     * 필수 동의 두 항목(개인정보, 얼굴 정보)에 모두 동의했는지 확인한다.
+     */
+    public boolean hasRequiredConsent() {
+        return privacyAgreedAt != null && faceAgreedAt != null;
     }
 }
