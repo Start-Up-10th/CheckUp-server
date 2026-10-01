@@ -83,6 +83,14 @@ class OpenApiConfigTest {
                 .andExpect(jsonPath("$.paths['/api/v1/auth/logout'].post.responses['204']").exists());
     }
 
+    @Test
+    @DisplayName("세션의 회원 id(@AuthenticationPrincipal)는 요청 파라미터로 문서에 나오지 않는다")
+    void memberIdIsNotARequestParameter() throws Exception {
+        List<Object> memberIdParams = JsonPath.read(apiDocs(), "$.paths..parameters[?(@.name == 'memberId')]");
+
+        assertThat(memberIdParams).isEmpty();
+    }
+
     private String apiDocs() throws Exception {
         return mockMvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
     }
