@@ -1,5 +1,7 @@
 package com.checkup.checkup.domain.consent.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 학생 서비스 이용 동의 API(REQ-AUTH-004).
  */
+@Tag(name = "동의", description = "학생 서비스 이용 동의(REQ-AUTH-004)")
 @RestController
 @RequestMapping("/api/v1/consent")
 @RequiredArgsConstructor
@@ -31,6 +34,7 @@ public class ConsentController {
      * @param memberId 세션의 회원 id
      * @param request  동의 항목
      */
+    @Operation(summary = "서비스 이용 동의 저장", description = "필수 두 항목(privacy, face)이 true가 아니거나 빠지면 400 INVALID_REQUEST, 학생이 아니면 403 MISSING_STUDENT_INFO. 다시 보내면 처음 동의 시각은 유지하고 공지 알림 수신만 바꾼다. 성공 204.")
     @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void agree(

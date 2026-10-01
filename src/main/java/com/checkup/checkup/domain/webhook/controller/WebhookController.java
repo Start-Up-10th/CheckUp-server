@@ -1,5 +1,7 @@
 package com.checkup.checkup.domain.webhook.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.webhook.dto.response.StudentSyncResponse;
 import com.checkup.checkup.domain.webhook.service.StudentManualSyncService;
 import com.checkup.checkup.domain.webhook.service.WebhookService;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
  * - 수동 동기화({@code POST /api/v1/webhook/sync}): 관리자가 로그인한 상태로 호출해 놓친 웹훅 변경을 복구한다.
  */
 @RequiredArgsConstructor
+@Tag(name = "DataGSM 동기화", description = "DataGSM 학생 정보 동기화. 웹훅 수신은 DataGSM 전용이라 문서에서 숨긴다")
 @RestController
 @RequestMapping("/api/v1/webhook")
 public class WebhookController {
@@ -55,6 +58,7 @@ public class WebhookController {
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
      *                         DataGSM 요청이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
+    @Operation(summary = "DataGSM 학생 수동 동기화", description = "관리자 전용. 놓친 웹훅 변경을 DataGSM 학생 목록으로 다시 반영한다. DataGSM 요청이 실패하면 502 DATAGSM_ERROR.")
     @PostMapping("/sync")
     public StudentSyncResponse syncStudents(@AuthenticationPrincipal Long memberId) {
         return studentManualSyncService.sync(memberId);
