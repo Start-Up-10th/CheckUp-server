@@ -4,11 +4,14 @@ import com.checkup.checkup.global.exception.ErrorResponse;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiCustomizer;
@@ -26,6 +29,7 @@ public class OpenApiConfig {
 
     private static final String SESSION_COOKIE = "SESSION";
     private static final String ERROR_RESPONSE = "ErrorResponse";
+    private static final String LOGOUT_PATH = "/api/v1/auth/logout";
 
     @Bean
     public OpenAPI checkupOpenApi() {
@@ -66,5 +70,18 @@ public class OpenApiConfig {
                 }
             }));
         };
+    }
+
+    /**
+     * 로그아웃은 컨트롤러가 아니라 Spring Security 로그아웃 필터가 처리해 자동 문서에 나오지 않는다. 문서에만 직접 추가한다.
+     */
+    @Bean
+    public OpenApiCustomizer logoutPathCustomizer() {
+        return openApi -> openApi.path(LOGOUT_PATH, new PathItem().post(new Operation()
+                .addTagsItem("인증")
+                .summary("로그아웃")
+                .description("세션을 무효화하고 SESSION 쿠키를 지운다. 로그인하지 않았어도 204다. 열려 있던 QR·얼굴 인식 세션도 정리된다.")
+                .operationId("logout")
+                .responses(new ApiResponses().addApiResponse("204", new ApiResponse().description("로그아웃 완료")))));
     }
 }
