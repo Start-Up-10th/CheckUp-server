@@ -57,7 +57,6 @@ public class VolunteerService {
      * 전체 학생의 봉사 횟수 명단을 호실·이름·학번순으로 조회한다.
      *
      * @param memberId 세션의 회원 id
-     * @param floor    층(호실의 맨 앞자리). {@code null}이면 전체 층이고, 값이 있으면 호실 미배정 학생은 빠진다.
      * @param query    검색어. 숫자면 호실 번호나 학번이 정확히 같은 학생이다. 그 밖에는 이름으로 찾고,
      *                 이름에 포함 → 초성 일치 → 오타 1개 순으로 앞에 둔다({@link KoreanNameMatcher}). 비어 있으면 전체다.
      * @param minCount 최소 봉사 횟수. 당일 봉사자 지정 후보는 1을 넣어 봉사가 남은 학생만 찾는다. {@code null}이면 제한 없다.
@@ -66,7 +65,7 @@ public class VolunteerService {
      */
     @Transactional(readOnly = true)
     public List<VolunteerResponse> getVolunteers(
-            Long memberId, Integer floor, String query, Integer minCount, Boolean onDuty) {
+            Long memberId, String query, Integer minCount, Boolean onDuty) {
         adminVerifier.verify(memberId);
         ToIntFunction<Student> rank = ranker(query);
         Map<Long, Instant> lastActivities = volunteerAdjustmentRepository.findLastActivities().stream()
@@ -78,7 +77,6 @@ public class VolunteerService {
                 .collect(Collectors.toMap(duty -> duty.getStudent().getId(), VolunteerDuty::getStatus));
         return studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()
                 .stream()
-                .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(student -> minCount == null || student.getVolunteerCount() >= minCount)
                 .filter(student -> !Boolean.TRUE.equals(onDuty) || todayDuties.containsKey(student.getId()))
                 .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)

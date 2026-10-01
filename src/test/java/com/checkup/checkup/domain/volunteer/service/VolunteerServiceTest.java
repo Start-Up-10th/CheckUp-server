@@ -57,7 +57,7 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(student, "volunteerCount", 2);
         given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(student));
 
-        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null, null);
+        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null);
 
         assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null, null));
     }
@@ -71,23 +71,9 @@ class VolunteerServiceTest {
                 student(3L, "다학생", 2103, 301),
                 student(4L, "가학생", 2104, 412));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, null, null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2103, 2104, 2102, 2101);
-    }
-
-    @Test
-    @DisplayName("층을 고르면 호실 맨 앞자리가 그 층인 학생만 나오고 호실이 없는 학생은 빠진다")
-    void filteredByFloor() {
-        givenStudents(
-                student(1L, "학생1", 2101, 412),
-                student(2L, "학생2", 2102, 501),
-                student(3L, "학생3", 2103, null),
-                student(4L, "학생4", 2104, 401));
-
-        assertThat(service.getVolunteers(MEMBER_ID, 4, null, null, null))
-                .extracting(VolunteerResponse::studentNumber)
-                .containsExactly(2104, 2101);
     }
 
     @Test
@@ -99,28 +85,25 @@ class VolunteerServiceTest {
                 student(3L, "학생3", 2103, 413),
                 student(4L, "학생4", 4120, 301));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, " 412 ", null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, " 412 ", null, null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2101, 2102);
-        assertThat(service.getVolunteers(MEMBER_ID, null, "2103", null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, "2103", null, null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2103);
     }
 
     @Test
-    @DisplayName("글자로 검색하면 이름에 포함된 학생만 나오고, 층 필터와 함께 쓸 수 있다")
-    void nameSearchWithFloor() {
+    @DisplayName("글자로 검색하면 이름에 포함된 학생만 나온다")
+    void nameSearch() {
         givenStudents(
                 student(1L, "강민우", 2101, 412),
                 student(2L, "김민우", 2102, 501),
                 student(3L, "홍길동", 2103, 413));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, "민우", null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, "민우", null, null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민우", "김민우");
-        assertThat(service.getVolunteers(MEMBER_ID, 4, "민우", null, null))
-                .extracting(VolunteerResponse::name)
-                .containsExactly("강민우");
     }
 
     @Test
@@ -132,10 +115,10 @@ class VolunteerServiceTest {
                 student(3L, "김민우", 2103, 401),
                 student(4L, "홍길동", 2104, 201));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, "강민우", null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, "강민우", null, null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민우", "강민오");
-        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ", null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, "ㄱㅁㅇ", null, null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민오", "김민우", "강민우");
     }
@@ -150,10 +133,10 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(two, "volunteerCount", 2);
         givenStudents(none, one, two);
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, null, 1, null))
+        assertThat(service.getVolunteers(MEMBER_ID, null, 1, null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("김민우", "홍길동");
-        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ", 1, null))
+        assertThat(service.getVolunteers(MEMBER_ID, "ㄱㅁㅇ", 1, null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("김민우");
     }
@@ -166,7 +149,7 @@ class VolunteerServiceTest {
         givenStudents(student);
         given(volunteerAdjustmentRepository.findLastActivities()).willReturn(List.of(lastActivity(10L, NOW)));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, null, null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null))
                 .extracting(VolunteerResponse::lastActivityAt)
                 .containsExactly(NOW);
     }
@@ -262,7 +245,7 @@ class VolunteerServiceTest {
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
 
-        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null, null, null, null))
+        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null, null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
         verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();
