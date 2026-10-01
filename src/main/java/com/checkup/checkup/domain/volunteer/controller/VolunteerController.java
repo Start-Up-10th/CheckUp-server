@@ -102,4 +102,16 @@ public class VolunteerController {
     public VolunteerResponse cancelDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
         return volunteerService.cancelDuty(memberId, studentId);
     }
+
+    /**
+     * 오늘 당일 봉사를 완료로 표시하고 봉사 횟수를 1 줄인다. 자치위원이 봉사를 확인했을 때 누른다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 완료 뒤 학생의 명단 항목
+     */
+    @PostMapping("/{studentId}/duty/complete")
+    public VolunteerResponse completeDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+        return volunteerService.completeDuty(memberId, studentId);
+    }
 }
