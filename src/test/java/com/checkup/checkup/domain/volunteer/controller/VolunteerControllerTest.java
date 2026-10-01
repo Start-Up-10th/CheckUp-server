@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,7 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.GlobalExceptionHandler;
 import com.checkup.checkup.global.security.SecurityConfig;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,24 @@ class VolunteerControllerTest {
                 .andExpect(status().isOk());
 
         verify(volunteerService).getVolunteers(MEMBER_ID, 4, "412");
+    }
+
+    @Test
+    @DisplayName("증가·차감은 경로의 학생 id와 Idempotency-Key로 처리하고 바뀐 항목을 응답한다")
+    void adjustReturnsUpdatedItem() throws Exception {
+        VolunteerResponse updated = new VolunteerResponse(200L, "학생", 2105, 301, 3, 3, Instant.parse("2026-10-01T03:00:00Z"));
+        given(volunteerService.increase(MEMBER_ID, 200L, "key-1")).willReturn(updated);
+        given(volunteerService.decrease(MEMBER_ID, 200L, null)).willReturn(updated);
+
+        mockMvc.perform(patch(BASE + "/200/count/increase").header("Idempotency-Key", "key-1").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.volunteerCount").value(3))
+                .andExpect(jsonPath("$.lastActivityAt").value("2026-10-01T03:00:00Z"));
+        mockMvc.perform(patch(BASE + "/200/count/decrease").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk());
+
+        verify(volunteerService).increase(MEMBER_ID, 200L, "key-1");
+        verify(volunteerService).decrease(MEMBER_ID, 200L, null);
     }
 
     @Test
