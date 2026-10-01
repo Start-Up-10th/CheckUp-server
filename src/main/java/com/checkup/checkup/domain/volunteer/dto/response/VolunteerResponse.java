@@ -1,0 +1,36 @@
+package com.checkup.checkup.domain.volunteer.dto.response;
+
+import com.checkup.checkup.domain.member.entity.Student;
+
+import java.time.Instant;
+
+/**
+ * 봉사 관리 명단의 학생 한 명. 명단은 저장된 전체 학생이다.
+ *
+ * @param studentId      DataGSM 학생 id. 횟수 조정 API의 경로 값이다.
+ * @param name           이름
+ * @param studentNumber  학번
+ * @param dormitoryRoom  호실. 미배정이면 {@code null}
+ * @param volunteerCount 앞으로 해야 할 봉사 횟수
+ * @param lastActivityAt 마지막 횟수 조정 시각. 조정한 적 없으면 {@code null}(화면은 {@code -})
+ */
+public record VolunteerResponse(
+        Long studentId,
+        String name,
+        int studentNumber,
+        Integer dormitoryRoom,
+        int volunteerCount,
+        Instant lastActivityAt
+) {
+
+    /** 최근 활동은 횟수 조정 기록이 생기면 채운다. 지금은 항상 {@code null}이다. */
+    public static VolunteerResponse from(Student student) {
+        return new VolunteerResponse(
+                student.getDatagsmStudentId(),
+                student.getMember().getName(),
+                student.getStudentNumber(),
+                student.getDormitoryRoom(),
+                student.getVolunteerCount(),
+                null);
+    }
+}
