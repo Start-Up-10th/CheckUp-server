@@ -26,6 +26,22 @@ class KoreanNameMatcherTest {
     }
 
     @Test
+    @DisplayName("자음·모음 하나만 다르면 오타로 보고 찾는다")
+    void oneTypo() {
+        assertThat(KoreanNameMatcher.rank("강민우", "강민오")).isEqualTo(KoreanNameMatcher.TYPO);
+        assertThat(KoreanNameMatcher.rank("강민우", "감민우")).isEqualTo(KoreanNameMatcher.TYPO);
+        assertThat(KoreanNameMatcher.rank("강민우", "가민우")).isEqualTo(KoreanNameMatcher.TYPO);
+    }
+
+    @Test
+    @DisplayName("두 개 이상 다르거나 한 글자 검색이면 오타로 찾지 않는다")
+    void tooDifferentIsNoMatch() {
+        assertThat(KoreanNameMatcher.rank("강민우", "김민우")).isEqualTo(KoreanNameMatcher.NO_MATCH);
+        assertThat(KoreanNameMatcher.rank("강민우", "홍길동")).isEqualTo(KoreanNameMatcher.NO_MATCH);
+        assertThat(KoreanNameMatcher.rank("이", "오")).isEqualTo(KoreanNameMatcher.NO_MATCH);
+    }
+
+    @Test
     @DisplayName("한글을 초성과 자음·모음으로 쪼갠다")
     void decompose() {
         assertThat(KoreanNameMatcher.initials("강민우")).isEqualTo("ㄱㅁㅇ");
