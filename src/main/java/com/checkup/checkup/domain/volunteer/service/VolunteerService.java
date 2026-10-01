@@ -172,6 +172,35 @@ public class VolunteerService {
         return reload(student.getId());
     }
 
+    /**
+     * 오늘 당일 봉사를 완료로 표시하고 봉사 횟수를 1 줄인다. 자치위원이 봉사를 확인했을 때 쓴다.
+     * 완료 표시와 차감은 한 트랜잭션이라, 차감할 수 없으면 완료 표시도 취소된다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 완료 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         오늘 지정되지 않았으면 {@link ErrorCode#NOT_ON_DUTY}(404),
+     *                         이미 완료했으면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409),
+     *                         그 사이 횟수가 0이 됐으면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409)
+     */
+    @Transactional
+    public VolunteerResponse completeDuty(Long memberId, Long studentId) {
+        adminVerifier.verify(memberId);
+        Long id = findStudent(studentId).getId();
+        Instant now = clock.instant();
+        VolunteerDuty duty = findTodayDuty(id, operatingDayCalculator.today());
+        if (volunteerDutyRepository.complete(duty.getId(), now) == 0) {
+            throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
+        }
+        volunteerAdjustmentRepository.insertIfAbsent(id, -1, null, now);
+        if (studentRepository.decreaseVolunteerCount(id) == 0) {
+            throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
+        }
+        return reload(id);
+    }
+
     private VolunteerDuty findTodayDuty(Long studentId, LocalDate today) {
         return volunteerDutyRepository.findByStudentIdAndOperatingDay(studentId, today)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_ON_DUTY));
