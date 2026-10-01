@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByMember(Member member);
@@ -34,4 +37,14 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
      */
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByOrderByMember_NameAscStudentNumberAsc();
+
+    /**
+     * 봉사 횟수를 1 늘린다. DB에서 바로 더해 동시에 눌러도 빠지지 않는다.
+     *
+     * @return 바뀐 행 수(학생이 있으면 1)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.volunteerCount = s.volunteerCount + 1 WHERE s.id = :id")
+    int increaseVolunteerCount(@Param("id") Long id);
+
 }
