@@ -90,6 +90,17 @@ class VolunteerControllerTest {
     }
 
     @Test
+    @DisplayName("횟수가 0인데 차감하면 409 VOLUNTEER_COUNT_ZERO로 응답한다")
+    void decreaseAtZeroReturnsConflict() throws Exception {
+        willThrow(new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO))
+                .given(volunteerService).decrease(MEMBER_ID, 200L, null);
+
+        mockMvc.perform(patch(BASE + "/200/count/decrease").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("VOLUNTEER_COUNT_ZERO"));
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null);
