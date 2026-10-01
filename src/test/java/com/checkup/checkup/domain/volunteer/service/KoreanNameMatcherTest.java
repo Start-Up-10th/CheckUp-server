@@ -11,6 +11,21 @@ import org.junit.jupiter.api.Test;
 class KoreanNameMatcherTest {
 
     @Test
+    @DisplayName("이름에 검색어가 들어 있으면 가장 높은 순위다")
+    void containsIsBest() {
+        assertThat(KoreanNameMatcher.rank("강민우", "민우")).isEqualTo(KoreanNameMatcher.CONTAINS);
+        assertThat(KoreanNameMatcher.rank("강민우", "강민우")).isEqualTo(KoreanNameMatcher.CONTAINS);
+    }
+
+    @Test
+    @DisplayName("초성만 입력하면 이름의 초성으로 찾는다")
+    void initials() {
+        assertThat(KoreanNameMatcher.rank("강민우", "ㄱㅁㅇ")).isEqualTo(KoreanNameMatcher.INITIALS);
+        assertThat(KoreanNameMatcher.rank("강민우", "ㅁㅇ")).isEqualTo(KoreanNameMatcher.INITIALS);
+        assertThat(KoreanNameMatcher.rank("강민우", "ㄴㅁㅇ")).isEqualTo(KoreanNameMatcher.NO_MATCH);
+    }
+
+    @Test
     @DisplayName("한글을 초성과 자음·모음으로 쪼갠다")
     void decompose() {
         assertThat(KoreanNameMatcher.initials("강민우")).isEqualTo("ㄱㅁㅇ");
