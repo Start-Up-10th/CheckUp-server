@@ -106,6 +106,23 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("초성과 오타 1개로도 찾고, 이름 포함 → 초성 → 오타 순으로 앞에 둔다")
+    void similarNameSearchIsRankedBeforeRoomOrder() {
+        givenStudents(
+                student(1L, "강민오", 2101, 301),
+                student(2L, "강민우", 2102, 501),
+                student(3L, "김민우", 2103, 401),
+                student(4L, "홍길동", 2104, 201));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, "강민우"))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("강민우", "강민오");
+        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ"))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("강민오", "김민우", "강민우");
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
