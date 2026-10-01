@@ -73,6 +73,23 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("숫자로 검색하면 호실 번호나 학번이 정확히 같은 학생만 나온다")
+    void numberSearchMatchesRoomOrStudentNumberExactly() {
+        givenStudents(
+                student(1L, "학생1", 2101, 412),
+                student(2L, "학생2", 2102, 412),
+                student(3L, "학생3", 2103, 413),
+                student(4L, "학생4", 4120, 301));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, " 412 "))
+                .extracting(VolunteerResponse::studentNumber)
+                .containsExactly(2101, 2102);
+        assertThat(service.getVolunteers(MEMBER_ID, null, "2103"))
+                .extracting(VolunteerResponse::studentNumber)
+                .containsExactly(2103);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
