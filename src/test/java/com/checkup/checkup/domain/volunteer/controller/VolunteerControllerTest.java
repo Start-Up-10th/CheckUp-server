@@ -48,7 +48,7 @@ class VolunteerControllerTest {
     @Test
     @DisplayName("명단을 배열로 응답하고 최근 활동이 없으면 null이다")
     void listReturnsArray() throws Exception {
-        given(volunteerService.getVolunteers(MEMBER_ID, null, null, null))
+        given(volunteerService.getVolunteers(MEMBER_ID, null, null, null, null))
                 .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null, null)));
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
@@ -68,7 +68,7 @@ class VolunteerControllerTest {
         mockMvc.perform(get(BASE).param("floor", "4").param("q", "412").with(loginAs(MEMBER_ID)))
                 .andExpect(status().isOk());
 
-        verify(volunteerService).getVolunteers(MEMBER_ID, 4, "412", null);
+        verify(volunteerService).getVolunteers(MEMBER_ID, 4, "412", null, null);
     }
 
     @Test
@@ -106,13 +106,13 @@ class VolunteerControllerTest {
         mockMvc.perform(get(BASE).param("minCount", "1").param("q", "민우").with(loginAs(MEMBER_ID)))
                 .andExpect(status().isOk());
 
-        verify(volunteerService).getVolunteers(MEMBER_ID, null, "민우", 1);
+        verify(volunteerService).getVolunteers(MEMBER_ID, null, "민우", 1, null);
     }
 
     @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
-        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null, null);
+        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null, null, null);
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
                 .andExpect(status().isForbidden())
@@ -126,7 +126,7 @@ class VolunteerControllerTest {
         mockMvc.perform(patch(BASE + "/200/count/increase")).andExpect(status().isUnauthorized());
         mockMvc.perform(patch(BASE + "/200/count/decrease")).andExpect(status().isUnauthorized());
 
-        verify(volunteerService, never()).getVolunteers(any(), any(), any(), any());
+        verify(volunteerService, never()).getVolunteers(any(), any(), any(), any(), any());
         verify(volunteerService, never()).increase(any(), any(), any());
         verify(volunteerService, never()).decrease(any(), any(), any());
     }

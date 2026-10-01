@@ -61,10 +61,12 @@ public class VolunteerService {
      * @param query    검색어. 숫자면 호실 번호나 학번이 정확히 같은 학생이다. 그 밖에는 이름으로 찾고,
      *                 이름에 포함 → 초성 일치 → 오타 1개 순으로 앞에 둔다({@link KoreanNameMatcher}). 비어 있으면 전체다.
      * @param minCount 최소 봉사 횟수. 당일 봉사자 지정 후보는 1을 넣어 봉사가 남은 학생만 찾는다. {@code null}이면 제한 없다.
+     * @param onDuty   {@code true}면 오늘 당일 봉사자로 지정된(완료 포함) 학생만 본다. {@code null}·{@code false}면 제한 없다.
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
      */
     @Transactional(readOnly = true)
-    public List<VolunteerResponse> getVolunteers(Long memberId, Integer floor, String query, Integer minCount) {
+    public List<VolunteerResponse> getVolunteers(
+            Long memberId, Integer floor, String query, Integer minCount, Boolean onDuty) {
         adminVerifier.verify(memberId);
         ToIntFunction<Student> rank = ranker(query);
         Map<Long, Instant> lastActivities = volunteerAdjustmentRepository.findLastActivities().stream()
@@ -78,6 +80,7 @@ public class VolunteerService {
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(student -> minCount == null || student.getVolunteerCount() >= minCount)
+                .filter(student -> !Boolean.TRUE.equals(onDuty) || todayDuties.containsKey(student.getId()))
                 .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)
                 .sorted(Comparator.comparingInt(rank).thenComparing(ROOM_ORDER))
                 .map(student -> VolunteerResponse.of(
