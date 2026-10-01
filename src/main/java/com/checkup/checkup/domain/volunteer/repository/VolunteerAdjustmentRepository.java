@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAdjustment, Long> {
 
@@ -29,6 +30,9 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
             @Param("requestKey") String requestKey,
             @Param("createdAt") Instant createdAt
     );
+
+    /** 재시도 키로 이미 남은 조정 기록을 찾는다. 같은 키가 다른 학생·방향에 쓰였는지 확인할 때 쓴다. */
+    Optional<VolunteerAdjustment> findByRequestKey(String requestKey);
 
     /**
      * 학생별 마지막 조정 시각을 읽는다. 봉사 관리 명단의 "최근 활동"이다. 조정한 적 없는 학생은 결과에 없다.
