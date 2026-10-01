@@ -320,6 +320,41 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("지정을 취소하면 그 학생·날짜의 봉사 알림을 지운다")
+    void cancelDeletesNotification() {
+        givenAdjustable(2);
+        givenTodayDuty(DutyStatus.ASSIGNED);
+        given(volunteerDutyRepository.cancel(50L)).willReturn(1);
+
+        service.cancelDuty(MEMBER_ID, 200L);
+
+        verify(notificationService).delete(10L, NotificationType.VOLUNTEER, "duty:2026-10-01");
+    }
+
+    @Test
+    @DisplayName("오늘 지정되지 않았으면 취소는 404 NOT_ON_DUTY다")
+    void cancelWithoutDutyIsRejected() {
+        givenAdjustable(2);
+
+        assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_ON_DUTY));
+    }
+
+    @Test
+    @DisplayName("이미 완료한 지정은 409 DUTY_ALREADY_COMPLETED로 취소할 수 없고 알림도 남는다")
+    void cancelCompletedIsRejected() {
+        givenAdjustable(1);
+        givenTodayDuty(DutyStatus.COMPLETED);
+        given(volunteerDutyRepository.cancel(50L)).willReturn(0);
+
+        assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_ALREADY_COMPLETED));
+        verify(notificationService, never()).delete(anyLong(), any(), any());
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
