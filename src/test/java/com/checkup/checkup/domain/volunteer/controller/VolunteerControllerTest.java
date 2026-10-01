@@ -135,6 +135,17 @@ class VolunteerControllerTest {
     }
 
     @Test
+    @DisplayName("봉사가 없는 학생을 지정하면 409 NO_VOLUNTEER_LEFT와 \"봉사가 없습니다.\"로 응답한다")
+    void assignWithoutVolunteerReturnsConflict() throws Exception {
+        willThrow(new CustomException(ErrorCode.NO_VOLUNTEER_LEFT)).given(volunteerService).assignDuty(MEMBER_ID, 200L);
+
+        mockMvc.perform(post(BASE + "/200/duty").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("NO_VOLUNTEER_LEFT"))
+                .andExpect(jsonPath("$.message").value("봉사가 없습니다."));
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null, null, null);
