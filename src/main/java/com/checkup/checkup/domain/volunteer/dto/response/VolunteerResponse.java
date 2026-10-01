@@ -25,8 +25,11 @@ public record VolunteerResponse(
         Instant lastActivityAt
 ) {
 
-    /** 최근 활동은 횟수 조정 기록이 생기면 채운다. 지금은 항상 {@code null}이다. */
-    public static VolunteerResponse from(Student student) {
+    /**
+     * @param student        학생
+     * @param lastActivityAt 마지막 봉사 횟수 조정 시각. 조정한 적 없으면 {@code null}
+     */
+    public static VolunteerResponse of(Student student, Instant lastActivityAt) {
         return new VolunteerResponse(
                 student.getDatagsmStudentId(),
                 student.getMember().getName(),
@@ -34,6 +37,6 @@ public record VolunteerResponse(
                 student.getDormitoryRoom(),
                 student.getDormitoryFloor(),
                 student.getVolunteerCount(),
-                null);
+                lastActivityAt);
     }
 }

@@ -13,6 +13,7 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
@@ -30,7 +31,9 @@ class VolunteerServiceTest {
 
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
-    private final VolunteerService service = new VolunteerService(adminVerifier, studentRepository);
+    private final VolunteerAdjustmentRepository volunteerAdjustmentRepository = mock(VolunteerAdjustmentRepository.class);
+    private final VolunteerService service = new VolunteerService(
+            adminVerifier, studentRepository, volunteerAdjustmentRepository);
 
     @Test
     @DisplayName("전체 학생을 DataGSM id·이름·학번·호실·봉사 횟수로 응답하고 최근 활동은 비운다")

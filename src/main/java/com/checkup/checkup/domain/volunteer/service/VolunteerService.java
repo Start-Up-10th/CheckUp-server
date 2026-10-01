@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.volunteer.service;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
@@ -11,9 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 /**
@@ -35,6 +39,7 @@ public class VolunteerService {
 
     private final AdminVerifier adminVerifier;
     private final StudentRepository studentRepository;
+    private final VolunteerAdjustmentRepository volunteerAdjustmentRepository;
 
     /**
      * 전체 학생의 봉사 횟수 명단을 호실·이름·학번순으로 조회한다.
@@ -49,12 +54,16 @@ public class VolunteerService {
     public List<VolunteerResponse> getVolunteers(Long memberId, Integer floor, String query) {
         adminVerifier.verify(memberId);
         ToIntFunction<Student> rank = ranker(query);
+        Map<Long, Instant> lastActivities = volunteerAdjustmentRepository.findLastActivities().stream()
+                .collect(Collectors.toMap(
+                        VolunteerAdjustmentRepository.LastActivity::getStudentId,
+                        VolunteerAdjustmentRepository.LastActivity::getLastActivityAt));
         return studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)
                 .sorted(Comparator.comparingInt(rank).thenComparing(ROOM_ORDER))
-                .map(VolunteerResponse::from)
+                .map(student -> VolunteerResponse.of(student, lastActivities.get(student.getId())))
                 .toList();
     }
 
