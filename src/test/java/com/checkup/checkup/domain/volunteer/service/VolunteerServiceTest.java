@@ -50,7 +50,7 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(student, "volunteerCount", 2);
         given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(student));
 
-        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null);
+        List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null);
 
         assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null));
     }
@@ -64,7 +64,7 @@ class VolunteerServiceTest {
                 student(3L, "다학생", 2103, 301),
                 student(4L, "가학생", 2104, 412));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2103, 2104, 2102, 2101);
     }
@@ -78,7 +78,7 @@ class VolunteerServiceTest {
                 student(3L, "학생3", 2103, null),
                 student(4L, "학생4", 2104, 401));
 
-        assertThat(service.getVolunteers(MEMBER_ID, 4, null))
+        assertThat(service.getVolunteers(MEMBER_ID, 4, null, null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2104, 2101);
     }
@@ -92,10 +92,10 @@ class VolunteerServiceTest {
                 student(3L, "학생3", 2103, 413),
                 student(4L, "학생4", 4120, 301));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, " 412 "))
+        assertThat(service.getVolunteers(MEMBER_ID, null, " 412 ", null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2101, 2102);
-        assertThat(service.getVolunteers(MEMBER_ID, null, "2103"))
+        assertThat(service.getVolunteers(MEMBER_ID, null, "2103", null))
                 .extracting(VolunteerResponse::studentNumber)
                 .containsExactly(2103);
     }
@@ -108,10 +108,10 @@ class VolunteerServiceTest {
                 student(2L, "김민우", 2102, 501),
                 student(3L, "홍길동", 2103, 413));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, "민우"))
+        assertThat(service.getVolunteers(MEMBER_ID, null, "민우", null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민우", "김민우");
-        assertThat(service.getVolunteers(MEMBER_ID, 4, "민우"))
+        assertThat(service.getVolunteers(MEMBER_ID, 4, "민우", null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민우");
     }
@@ -125,10 +125,10 @@ class VolunteerServiceTest {
                 student(3L, "김민우", 2103, 401),
                 student(4L, "홍길동", 2104, 201));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, "강민우"))
+        assertThat(service.getVolunteers(MEMBER_ID, null, "강민우", null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민우", "강민오");
-        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ"))
+        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ", null))
                 .extracting(VolunteerResponse::name)
                 .containsExactly("강민오", "김민우", "강민우");
     }
@@ -141,7 +141,7 @@ class VolunteerServiceTest {
         givenStudents(student);
         given(volunteerAdjustmentRepository.findLastActivities()).willReturn(List.of(lastActivity(10L, NOW)));
 
-        assertThat(service.getVolunteers(MEMBER_ID, null, null))
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, null))
                 .extracting(VolunteerResponse::lastActivityAt)
                 .containsExactly(NOW);
     }
@@ -237,7 +237,7 @@ class VolunteerServiceTest {
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
 
-        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null, null))
+        assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null, null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
         verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();
