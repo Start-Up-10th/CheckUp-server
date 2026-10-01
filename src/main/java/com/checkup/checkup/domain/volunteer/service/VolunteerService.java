@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
+import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +40,7 @@ public class VolunteerService {
 
     private static final Pattern DIGITS = Pattern.compile("\\d{1,9}");
     private static final int MAX_REQUEST_KEY_LENGTH = 100;
+    private static final String DUTY_MESSAGE = "오늘 봉사 당번으로 지정됐어요. 봉사를 마치면 자치위원에게 확인받으세요.";
 
     /** 호실 → 이름 → 학번순. 호실이 없는 학생은 맨 뒤에 둔다. */
     private static final Comparator<Student> ROOM_ORDER = Comparator
@@ -117,6 +120,42 @@ public class VolunteerService {
     @Transactional
     public VolunteerResponse decrease(Long memberId, Long studentId, String requestKey) {
         return adjust(memberId, studentId, requestKey, -1);
+    }
+
+    /**
+     * 학생을 오늘(운영일) 당일 봉사자로 지정하고 봉사 알림을 보낸다. 봉사 횟수는 바꾸지 않는다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 지정 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         봉사 횟수가 0이면 {@link ErrorCode#NO_VOLUNTEER_LEFT}(409),
+     *                         오늘 이미 지정됐으면 {@link ErrorCode#ALREADY_ON_DUTY}(409)
+     */
+    @Transactional
+    public VolunteerResponse assignDuty(Long memberId, Long studentId) {
+        adminVerifier.verify(memberId);
+        Student student = findStudent(studentId);
+        if (student.getVolunteerCount() <= 0) {
+            throw new CustomException(ErrorCode.NO_VOLUNTEER_LEFT);
+        }
+        LocalDate today = operatingDayCalculator.today();
+        if (volunteerDutyRepository.assign(student.getId(), today, clock.instant()) == 0) {
+            throw new CustomException(ErrorCode.ALREADY_ON_DUTY);
+        }
+        notificationService.create(student.getId(), NotificationType.VOLUNTEER, dutyKey(today), DUTY_MESSAGE);
+        return toResponse(student);
+    }
+
+    private VolunteerDuty findTodayDuty(Long studentId, LocalDate today) {
+        return volunteerDutyRepository.findByStudentIdAndOperatingDay(studentId, today)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_ON_DUTY));
+    }
+
+    /** 당일 봉사자 알림의 원본 키. 학생·운영일마다 알림이 하나다. */
+    private static String dutyKey(LocalDate operatingDay) {
+        return "duty:" + operatingDay;
     }
 
     /**
