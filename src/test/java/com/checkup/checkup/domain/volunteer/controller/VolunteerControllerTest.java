@@ -6,12 +6,15 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -107,6 +110,28 @@ class VolunteerControllerTest {
                 .andExpect(status().isOk());
 
         verify(volunteerService).getVolunteers(MEMBER_ID, null, "민우", 1, null);
+    }
+
+    @Test
+    @DisplayName("지정·취소·완료는 경로의 학생 id로 처리하고 바뀐 항목을 오늘 지정 상태와 함께 응답한다")
+    void dutyEndpointsReturnUpdatedItem() throws Exception {
+        given(volunteerService.assignDuty(MEMBER_ID, 200L))
+                .willReturn(new VolunteerResponse(200L, "학생", 2105, 301, 2, null, DutyStatus.ASSIGNED));
+        given(volunteerService.cancelDuty(MEMBER_ID, 200L))
+                .willReturn(new VolunteerResponse(200L, "학생", 2105, 301, 2, null, null));
+        given(volunteerService.completeDuty(MEMBER_ID, 200L))
+                .willReturn(new VolunteerResponse(200L, "학생", 2105, 301, 1, null, DutyStatus.COMPLETED));
+
+        mockMvc.perform(post(BASE + "/200/duty").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todayDuty").value("ASSIGNED"));
+        mockMvc.perform(delete(BASE + "/200/duty").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todayDuty").isEmpty());
+        mockMvc.perform(post(BASE + "/200/duty/complete").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todayDuty").value("COMPLETED"))
+                .andExpect(jsonPath("$.volunteerCount").value(1));
     }
 
     @Test
