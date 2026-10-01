@@ -59,6 +59,20 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("층을 고르면 호실 맨 앞자리가 그 층인 학생만 나오고 호실이 없는 학생은 빠진다")
+    void filteredByFloor() {
+        givenStudents(
+                student(1L, "학생1", 2101, 412),
+                student(2L, "학생2", 2102, 501),
+                student(3L, "학생3", 2103, null),
+                student(4L, "학생4", 2104, 401));
+
+        assertThat(service.getVolunteers(MEMBER_ID, 4, null))
+                .extracting(VolunteerResponse::studentNumber)
+                .containsExactly(2104, 2101);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
