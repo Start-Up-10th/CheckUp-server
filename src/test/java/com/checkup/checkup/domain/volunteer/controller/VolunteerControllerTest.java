@@ -61,6 +61,15 @@ class VolunteerControllerTest {
     }
 
     @Test
+    @DisplayName("층과 검색어를 서비스로 넘긴다")
+    void floorAndQueryArePassed() throws Exception {
+        mockMvc.perform(get(BASE).param("floor", "4").param("q", "412").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk());
+
+        verify(volunteerService).getVolunteers(MEMBER_ID, 4, "412");
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403 ADMIN_ONLY로 응답한다")
     void nonAdminReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(volunteerService).getVolunteers(MEMBER_ID, null, null);
