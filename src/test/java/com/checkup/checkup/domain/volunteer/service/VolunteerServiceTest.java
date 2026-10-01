@@ -62,7 +62,7 @@ class VolunteerServiceTest {
     void listIsConverted() {
         Student student = Student.create(Member.create(100L, "학생", MemberRole.STUDENT), 200L, 2, 1, 5, 2105, 301);
         ReflectionTestUtils.setField(student, "volunteerCount", 2);
-        given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(student));
+        given(studentRepository.findAllByDatagsmStudentIdIsNotNull()).willReturn(List.of(student));
 
         List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null, null);
 
@@ -423,7 +423,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.getVolunteers(MEMBER_ID, null, null, null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
-        verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();
+        verify(studentRepository, never()).findAllByDatagsmStudentIdIsNotNull();
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
@@ -434,7 +434,7 @@ class VolunteerServiceTest {
     }
 
     private void givenStudents(Student... students) {
-        given(studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()).willReturn(List.of(students));
+        given(studentRepository.findAllByDatagsmStudentIdIsNotNull()).willReturn(List.of(students));
     }
 
     private static Student student(Long datagsmId, String name, int studentNumber, Integer room) {

@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 /**
  * 봉사 관리(DEC-020). 사감·기숙사 자치위원(관리자)만 사용할 수 있다.
  *
- * 명단은 저장된 전체 학생이다. 관리자는 이 명단에서 학생의 봉사 횟수를 조정한다.
+ * 명단은 DataGSM 학생 id가 있는 저장된 전체 학생이다. 관리자는 이 명단에서 학생의 봉사 횟수를 조정한다.
  * 봉사 횟수는 앞으로 해야 할 봉사 횟수이고, 조정은 알림을 만들지 않는다.
  */
 @Service
@@ -79,7 +79,7 @@ public class VolunteerService {
         Map<Long, DutyStatus> todayDuties = volunteerDutyRepository
                 .findAllByOperatingDay(operatingDayCalculator.today()).stream()
                 .collect(Collectors.toMap(duty -> duty.getStudent().getId(), VolunteerDuty::getStatus));
-        return studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()
+        return studentRepository.findAllByDatagsmStudentIdIsNotNull()
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(student -> minCount == null || student.getVolunteerCount() >= minCount)

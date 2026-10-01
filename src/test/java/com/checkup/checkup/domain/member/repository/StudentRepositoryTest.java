@@ -65,14 +65,16 @@ class StudentRepositoryTest {
     }
 
     @Test
-    @DisplayName("전체 학생을 이름·학번순으로 조회하고 회원 정보를 함께 가져온다")
-    void 전체_학생을_이름과_학번순으로_조회한다() {
+    @DisplayName("DataGSM 학생 id가 있는 학생만 회원 정보와 함께 조회한다")
+    void DataGSM_학생_id가_있는_학생만_조회한다() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, null);
+        Member noId = memberRepository.save(Member.create(88_888L, "아이디 없음", MemberRole.STUDENT));
+        studentRepository.saveAndFlush(Student.create(noId, null, 1, 1, 1, 1104, 301));
 
-        List<Student> students = studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc();
+        List<Student> students = studentRepository.findAllByDatagsmStudentIdIsNotNull();
 
-        assertThat(students).extracting(Student::getStudentNumber).containsSubsequence(1103, 1102);
+        assertThat(students).extracting(Student::getStudentNumber).contains(1102, 1103).doesNotContain(1104);
         assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
                 .isLoaded(student, "member")).isTrue());
     }

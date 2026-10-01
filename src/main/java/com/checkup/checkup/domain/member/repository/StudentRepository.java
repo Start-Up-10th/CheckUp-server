@@ -33,10 +33,11 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     List<Student> findAllByDatagsmStudentIdIn(Collection<Long> datagsmStudentIds);
 
     /**
-     * 저장된 모든 학생을 이름·학번순으로 회원 정보와 함께 조회한다. 봉사 관리 명단에 쓴다.
+     * DataGSM 학생 id가 있는 모든 학생을 회원 정보와 함께 조회한다. 봉사 관리 명단에 쓴다.
+     * 명단의 조정 API 경로가 DataGSM 학생 id라서 그 값이 없는 학생은 뺀다. 정렬은 쓰는 쪽에서 한다.
      */
     @EntityGraph(attributePaths = "member")
-    List<Student> findAllByOrderByMember_NameAscStudentNumberAsc();
+    List<Student> findAllByDatagsmStudentIdIsNotNull();
 
     /**
      * 봉사 횟수를 1 늘린다. DB에서 바로 더해 동시에 눌러도 빠지지 않는다.
