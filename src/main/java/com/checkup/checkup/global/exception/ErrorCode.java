@@ -39,6 +39,10 @@ public enum ErrorCode {
 
     // 봉사
     VOLUNTEER_COUNT_ZERO(HttpStatus.CONFLICT, "봉사 횟수가 0이라 차감할 수 없습니다."),
+    NO_VOLUNTEER_LEFT(HttpStatus.CONFLICT, "봉사가 없습니다."),
+    ALREADY_ON_DUTY(HttpStatus.CONFLICT, "이미 오늘 봉사자로 지정된 학생입니다."),
+    NOT_ON_DUTY(HttpStatus.NOT_FOUND, "오늘 봉사자로 지정되지 않은 학생입니다."),
+    DUTY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 봉사를 완료했습니다."),
 
     // QR
     QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다."),
