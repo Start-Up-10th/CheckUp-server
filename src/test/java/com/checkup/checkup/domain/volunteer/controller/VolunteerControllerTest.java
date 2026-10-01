@@ -114,8 +114,12 @@ class VolunteerControllerTest {
     @DisplayName("로그인하지 않으면 401이고 서비스를 호출하지 않는다")
     void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch(BASE + "/200/count/increase")).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch(BASE + "/200/count/decrease")).andExpect(status().isUnauthorized());
 
         verify(volunteerService, never()).getVolunteers(any(), any(), any());
+        verify(volunteerService, never()).increase(any(), any(), any());
+        verify(volunteerService, never()).decrease(any(), any(), any());
     }
 
     private static RequestPostProcessor loginAs(Long memberId) {
