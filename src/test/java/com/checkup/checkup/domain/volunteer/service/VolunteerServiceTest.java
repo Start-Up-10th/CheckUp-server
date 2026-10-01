@@ -222,6 +222,17 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("저장된 학생이 없으면 404 STUDENT_NOT_FOUND이고 기록하지 않는다")
+    void adjustUnknownStudentIsRejected() {
+        given(studentRepository.findByDatagsmStudentId(200L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
@@ -230,6 +241,9 @@ class VolunteerServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
         verify(studentRepository, never()).findAllByOrderByMember_NameAscStudentNumberAsc();
+        assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
     }
 
     private void givenStudents(Student... students) {
