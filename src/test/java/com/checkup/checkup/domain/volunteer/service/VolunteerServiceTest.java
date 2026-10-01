@@ -207,6 +207,25 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("같은 키가 다른 학생이나 반대 방향 요청에 쓰였으면 409 IDEMPOTENCY_KEY_REUSED다")
+    void reusedKeyForOtherRequestIsRejected() {
+        givenAdjustable(2);
+        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), any(), any())).willReturn(0);
+
+        given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(99L, 1)));
+        assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "key-1"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
+
+        given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(10L, 1)));
+        assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, "key-1"))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
+        verify(studentRepository, never()).increaseVolunteerCount(anyLong());
+        verify(studentRepository, never()).decreaseVolunteerCount(anyLong());
+    }
+
+    @Test
     @DisplayName("키가 없거나 비어 있으면 null로 기록하고 매번 반영한다")
     void blankKeyIsNull() {
         givenAdjustable(2);
