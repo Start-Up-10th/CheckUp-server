@@ -2,6 +2,9 @@ package com.checkup.checkup.domain.volunteer.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
@@ -21,6 +24,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -130,6 +134,19 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("명단의 최근 활동은 학생별 마지막 조정 시각이다")
+    void listFillsLastActivity() {
+        Student student = student(1L, "학생", 2101, 301);
+        ReflectionTestUtils.setField(student, "id", 10L);
+        givenStudents(student);
+        given(volunteerAdjustmentRepository.findLastActivities()).willReturn(List.of(lastActivity(10L, NOW)));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, null))
+                .extracting(VolunteerResponse::lastActivityAt)
+                .containsExactly(NOW);
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
@@ -147,5 +164,29 @@ class VolunteerServiceTest {
     private static Student student(Long datagsmId, String name, int studentNumber, Integer room) {
         return Student.create(Member.create(datagsmId + 1000, name, MemberRole.STUDENT), datagsmId, 2, 1, 1,
                 studentNumber, room);
+    }
+
+    /** DataGSM id 200, 내부 id 10, 봉사 횟수 {@code count}인 학생을 저장소가 돌려주게 한다. */
+    private Student givenAdjustable(int count) {
+        Student student = student(200L, "학생", 2105, 301);
+        ReflectionTestUtils.setField(student, "id", 10L);
+        ReflectionTestUtils.setField(student, "volunteerCount", count);
+        given(studentRepository.findByDatagsmStudentId(200L)).willReturn(Optional.of(student));
+        given(studentRepository.findById(10L)).willReturn(Optional.of(student));
+        return student;
+    }
+
+    private static VolunteerAdjustmentRepository.LastActivity lastActivity(Long studentId, Instant at) {
+        return new VolunteerAdjustmentRepository.LastActivity() {
+            @Override
+            public Long getStudentId() {
+                return studentId;
+            }
+
+            @Override
+            public Instant getLastActivityAt() {
+                return at;
+            }
+        };
     }
 }
