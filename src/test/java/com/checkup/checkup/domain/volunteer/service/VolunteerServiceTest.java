@@ -90,6 +90,22 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("글자로 검색하면 이름에 포함된 학생만 나오고, 층 필터와 함께 쓸 수 있다")
+    void nameSearchWithFloor() {
+        givenStudents(
+                student(1L, "강민우", 2101, 412),
+                student(2L, "김민우", 2102, 501),
+                student(3L, "홍길동", 2103, 413));
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, "민우"))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("강민우", "김민우");
+        assertThat(service.getVolunteers(MEMBER_ID, 4, "민우"))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("강민우");
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
