@@ -170,10 +170,16 @@ class VolunteerControllerTest {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
         mockMvc.perform(patch(BASE + "/200/count/increase")).andExpect(status().isUnauthorized());
         mockMvc.perform(patch(BASE + "/200/count/decrease")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post(BASE + "/200/duty")).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete(BASE + "/200/duty")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post(BASE + "/200/duty/complete")).andExpect(status().isUnauthorized());
 
         verify(volunteerService, never()).getVolunteers(any(), any(), any(), any(), any());
         verify(volunteerService, never()).increase(any(), any(), any());
         verify(volunteerService, never()).decrease(any(), any(), any());
+        verify(volunteerService, never()).assignDuty(any(), any());
+        verify(volunteerService, never()).cancelDuty(any(), any());
+        verify(volunteerService, never()).completeDuty(any(), any());
     }
 
     private static RequestPostProcessor loginAs(Long memberId) {
