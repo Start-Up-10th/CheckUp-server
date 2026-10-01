@@ -285,6 +285,41 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("봉사가 남은 학생을 오늘 봉사자로 지정하고 학생·날짜별 봉사 알림을 만든다")
+    void assignCreatesDutyAndNotification() {
+        givenAdjustable(2);
+        given(volunteerDutyRepository.assign(10L, TODAY, NOW)).willReturn(1);
+
+        service.assignDuty(MEMBER_ID, 200L);
+
+        verify(notificationService).create(eq(10L), eq(NotificationType.VOLUNTEER), eq("duty:2026-10-01"), any());
+    }
+
+    @Test
+    @DisplayName("봉사 횟수가 0이면 409 NO_VOLUNTEER_LEFT이고 지정·알림을 만들지 않는다")
+    void assignWithoutVolunteerIsRejected() {
+        givenAdjustable(0);
+
+        assertThatThrownBy(() -> service.assignDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NO_VOLUNTEER_LEFT));
+        verify(volunteerDutyRepository, never()).assign(anyLong(), any(), any());
+        verify(notificationService, never()).create(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("오늘 이미 지정됐으면 409 ALREADY_ON_DUTY이고 알림을 또 만들지 않는다")
+    void assignTwiceIsRejected() {
+        givenAdjustable(2);
+        given(volunteerDutyRepository.assign(10L, TODAY, NOW)).willReturn(0);
+
+        assertThatThrownBy(() -> service.assignDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ALREADY_ON_DUTY));
+        verify(notificationService, never()).create(anyLong(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("관리자가 아니면 403이고 학생을 조회하지 않는다")
     void nonAdminIsRejected() {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
