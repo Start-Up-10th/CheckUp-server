@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -88,5 +89,17 @@ public class VolunteerController {
     @PostMapping("/{studentId}/duty")
     public VolunteerResponse assignDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
         return volunteerService.assignDuty(memberId, studentId);
+    }
+
+    /**
+     * 오늘 당일 봉사자 지정을 취소하고 그 알림을 지운다. 이미 완료했으면 409다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @return 취소 뒤 학생의 명단 항목
+     */
+    @DeleteMapping("/{studentId}/duty")
+    public VolunteerResponse cancelDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+        return volunteerService.cancelDuty(memberId, studentId);
     }
 }
