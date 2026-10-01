@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
 public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Long> {
 
@@ -27,4 +29,10 @@ public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Lo
             @Param("operatingDay") LocalDate operatingDay,
             @Param("createdAt") Instant createdAt
     );
+
+    /** 학생의 그 운영일 지정. */
+    Optional<VolunteerDuty> findByStudentIdAndOperatingDay(Long studentId, LocalDate operatingDay);
+
+    /** 그 운영일에 지정된 모든 학생. 봉사 관리 명단의 지정 상태 표시에 쓴다. */
+    List<VolunteerDuty> findAllByOperatingDay(LocalDate operatingDay);
 }
