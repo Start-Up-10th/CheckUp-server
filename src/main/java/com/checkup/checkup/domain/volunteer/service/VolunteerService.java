@@ -3,10 +3,15 @@ package com.checkup.checkup.domain.volunteer.service;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.notification.service.NotificationService;
+import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
+import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
+import com.checkup.checkup.global.time.OperatingDayCalculator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +48,9 @@ public class VolunteerService {
     private final AdminVerifier adminVerifier;
     private final StudentRepository studentRepository;
     private final VolunteerAdjustmentRepository volunteerAdjustmentRepository;
+    private final VolunteerDutyRepository volunteerDutyRepository;
+    private final NotificationService notificationService;
+    private final OperatingDayCalculator operatingDayCalculator;
     private final Clock clock;
 
     /**
@@ -63,13 +71,17 @@ public class VolunteerService {
                 .collect(Collectors.toMap(
                         VolunteerAdjustmentRepository.LastActivity::getStudentId,
                         VolunteerAdjustmentRepository.LastActivity::getLastActivityAt));
+        Map<Long, DutyStatus> todayDuties = volunteerDutyRepository
+                .findAllByOperatingDay(operatingDayCalculator.today()).stream()
+                .collect(Collectors.toMap(duty -> duty.getStudent().getId(), VolunteerDuty::getStatus));
         return studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
                 .filter(student -> minCount == null || student.getVolunteerCount() >= minCount)
                 .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)
                 .sorted(Comparator.comparingInt(rank).thenComparing(ROOM_ORDER))
-                .map(student -> VolunteerResponse.of(student, lastActivities.get(student.getId())))
+                .map(student -> VolunteerResponse.of(
+                        student, lastActivities.get(student.getId()), todayDuties.get(student.getId())))
                 .toList();
     }
 
@@ -128,7 +140,17 @@ public class VolunteerService {
 
         Student updated = studentRepository.findById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
-        return VolunteerResponse.of(updated, volunteerAdjustmentRepository.findLastActivityAt(id));
+        return toResponse(updated);
+    }
+
+    /** 학생 한 명의 명단 항목을 최근 활동·오늘 지정 상태와 함께 만든다. */
+    private VolunteerResponse toResponse(Student student) {
+        DutyStatus todayDuty = volunteerDutyRepository
+                .findByStudentIdAndOperatingDay(student.getId(), operatingDayCalculator.today())
+                .map(VolunteerDuty::getStatus)
+                .orElse(null);
+        return VolunteerResponse.of(
+                student, volunteerAdjustmentRepository.findLastActivityAt(student.getId()), todayDuty);
     }
 
     private static String normalizeKey(String requestKey) {

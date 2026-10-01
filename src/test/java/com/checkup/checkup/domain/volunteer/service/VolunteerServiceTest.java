@@ -16,7 +16,10 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
+import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
+import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
@@ -40,8 +43,12 @@ class VolunteerServiceTest {
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final VolunteerAdjustmentRepository volunteerAdjustmentRepository = mock(VolunteerAdjustmentRepository.class);
+    private final VolunteerDutyRepository volunteerDutyRepository = mock(VolunteerDutyRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
+    private final Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
     private final VolunteerService service = new VolunteerService(
-            adminVerifier, studentRepository, volunteerAdjustmentRepository, Clock.fixed(NOW, ZoneOffset.UTC));
+            adminVerifier, studentRepository, volunteerAdjustmentRepository, volunteerDutyRepository,
+            notificationService, new OperatingDayCalculator(clock), clock);
 
     @Test
     @DisplayName("전체 학생을 DataGSM id·이름·학번·호실·봉사 횟수로 응답하고 최근 활동은 비운다")
@@ -52,7 +59,7 @@ class VolunteerServiceTest {
 
         List<VolunteerResponse> list = service.getVolunteers(MEMBER_ID, null, null, null);
 
-        assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null));
+        assertThat(list).containsExactly(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null, null));
     }
 
     @Test

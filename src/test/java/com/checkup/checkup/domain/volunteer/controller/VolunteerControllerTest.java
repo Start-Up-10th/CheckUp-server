@@ -49,7 +49,7 @@ class VolunteerControllerTest {
     @DisplayName("명단을 배열로 응답하고 최근 활동이 없으면 null이다")
     void listReturnsArray() throws Exception {
         given(volunteerService.getVolunteers(MEMBER_ID, null, null, null))
-                .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null)));
+                .willReturn(List.of(new VolunteerResponse(200L, "학생", 2105, 301, 3, 2, null, null)));
 
         mockMvc.perform(get(BASE).with(loginAs(MEMBER_ID)))
                 .andExpect(status().isOk())
@@ -74,7 +74,7 @@ class VolunteerControllerTest {
     @Test
     @DisplayName("증가·차감은 경로의 학생 id와 Idempotency-Key로 처리하고 바뀐 항목을 응답한다")
     void adjustReturnsUpdatedItem() throws Exception {
-        VolunteerResponse updated = new VolunteerResponse(200L, "학생", 2105, 301, 3, 3, Instant.parse("2026-10-01T03:00:00Z"));
+        VolunteerResponse updated = new VolunteerResponse(200L, "학생", 2105, 301, 3, 3, Instant.parse("2026-10-01T03:00:00Z"), null);
         given(volunteerService.increase(MEMBER_ID, 200L, "key-1")).willReturn(updated);
         given(volunteerService.decrease(MEMBER_ID, 200L, null)).willReturn(updated);
 
