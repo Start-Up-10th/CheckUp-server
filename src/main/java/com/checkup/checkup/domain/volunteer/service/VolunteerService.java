@@ -215,6 +215,7 @@ public class VolunteerService {
 
     /**
      * 조정 기록을 먼저 남기고 횟수를 바꾼다. 같은 키의 기록이 이미 있으면 재시도로 보고 횟수를 바꾸지 않는다.
+     * 그 키가 다른 학생이나 반대 방향 요청에 쓰였으면 {@link ErrorCode#IDEMPOTENCY_KEY_REUSED}(409)다.
      * 차감할 수 없으면 예외로 트랜잭션이 취소돼 기록도 남지 않는다.
      */
     private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int delta) {
@@ -229,9 +230,24 @@ public class VolunteerService {
             if (changed == 0) {
                 throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
             }
+        } else {
+            verifySameRequest(key, id, delta);
         }
 
         return reload(id);
+    }
+
+    /**
+     * 키가 겹쳐 기록되지 않았을 때, 기존 기록이 같은 학생·같은 방향의 재시도인지 확인한다.
+     * 웹이 키를 다른 요청에 다시 쓰면 반영되지 않았는데 성공으로 보이지 않도록 409로 알린다.
+     */
+    private void verifySameRequest(String key, Long studentId, int delta) {
+        boolean same = volunteerAdjustmentRepository.findByRequestKey(key)
+                .map(existing -> existing.getStudent().getId().equals(studentId) && existing.getDelta() == delta)
+                .orElse(false);
+        if (!same) {
+            throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
+        }
     }
 
     private Student findStudent(Long studentId) {

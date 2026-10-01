@@ -18,6 +18,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
@@ -198,6 +199,7 @@ class VolunteerServiceTest {
     void retryWithSameKeyDoesNotChangeCount() {
         givenAdjustable(2);
         given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, "key-1", NOW)).willReturn(0);
+        given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(10L, 1)));
 
         service.increase(MEMBER_ID, 200L, "key-1");
 
@@ -454,5 +456,15 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(duty, "status", status);
         given(volunteerDutyRepository.findByStudentIdAndOperatingDay(10L, TODAY)).willReturn(Optional.of(duty));
         return duty;
+    }
+
+    /** 학생 {@code studentId}에 {@code delta}로 남은 조정 기록. */
+    private static VolunteerAdjustment adjustment(Long studentId, int delta) {
+        Student student = student(studentId, "학생", 2105, 301);
+        ReflectionTestUtils.setField(student, "id", studentId);
+        VolunteerAdjustment adjustment = BeanUtils.instantiateClass(VolunteerAdjustment.class);
+        ReflectionTestUtils.setField(adjustment, "student", student);
+        ReflectionTestUtils.setField(adjustment, "delta", (short) delta);
+        return adjustment;
     }
 }
