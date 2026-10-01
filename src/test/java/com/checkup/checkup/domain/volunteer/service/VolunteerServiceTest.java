@@ -134,6 +134,24 @@ class VolunteerServiceTest {
     }
 
     @Test
+    @DisplayName("최소 봉사 횟수를 주면 그 이상 남은 학생만 나오고 검색과 함께 쓸 수 있다")
+    void filteredByMinCountWithSearch() {
+        Student none = student(1L, "강민우", 2101, 301);
+        Student one = student(2L, "김민우", 2102, 401);
+        Student two = student(3L, "홍길동", 2103, 402);
+        ReflectionTestUtils.setField(one, "volunteerCount", 1);
+        ReflectionTestUtils.setField(two, "volunteerCount", 2);
+        givenStudents(none, one, two);
+
+        assertThat(service.getVolunteers(MEMBER_ID, null, null, 1))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("김민우", "홍길동");
+        assertThat(service.getVolunteers(MEMBER_ID, null, "ㄱㅁㅇ", 1))
+                .extracting(VolunteerResponse::name)
+                .containsExactly("김민우");
+    }
+
+    @Test
     @DisplayName("명단의 최근 활동은 학생별 마지막 조정 시각이다")
     void listFillsLastActivity() {
         Student student = student(1L, "학생", 2101, 301);
