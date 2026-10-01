@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 
 /**
@@ -41,31 +41,37 @@ public class VolunteerService {
      *
      * @param memberId 세션의 회원 id
      * @param floor    층(호실의 맨 앞자리). {@code null}이면 전체 층이고, 값이 있으면 호실 미배정 학생은 빠진다.
-     * @param query    검색어. 숫자면 호실 번호나 학번이 정확히 같은 학생, 그 밖에는 이름에 포함된 학생. 비어 있으면 전체다.
+     * @param query    검색어. 숫자면 호실 번호나 학번이 정확히 같은 학생이다. 그 밖에는 이름으로 찾고,
+     *                 이름에 포함 → 초성 일치 → 오타 1개 순으로 앞에 둔다({@link KoreanNameMatcher}). 비어 있으면 전체다.
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
      */
     @Transactional(readOnly = true)
     public List<VolunteerResponse> getVolunteers(Long memberId, Integer floor, String query) {
         adminVerifier.verify(memberId);
+        ToIntFunction<Student> rank = ranker(query);
         return studentRepository.findAllByOrderByMember_NameAscStudentNumberAsc()
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
-                .filter(matches(query))
-                .sorted(ROOM_ORDER)
+                .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)
+                .sorted(Comparator.comparingInt(rank).thenComparing(ROOM_ORDER))
                 .map(VolunteerResponse::from)
                 .toList();
     }
 
-    private static Predicate<Student> matches(String query) {
+    /**
+     * 검색어에 맞는 정도를 순위로 돌려주는 함수를 만든다. 순위가 낮을수록 앞에 오고, 맞지 않으면 {@link KoreanNameMatcher#NO_MATCH}다.
+     */
+    private static ToIntFunction<Student> ranker(String query) {
         if (query == null || query.isBlank()) {
-            return student -> true;
+            return student -> KoreanNameMatcher.CONTAINS;
         }
         String keyword = query.strip();
         if (DIGITS.matcher(keyword).matches()) {
             int number = Integer.parseInt(keyword);
-            return student -> Objects.equals(student.getDormitoryRoom(), number)
-                    || student.getStudentNumber() == number;
+            return student -> Objects.equals(student.getDormitoryRoom(), number) || student.getStudentNumber() == number
+                    ? KoreanNameMatcher.CONTAINS
+                    : KoreanNameMatcher.NO_MATCH;
         }
-        return student -> student.getMember().getName().contains(keyword);
+        return student -> KoreanNameMatcher.rank(student.getMember().getName(), keyword);
     }
 }
