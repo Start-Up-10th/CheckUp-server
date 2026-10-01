@@ -48,4 +48,16 @@ public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Lo
             WHERE d.id = :id AND d.status = com.checkup.checkup.domain.volunteer.entity.DutyStatus.ASSIGNED
             """)
     int complete(@Param("id") Long id, @Param("completedAt") Instant completedAt);
+
+    /**
+     * 아직 완료하지 않은 지정만 지운다. 완료한 지정은 취소할 수 없다.
+     *
+     * @return 지웠으면 1, 이미 완료였으면 0
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            DELETE FROM VolunteerDuty d
+            WHERE d.id = :id AND d.status = com.checkup.checkup.domain.volunteer.entity.DutyStatus.ASSIGNED
+            """)
+    int cancel(@Param("id") Long id);
 }
