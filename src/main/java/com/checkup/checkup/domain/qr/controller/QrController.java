@@ -1,5 +1,7 @@
 package com.checkup.checkup.domain.qr.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 /**
  * 관리자 QR 화면 API(REQ-ATT-003·004, 하네스 DEC-018).
  */
+@Tag(name = "QR(관리자)", description = "관리자 QR 화면. 페이지마다 독립 세션(REQ-ATT-003·004, DEC-018)")
 @RestController
 @RequestMapping("/api/v1/qr")
 @RequiredArgsConstructor
@@ -36,6 +39,7 @@ public class QrController {
      * @param memberId 세션의 회원 id
      * @return 201과 세션·QR 링크
      */
+    @Operation(summary = "QR 세션 생성", description = "페이지 진입·용도 탭 선택마다 새 세션과 첫 QR을 발급한다. 성공 201.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public QrSessionResponse create(
@@ -53,6 +57,7 @@ public class QrController {
      * @param sessionId QR 세션 ID
      * @return 세션·QR 링크. 세션이 없거나 끝났거나 다른 관리자의 세션이면 404
      */
+    @Operation(summary = "QR 세션 유지·현재 QR 조회", description = "약 20초마다 호출한다. 토큰 만료가 가까우면 새 QR로 바뀐다. 세션이 없거나 끝났으면 404 QR_SESSION_NOT_FOUND.")
     @PostMapping("/{sessionId}/heartbeat")
     public QrSessionResponse heartbeat(
             @AuthenticationPrincipal Long memberId,
@@ -68,6 +73,7 @@ public class QrController {
      * @param memberId  세션의 회원 id
      * @param sessionId QR 세션 ID
      */
+    @Operation(summary = "QR 세션 종료", description = "이 페이지의 세션만 종료한다. sendBeacon으로 호출할 수 있다. 성공 204.")
     @PostMapping("/{sessionId}/close")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void close(
