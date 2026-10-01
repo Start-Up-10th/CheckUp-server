@@ -66,7 +66,7 @@ public class Student {
     @Column(nullable = true)
     private String specialty;
 
-    /** 누적 봉사 횟수. DataGSM 값이 아니라 우리 서버가 관리하므로 동기화 갱신에서 건드리지 않는다. */
+    /** 앞으로 해야 할 봉사 횟수(DEC-020). DataGSM 값이 아니라 우리 서버가 관리하므로 동기화 갱신에서 건드리지 않는다. */
     @Column(nullable = false)
     private int volunteerCount;
 
