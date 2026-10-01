@@ -8,6 +8,7 @@ import com.checkup.checkup.domain.face.ai.AiFaceClient;
 import com.checkup.checkup.domain.face.ai.AiFaceFrameResponse;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.domain.member.entity.Student;
+import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
@@ -55,7 +56,7 @@ class FaceRecognitionServiceTest {
     void KNOWN_후보만_현재_출석_대상으로_기록한다() {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
-        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any())).willReturn(true);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
                 .willAnswer(invocation -> {
                     clock.advance(Duration.ofSeconds(1));
@@ -65,6 +66,10 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        Member member = mock(Member.class);
+        given(member.getName()).willReturn("Student Name");
+        given(student.getMember()).willReturn(member);
+        given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
         given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
@@ -74,7 +79,8 @@ class FaceRecognitionServiceTest {
 
         assertThat(response.faces()).hasSize(1);
         assertThat(response.faces().getFirst().recognition().status()).isEqualTo("KNOWN");
-        assertThat(response.faces().getFirst().recognition().studentId()).isEqualTo("900");
+        assertThat(response.faces().getFirst().recognition().studentName()).isEqualTo("Student Name");
+        assertThat(response.faces().getFirst().recognition().studentNumber()).isEqualTo(15);
         assertThat(response.faces().getFirst().recognition().attendance()).isEqualTo("RECORDED");
         verify(attendanceService).markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE);
     }
@@ -83,7 +89,7 @@ class FaceRecognitionServiceTest {
     void AI가_현재_세션_후보가_아닌_학생을_반환하면_UNKNOWN으로_낮춘다() {
         FaceSessionView session = session(Set.of(777L));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
-        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any())).willReturn(true);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
                 .willReturn(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         Student student = mock(Student.class);
@@ -95,7 +101,7 @@ class FaceRecognitionServiceTest {
         var response = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1});
 
         assertThat(response.faces().getFirst().recognition().status()).isEqualTo("UNKNOWN");
-        assertThat(response.faces().getFirst().recognition().studentId()).isNull();
+        assertThat(response.faces().getFirst().recognition().studentName()).isNull();
         verify(attendanceService, never()).markAttended(any(), any(), any(), any());
     }
 
@@ -104,7 +110,7 @@ class FaceRecognitionServiceTest {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
-        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any())).willReturn(true);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
                 .willReturn(new AiFaceFrameResponse("frame-1", List.of(
                         face("UNKNOWN", null), face("NOT_ATTEMPTED", null))));

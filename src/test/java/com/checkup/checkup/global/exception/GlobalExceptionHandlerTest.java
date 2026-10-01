@@ -60,13 +60,18 @@ class GlobalExceptionHandlerTest {
         var unauthorized = handler.handleFaceAi(new AiFaceException(401, "frame", "unauthorized"));
         var rejected = handler.handleFaceAi(new AiFaceException(422, "enrollment", "low_quality"));
         var unavailable = handler.handleFaceAi(new AiFaceException(503, "frame", "not_ready"));
+        var multipleFaces = handler.handleFaceAi(new AiFaceException(422, "enrollment", "MULTIPLE_IDENTITIES"));
+        var modelMismatch = handler.handleFaceAi(new AiFaceException(422, "session_create", "MODEL_MISMATCH"));
 
-        assertThat(unauthorized.getStatusCode().value()).isEqualTo(502);
-        assertThat(unauthorized.getBody().code()).isEqualTo("FACE_AI_BAD_GATEWAY");
+        assertThat(unauthorized.getStatusCode().value()).isEqualTo(503);
+        assertThat(unauthorized.getBody().code()).isEqualTo("FACE_AI_UNAVAILABLE");
         assertThat(rejected.getStatusCode().value()).isEqualTo(422);
         assertThat(rejected.getBody().code()).isEqualTo("FACE_ENROLLMENT_REJECTED");
         assertThat(unavailable.getStatusCode().value()).isEqualTo(503);
         assertThat(unavailable.getBody().code()).isEqualTo("FACE_AI_UNAVAILABLE");
+        assertThat(multipleFaces.getBody().code()).isEqualTo("FACE_ENROLLMENT_MULTIPLE_IDENTITIES");
+        assertThat(modelMismatch.getStatusCode().value()).isEqualTo(502);
+        assertThat(modelMismatch.getBody().code()).isEqualTo("FACE_AI_BAD_GATEWAY");
     }
 
     @Test

@@ -43,8 +43,10 @@ public enum ErrorCode {
     // 얼굴 인식
     FACE_CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "얼굴 정보 처리 동의가 필요합니다."),
     FACE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "얼굴 정보가 이미 등록되어 있습니다."),
+    FACE_ENROLLMENT_NOT_ELIGIBLE(HttpStatus.FORBIDDEN, "현재 얼굴 등록 대상이 아닙니다."),
+    FACE_ENROLLMENT_MULTIPLE_IDENTITIES(HttpStatus.UNPROCESSABLE_ENTITY, "영상에 얼굴이 여러 명 포함되어 있습니다. 본인만 촬영해 주세요."),
     FACE_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "얼굴 인식 세션이 없거나 종료되었습니다."),
-    FACE_NO_CANDIDATES(HttpStatus.UNPROCESSABLE_ENTITY, "현재 인식할 수 있는 등록 학생이 없습니다."),
+    FACE_NO_ENROLLED_STUDENTS(HttpStatus.CONFLICT, "현재 인식할 수 있는 등록 학생이 없습니다."),
     FACE_TOO_MANY_CANDIDATES(HttpStatus.UNPROCESSABLE_ENTITY, "인식 대상 학생이 허용 인원을 초과했습니다."),
     FACE_ENROLLMENT_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "얼굴 등록 영상의 품질이 기준에 맞지 않습니다."),
     FACE_INVALID_MEDIA(HttpStatus.BAD_REQUEST, "지원하지 않거나 읽을 수 없는 영상·이미지입니다."),

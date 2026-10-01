@@ -29,6 +29,9 @@ public record FaceProperties(
         requirePositive(responseTimeout, "response-timeout");
         requirePositive(minFrameInterval, "min-frame-interval");
         requirePositive(sessionIdleTimeout, "session-idle-timeout");
+        if (maxUploadBytes > Integer.MAX_VALUE - 1L || maxFrameBytes > Integer.MAX_VALUE - 1L) {
+            throw new IllegalArgumentException("face request body limits must fit in a byte array");
+        }
         if (cleanupIntervalMs <= 0) {
             throw new IllegalArgumentException("cleanup-interval-ms must be positive");
         }

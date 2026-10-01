@@ -7,15 +7,16 @@ import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
 import com.checkup.checkup.domain.face.service.FaceStudentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Arrays;
 
 /** Student face-consent, status, and first-enrollment endpoints. */
 @RestController
@@ -37,12 +38,20 @@ public class FaceController {
         return faceStudentService.consent(memberId);
     }
 
-    @PostMapping(value = "/enrollments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    /** Accepts raw video bytes only. The upload buffer is cleared on every response path. */
+    @PostMapping(value = "/enrollments", consumes = {"video/webm", "video/mp4"})
     @ResponseStatus(HttpStatus.CREATED)
     public FaceEnrollmentResponse enroll(
             @AuthenticationPrincipal Long memberId,
-            @RequestPart("video") MultipartFile video
+            @RequestHeader("Content-Type") String contentType,
+            @RequestBody byte[] video
     ) {
-        return faceEnrollmentService.enroll(memberId, video);
+        try {
+            return faceEnrollmentService.enroll(memberId, contentType, video);
+        } finally {
+            if (video != null) {
+                Arrays.fill(video, (byte) 0);
+            }
+        }
     }
 }

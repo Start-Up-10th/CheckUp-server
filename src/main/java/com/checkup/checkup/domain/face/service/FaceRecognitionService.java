@@ -83,7 +83,7 @@ public class FaceRecognitionService {
         adminVerifier.verify(adminMemberId);
         List<FaceTemplate> templates = eligibleTemplates();
         if (templates.isEmpty()) {
-            throw new CustomException(ErrorCode.FACE_NO_CANDIDATES);
+            throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
         if (templates.size() > MAX_CANDIDATES) {
             throw new CustomException(ErrorCode.FACE_TOO_MANY_CANDIDATES);
@@ -107,7 +107,7 @@ public class FaceRecognitionService {
             deleteAiSessionQuietly(sessionId);
             throw e;
         }
-        return new FaceSessionResponse(sessionId, purpose, "ready");
+        return new FaceSessionResponse(sessionId, purpose, "ACTIVE");
     }
 
     public FaceFrameResponse recognize(
@@ -129,6 +129,8 @@ public class FaceRecognitionService {
         if (!framePermits.tryAcquire()) {
             throw new CustomException(ErrorCode.FACE_SERVICE_BUSY);
         }
+        UUID frameLockToken = UUID.randomUUID();
+        boolean frameClaimed = false;
         try {
             FaceSessionView session = faceSessionStore.findOwned(sessionId, adminMemberId);
             Instant now = clock.instant();
@@ -141,9 +143,11 @@ public class FaceRecognitionService {
                 closeOwned(session);
                 throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
-            boolean claimed = faceSessionStore.claimFrame(sessionId, adminMemberId, now,
-                    now.minus(properties.minFrameInterval()));
-            if (!claimed) {
+            Instant lockUntil = now.plus(properties.connectTimeout())
+                    .plus(properties.responseTimeout().multipliedBy(2)).plusSeconds(30);
+            frameClaimed = faceSessionStore.claimFrame(sessionId, adminMemberId, now,
+                    now.minus(properties.minFrameInterval()), frameLockToken, lockUntil);
+            if (!frameClaimed) {
                 throw new CustomException(ErrorCode.FACE_FRAME_RATE_LIMITED);
             }
 
@@ -186,6 +190,14 @@ public class FaceRecognitionService {
             }
             throw e;
         } finally {
+            if (frameClaimed) {
+                try {
+                    faceSessionStore.releaseFrame(sessionId, adminMemberId, frameLockToken, clock.instant());
+                } catch (RuntimeException e) {
+                    // The lease expires after the configured AI request timeout if release cannot reach the DB.
+                    log.warn("Face frame lock release failed: reason={}", e.getClass().getSimpleName());
+                }
+            }
             framePermits.release();
             if (image != null) {
                 Arrays.fill(image, (byte) 0);
@@ -208,9 +220,10 @@ public class FaceRecognitionService {
     }
 
     public void cleanupIdleSessions() {
-        Instant cutoff = clock.instant().minus(properties.sessionIdleTimeout());
-        faceSessionStore.findIdleBefore(cutoff).forEach(session -> {
-            if (!session.active() || faceSessionStore.markInactiveIfIdle(session.id(), cutoff)) {
+        Instant now = clock.instant();
+        Instant cutoff = now.minus(properties.sessionIdleTimeout());
+        faceSessionStore.findIdleBefore(cutoff, now).forEach(session -> {
+            if (!session.active() || faceSessionStore.markInactiveIfIdle(session.id(), cutoff, now)) {
                 closeOwnedQuietly(session);
             }
         });
@@ -227,16 +240,19 @@ public class FaceRecognitionService {
         String status = face.recognition().status();
         if (status == null || !Set.of("KNOWN", "UNKNOWN", "NOT_ATTEMPTED").contains(status)
                 || face.bbox() == null || face.bbox().size() != 4
-                || face.bbox().stream().anyMatch(value -> value == null || !Double.isFinite(value))
+                || face.trackId().isBlank()
+                || face.bbox().stream().anyMatch(value -> value == null || !Double.isFinite(value)
+                    || value < 0.0 || value > 1.0)
                 || face.landmarks() == null
                 || face.landmarks().stream().anyMatch(point -> point == null || point.size() != 2
-                    || point.stream().anyMatch(value -> value == null || !Double.isFinite(value)))
+                    || point.stream().anyMatch(value -> value == null || !Double.isFinite(value) || value < 0.0))
                 || qualityInvalid(face.quality()) || face.attempts() < 0
                 || notFinite(face.recognition().score()) || notFinite(face.recognition().margin())) {
             throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
         }
 
-        String studentId = null;
+        String studentName = null;
+        Integer studentNumber = null;
         String attendance = null;
         if ("KNOWN".equals(status)) {
             Long dataGsmStudentId = canonicalStudentId(face.recognition().studentId());
@@ -245,7 +261,8 @@ public class FaceRecognitionService {
             if (student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
                     && student.get().getDormitoryRoom() != null) {
-                studentId = dataGsmStudentId.toString();
+                studentName = student.get().getMember().getName();
+                studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttended(
                         student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
@@ -258,8 +275,7 @@ public class FaceRecognitionService {
         AiFaceFrameResponse.Quality quality = face.quality();
         return new FaceFrameResponse.Face(face.trackId(), face.bbox(), face.landmarks(),
                 new FaceFrameResponse.Quality(quality.brightness(), quality.sharpness(), quality.issues()),
-                new FaceFrameResponse.Recognition(status, studentId,
-                        face.recognition().score(), face.recognition().margin(), attendance),
+                new FaceFrameResponse.Recognition(status, studentName, studentNumber, attendance),
                 face.attempts(), face.qrRecommended());
     }
 
@@ -286,7 +302,8 @@ public class FaceRecognitionService {
             return null;
         }
         try {
-            return Long.parseLong(value);
+            Long parsed = Long.parseLong(value);
+            return parsed > 0 && parsed.toString().equals(value) ? parsed : null;
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -294,9 +311,7 @@ public class FaceRecognitionService {
 
     private List<FaceTemplate> eligibleTemplates() {
         return faceTemplateRepository.findAllByOrderByStudent_IdAsc().stream()
-                .filter(template -> template.getStudent().getFaceAgreedAt() != null)
-                .filter(template -> template.getStudent().getDormitoryRoom() != null)
-                .filter(template -> template.getStudent().getDatagsmStudentId() != null)
+                .filter(template -> eligibleStudent(template.getStudent()))
                 .toList();
     }
 
@@ -313,11 +328,14 @@ public class FaceRecognitionService {
         return new AiFaceSessionRequest(model, candidates);
     }
 
+    private static boolean eligibleStudent(Student student) {
+        return student.hasRequiredConsent() && student.getDormitoryRoom() != null
+                && student.getDatagsmStudentId() != null && student.getDatagsmStudentId() > 0;
+    }
+
     private AiFaceSessionRequest candidateRequest(Set<Long> studentIds) {
         List<FaceTemplate> templates = faceTemplateRepository.findAllByStudent_IdIn(studentIds).stream()
-                .filter(template -> template.getStudent().getFaceAgreedAt() != null)
-                .filter(template -> template.getStudent().getDormitoryRoom() != null)
-                .filter(template -> template.getStudent().getDatagsmStudentId() != null)
+                .filter(template -> eligibleStudent(template.getStudent()))
                 .toList();
         if (templates.size() != studentIds.size() || templates.size() > MAX_CANDIDATES || templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
@@ -350,6 +368,10 @@ public class FaceRecognitionService {
             for (List<Double> vector : vectors) {
                 if (vector == null || vector.size() != VECTOR_DIMENSION
                         || vector.stream().anyMatch(value -> value == null || !Double.isFinite(value))) {
+                    throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
+                }
+                double normSquared = vector.stream().mapToDouble(value -> value * value).sum();
+                if (Math.abs(Math.sqrt(normSquared) - 1.0) > 0.01) {
                     throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
                 }
             }

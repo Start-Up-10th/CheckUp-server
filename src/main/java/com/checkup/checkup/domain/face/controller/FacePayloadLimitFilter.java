@@ -26,11 +26,14 @@ import java.util.concurrent.Semaphore;
 public class FacePayloadLimitFilter extends OncePerRequestFilter {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
-    private Semaphore permits;
+    private Semaphore framePermits;
+    private Semaphore enrollmentPermits;
 
     @jakarta.annotation.PostConstruct
     void initialize() {
-        permits = new Semaphore(properties.maxConcurrentFrames());
+        framePermits = new Semaphore(properties.maxConcurrentFrames());
+        // Keep only one potentially large enrollment body buffered at a time.
+        enrollmentPermits = new Semaphore(1);
     }
 
     @Override
@@ -38,14 +41,15 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return !"POST".equalsIgnoreCase(request.getMethod())
                 || path == null
-                || !path.startsWith("/api/v1/face/sessions/")
-                || !path.endsWith("/frames");
+                || (!isEnrollmentPath(path) && !isFramePath(path));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        long maxSize = properties.maxFrameBytes();
+        boolean enrollment = isEnrollmentPath(request.getServletPath());
+        long maxSize = enrollment ? properties.maxUploadBytes() : properties.maxFrameBytes();
+        Semaphore permits = enrollment ? enrollmentPermits : framePermits;
         if (request.getContentLengthLong() > maxSize) {
             writeError(response, ErrorCode.FACE_UPLOAD_TOO_LARGE);
             return;
@@ -68,6 +72,14 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
         } finally {
             permits.release();
         }
+    }
+
+    private static boolean isEnrollmentPath(String path) {
+        return "/api/v1/face/enrollments".equals(path);
+    }
+
+    private static boolean isFramePath(String path) {
+        return path != null && path.startsWith("/api/v1/face/sessions/") && path.endsWith("/frames");
     }
 
     /** Returns null when input exceeds configured cap. At most cap+1 bytes are read into memory. */

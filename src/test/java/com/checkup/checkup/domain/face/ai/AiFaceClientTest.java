@@ -10,14 +10,55 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 
 class AiFaceClientTest {
+
+    @Test
+    void readinessUsesPublicHealthEndpointWithoutServiceBearer() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+
+        server.expect(requestTo("http://face-ai.test/health/ready"))
+                .andExpect(method(GET))
+                .andExpect(request -> assertThat(request.getHeaders().getFirst("Authorization")).isNull())
+                .andRespond(withSuccess("{\"status\":\"ready\"}", MediaType.APPLICATION_JSON));
+
+        client.ensureReady();
+
+        server.verify();
+    }
+
+    @Test
+    void notReadyResponseRejectsSessionSetup() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+
+        server.expect(requestTo("http://face-ai.test/health/ready"))
+                .andExpect(method(GET))
+                .andRespond(withSuccess("{\"status\":\"not_ready\"}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(client::ensureReady)
+                .isInstanceOfSatisfying(AiFaceException.class,
+                        error -> assertThat(error.getStatus()).isEqualTo(503));
+
+        server.verify();
+    }
 
     @Test
     void 영상_원본과_서비스_Bearer만_AI로_보낸다() {

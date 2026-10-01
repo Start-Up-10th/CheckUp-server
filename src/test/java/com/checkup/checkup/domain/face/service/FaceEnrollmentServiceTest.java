@@ -8,7 +8,6 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockMultipartFile;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
@@ -40,9 +39,9 @@ class FaceEnrollmentServiceTest {
     @Test
     void 동의가_없으면_AI를_호출하지_않는다() {
         given(enrollmentStore.status(MEMBER_ID))
-                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(false, false));
+                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(false, false, false));
 
-        assertThatThrownBy(() -> service.enroll(MEMBER_ID, video()))
+        assertThatThrownBy(() -> service.enroll(MEMBER_ID, "video/webm", video()))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_CONSENT_REQUIRED));
 
@@ -52,9 +51,9 @@ class FaceEnrollmentServiceTest {
     @Test
     void 기존_등록이_있으면_AI를_호출하지_않는다() {
         given(enrollmentStore.status(MEMBER_ID))
-                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true));
+                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, true));
 
-        assertThatThrownBy(() -> service.enroll(MEMBER_ID, video()))
+        assertThatThrownBy(() -> service.enroll(MEMBER_ID, "video/webm", video()))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_ALREADY_REGISTERED));
 
@@ -62,34 +61,44 @@ class FaceEnrollmentServiceTest {
     }
 
     @Test
+    void 등록_대상_학생이_아니면_AI를_호출하지_않는다() {
+        given(enrollmentStore.status(MEMBER_ID))
+                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, false, false));
+
+        assertThatThrownBy(() -> service.enroll(MEMBER_ID, "video/webm", video()))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE));
+
+        verify(aiFaceClient, never()).extract(any(), any());
+    }
+
+    @Test
     void 성공은_벡터와_모델정보를_저장하고_브라우저에는_상태만_준다() {
         given(enrollmentStore.status(MEMBER_ID))
-                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, false));
-        List<List<Double>> vectors = List.of(Collections.nCopies(256, 0.25));
+                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, false));
+        List<List<Double>> vectors = List.of(Collections.nCopies(256, 0.0625));
         given(aiFaceClient.extract(any(), eq(MediaType.parseMediaType("video/webm"))))
                 .willReturn(new AiFaceEnrollmentResponse(MODEL, 2, 1, vectors));
 
-        var response = service.enroll(MEMBER_ID, video());
+        var response = service.enroll(MEMBER_ID, "video/webm", video());
 
-        assertThat(response.status()).isEqualTo("registered");
+        assertThat(response.status()).isEqualTo("REGISTERED");
         verify(enrollmentStore).saveTemplate(eq(MEMBER_ID), eq(MODEL),
-                argThat(json -> json.startsWith("[[0.25,0.25") && json.endsWith("]]")));
+                argThat(json -> json.startsWith("[[0.0625,0.0625") && json.endsWith("]]")));
     }
 
     @Test
     void 잘못된_MIME은_AI로_전달하지_않는다() {
         given(enrollmentStore.status(MEMBER_ID))
-                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, false));
-        MockMultipartFile file = new MockMultipartFile("video", "capture.avi", "video/x-msvideo",
-                new byte[]{1, 2, 3});
+                .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, false));
 
-        assertThatThrownBy(() -> service.enroll(MEMBER_ID, file))
+        assertThatThrownBy(() -> service.enroll(MEMBER_ID, "video/x-msvideo", new byte[]{1, 2, 3}))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_INVALID_MEDIA));
         verify(aiFaceClient, never()).extract(any(), any());
     }
 
-    private static MockMultipartFile video() {
-        return new MockMultipartFile("video", "capture.webm", "video/webm", new byte[]{1, 2, 3});
+    private static byte[] video() {
+        return new byte[]{1, 2, 3};
     }
 }
