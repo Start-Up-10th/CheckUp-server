@@ -35,4 +35,17 @@ public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Lo
 
     /** 그 운영일에 지정된 모든 학생. 봉사 관리 명단의 지정 상태 표시에 쓴다. */
     List<VolunteerDuty> findAllByOperatingDay(LocalDate operatingDay);
+
+    /**
+     * 지정을 완료로 바꾼다. 아직 지정 상태일 때만 바꿔 완료가 두 번 반영되지 않는다.
+     *
+     * @return 완료로 바꿨으면 1, 이미 완료였으면 0
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE VolunteerDuty d
+            SET d.status = com.checkup.checkup.domain.volunteer.entity.DutyStatus.COMPLETED, d.completedAt = :completedAt
+            WHERE d.id = :id AND d.status = com.checkup.checkup.domain.volunteer.entity.DutyStatus.ASSIGNED
+            """)
+    int complete(@Param("id") Long id, @Param("completedAt") Instant completedAt);
 }
