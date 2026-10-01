@@ -1,5 +1,7 @@
 package com.checkup.checkup.domain.auth.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.consent.service.ConsentService;
 import com.checkup.checkup.domain.auth.service.AuthService;
@@ -34,6 +36,7 @@ import java.net.URI;
  * {@link com.checkup.checkup.global.security.SecurityConfig}의 Spring Security 로그아웃 필터가 처리한다.
  */
 @Slf4j
+@Tag(name = "인증", description = "DataGSM OAuth 로그인과 세션 사용자 조회. 로그아웃은 POST /api/v1/auth/logout")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -53,6 +56,7 @@ public class AuthController {
      * @return state·PKCE가 포함된 DataGSM 인가 URL로의 302 응답
      */
     @SecurityRequirements
+    @Operation(summary = "DataGSM 로그인 시작", description = "DataGSM 로그인 페이지로 302 리다이렉트한다. redirect는 로그인 뒤 돌아갈 웹 경로(선택)이며, 없거나 안전하지 않으면 /login/complete로 돌아간다.")
     @GetMapping("/login")
     public ResponseEntity<Void> login(@RequestParam(required = false) String redirect) {
         String url = authService.createLoginUrl(redirect);
@@ -70,6 +74,7 @@ public class AuthController {
      * @return 성공이면 로그인 시작 때 정한 웹 경로(기본 {@code /login/complete}), 실패면 웹 로그인 화면으로의 302 응답
      */
     @SecurityRequirements
+    @Operation(summary = "DataGSM 로그인 콜백", description = "DataGSM이 호출한다. 회원을 저장하고 SESSION 쿠키를 만든 뒤 웹으로 302 리다이렉트한다. 실패도 웹 /login?error=<ErrorCode>로 보낸다.")
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
             @RequestParam(required = false) String code,
@@ -98,6 +103,7 @@ public class AuthController {
      * @param memberId 세션에 저장된 회원 id
      * @return 현재 회원의 이름, 역할, 필수 동의 여부
      */
+    @Operation(summary = "현재 로그인 회원 조회", description = "SESSION 쿠키의 회원 정보와 필수 동의 여부(consented)를 돌려준다. 로그인하지 않았으면 401 UNAUTHORIZED.")
     @GetMapping("/me")
     public OAuthLoginResponse me(@AuthenticationPrincipal Long memberId) {
         Member member = memberService.getById(memberId);
