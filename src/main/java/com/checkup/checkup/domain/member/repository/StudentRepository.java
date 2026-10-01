@@ -47,4 +47,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @Query("UPDATE Student s SET s.volunteerCount = s.volunteerCount + 1 WHERE s.id = :id")
     int increaseVolunteerCount(@Param("id") Long id);
 
+    /**
+     * 봉사 횟수를 1 줄인다. 0이면 줄이지 않는다. 확인과 차감이 한 쿼리라 동시에 눌러도 0 미만이 되지 않는다.
+     *
+     * @return 줄였으면 1, 이미 0이라 그대로면 0
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.volunteerCount = s.volunteerCount - 1 WHERE s.id = :id AND s.volunteerCount > 0")
+    int decreaseVolunteerCount(@Param("id") Long id);
 }
