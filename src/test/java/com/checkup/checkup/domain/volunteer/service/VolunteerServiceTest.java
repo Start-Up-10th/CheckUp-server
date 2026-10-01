@@ -406,6 +406,10 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+        assertThatThrownBy(() -> service.assignDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
+        verify(volunteerDutyRepository, never()).assign(anyLong(), any(), any());
     }
 
     private void givenStudents(Student... students) {
