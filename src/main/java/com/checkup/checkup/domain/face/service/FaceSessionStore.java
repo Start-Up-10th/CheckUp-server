@@ -66,6 +66,11 @@ public class FaceSessionStore {
         return sessionRepository.claimFrame(sessionId, adminMemberId, now, cutoff, token, lockUntil) == 1;
     }
 
+    @Transactional
+    public boolean extendFrame(UUID sessionId, Long adminMemberId, UUID token, Instant now, Instant lockUntil) {
+        return sessionRepository.extendFrame(sessionId, adminMemberId, token, now, lockUntil) == 1;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void releaseFrame(UUID sessionId, Long adminMemberId, UUID token, Instant now) {
         sessionRepository.releaseFrame(sessionId, adminMemberId, token, now);

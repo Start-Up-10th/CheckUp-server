@@ -36,6 +36,13 @@ public interface FaceRecognitionSessionRepository extends JpaRepository<FaceReco
     );
 
     @Modifying
+    @Query("UPDATE FaceRecognitionSession s SET s.frameLockUntil = :lockUntil " +
+            "WHERE s.id = :id AND s.adminMemberId = :adminId AND s.active = true " +
+            "AND s.frameLockToken = :token AND s.frameLockUntil > :now")
+    int extendFrame(@Param("id") UUID id, @Param("adminId") Long adminId, @Param("token") UUID token,
+                    @Param("now") Instant now, @Param("lockUntil") Instant lockUntil);
+
+    @Modifying
     @Query("UPDATE FaceRecognitionSession s SET s.frameLockToken = null, s.frameLockUntil = null, " +
             "s.lastActivityAt = :now WHERE s.id = :id AND s.adminMemberId = :adminId " +
             "AND s.active = true AND s.frameLockToken = :token")

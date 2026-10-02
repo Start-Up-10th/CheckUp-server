@@ -90,21 +90,20 @@ public class FaceRecognitionService {
         }
         AiFaceSessionRequest request = sessionRequest(templates);
         UUID sessionId = UUID.randomUUID();
+        Instant now = clock.instant();
+        // Persist ownership before contacting AI so failed remote cleanup remains retryable.
+        faceSessionStore.create(sessionId, adminMemberId, purpose,
+                templates.stream().map(template -> template.getStudent().getId()).toList(),
+                now, now.minus(properties.minFrameInterval()));
         try {
             aiFaceClient.createSession(sessionId, request);
         } catch (RuntimeException e) {
-            deleteAiSessionQuietly(sessionId);
-            throw e;
-        }
-
-        Instant now = clock.instant();
-        try {
-            // Only persist after AI is ready; never hold a database transaction across inference setup.
-            faceSessionStore.create(sessionId, adminMemberId, purpose,
-                    templates.stream().map(template -> template.getStudent().getId()).toList(),
-                    now, now.minus(properties.minFrameInterval()));
-        } catch (RuntimeException e) {
-            deleteAiSessionQuietly(sessionId);
+            try {
+                faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwnedQuietly);
+            } catch (RuntimeException cleanupLookupFailure) {
+                log.warn("Unready face session cleanup deferred: reason={}",
+                        cleanupLookupFailure.getClass().getSimpleName());
+            }
             throw e;
         }
         return new FaceSessionResponse(sessionId, purpose, "ACTIVE");
@@ -160,6 +159,11 @@ public class FaceRecognitionService {
                 }
                 // Contract says 404 means session absent, so this frame was not processed; recreate and retry once.
                 try {
+                    Instant recoveryUntil = clock.instant().plus(properties.frameRecoveryLease());
+                    if (!faceSessionStore.extendFrame(sessionId, adminMemberId, frameLockToken,
+                            clock.instant(), recoveryUntil)) {
+                        throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
+                    }
                     aiFaceClient.createSession(sessionId, candidateRequest(session.candidateStudentIds()));
                     result = aiFaceClient.recognize(sessionId, frameId, image, mediaType);
                 } catch (RuntimeException recoveryFailure) {
@@ -167,9 +171,10 @@ public class FaceRecognitionService {
                     throw recoveryFailure;
                 }
             }
-            if (!frameId.equals(result.frameId())) {
+            if (result == null || !frameId.equals(result.frameId()) || result.faces() == null) {
                 throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
             }
+            result.faces().forEach(FaceRecognitionService::validateFace);
             FaceSessionView currentSession;
             try {
                 currentSession = faceSessionStore.findOwned(sessionId, adminMemberId);
@@ -234,22 +239,8 @@ public class FaceRecognitionService {
             AiFaceFrameResponse.FaceResult face,
             Instant verifiedAt
     ) {
-        if (face == null || face.trackId() == null || face.quality() == null || face.recognition() == null) {
-            throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
-        }
+        validateFace(face);
         String status = face.recognition().status();
-        if (status == null || !Set.of("KNOWN", "UNKNOWN", "NOT_ATTEMPTED").contains(status)
-                || face.bbox() == null || face.bbox().size() != 4
-                || face.trackId().isBlank()
-                || face.bbox().stream().anyMatch(value -> value == null || !Double.isFinite(value)
-                    || value < 0.0 || value > 1.0)
-                || face.landmarks() == null
-                || face.landmarks().stream().anyMatch(point -> point == null || point.size() != 2
-                    || point.stream().anyMatch(value -> value == null || !Double.isFinite(value) || value < 0.0))
-                || qualityInvalid(face.quality()) || face.attempts() < 0
-                || notFinite(face.recognition().score()) || notFinite(face.recognition().margin())) {
-            throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
-        }
 
         String studentName = null;
         Integer studentNumber = null;
@@ -277,6 +268,28 @@ public class FaceRecognitionService {
                 new FaceFrameResponse.Quality(quality.brightness(), quality.sharpness(), quality.issues()),
                 new FaceFrameResponse.Recognition(status, studentName, studentNumber, attendance),
                 face.attempts(), face.qrRecommended());
+    }
+
+    private static void validateFace(AiFaceFrameResponse.FaceResult face) {
+        if (face == null || face.trackId() == null || face.quality() == null || face.recognition() == null) {
+            throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
+        }
+        String status = face.recognition().status();
+        List<Double> bbox = face.bbox();
+        if (status == null || !Set.of("KNOWN", "UNKNOWN", "NOT_ATTEMPTED").contains(status)
+                || bbox == null || bbox.size() != 4
+                || face.trackId().isBlank()
+                || bbox.stream().anyMatch(value -> value == null || !Double.isFinite(value)
+                    || value < 0.0 || value > 1.0)
+                || bbox.get(0) + bbox.get(2) > 1.000001
+                || bbox.get(1) + bbox.get(3) > 1.000001
+                || face.landmarks() == null
+                || face.landmarks().stream().anyMatch(point -> point == null || point.size() != 2
+                    || point.stream().anyMatch(value -> value == null || !Double.isFinite(value) || value < 0.0))
+                || qualityInvalid(face.quality()) || face.attempts() < 0
+                || notFinite(face.recognition().score()) || notFinite(face.recognition().margin())) {
+            throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
+        }
     }
 
     private static String attendanceResult(AttendanceRecordResult result) {

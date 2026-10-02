@@ -55,6 +55,9 @@ public class GlobalExceptionHandler {
         if ("MULTIPLE_IDENTITIES".equals(e.getErrorCode()) && "enrollment".equals(e.getOperation())) {
             return ErrorCode.FACE_ENROLLMENT_MULTIPLE_IDENTITIES;
         }
+        if ("LOW_LIGHT".equals(e.getErrorCode()) && "enrollment".equals(e.getOperation())) {
+            return ErrorCode.FACE_ENROLLMENT_LOW_LIGHT;
+        }
         return switch (e.getOperation()) {
             case "enrollment" -> ErrorCode.FACE_ENROLLMENT_REJECTED;
             case "frame" -> ErrorCode.FACE_INVALID_FRAME;

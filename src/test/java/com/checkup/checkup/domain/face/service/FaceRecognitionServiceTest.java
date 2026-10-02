@@ -5,8 +5,10 @@ import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.face.ai.AiFaceClient;
+import com.checkup.checkup.domain.face.ai.AiFaceException;
 import com.checkup.checkup.domain.face.ai.AiFaceFrameResponse;
 import com.checkup.checkup.domain.face.config.FaceProperties;
+import com.checkup.checkup.domain.face.entity.FaceTemplate;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -28,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 
 class FaceRecognitionServiceTest {
@@ -120,6 +123,106 @@ class FaceRecognitionServiceTest {
         assertThat(response.faces()).extracting(f -> f.recognition().status())
                 .containsExactly("UNKNOWN", "NOT_ATTEMPTED");
         verify(attendanceService, never()).markAttended(any(), any(), any(), any());
+    }
+
+    @Test
+    void 얼굴_하나라도_응답_검증에_실패하면_어떤_얼굴도_출석_처리하지_않는다() {
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
+        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
+        AiFaceFrameResponse.FaceResult invalid = new AiFaceFrameResponse.FaceResult(
+                "track-2", List.of(0.95, 0.2, 0.2, 0.4), List.of(List.of(4.0, 5.0)),
+                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("UNKNOWN", null, null, null), 0, false);
+        given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
+                .willReturn(new AiFaceFrameResponse("frame-1",
+                        List.of(face("KNOWN", DATAGSM_STUDENT_ID.toString()), invalid)));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1}))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.FACE_AI_BAD_GATEWAY));
+
+        verify(attendanceService, never()).markAttended(any(), any(), any(), any());
+    }
+
+    @Test
+    void 복구가_원래_잠금_시간보다_길어도_프레임_잠금을_연장한다() throws Exception {
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
+        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
+        given(sessionStore.extendFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any())).willReturn(true);
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(STUDENT_DB_ID);
+        given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
+        given(student.getDormitoryRoom()).willReturn(301);
+        given(student.hasRequiredConsent()).willReturn(true);
+        FaceTemplate template = mock(FaceTemplate.class);
+        given(template.getStudent()).willReturn(student);
+        given(template.getModelId()).willReturn("model-a");
+        given(template.getModelVersion()).willReturn("v1");
+        given(template.getDimension()).willReturn(256);
+        given(template.getNormalization()).willReturn("l2");
+        given(template.getVectorsJson()).willReturn(toVectorsJson());
+        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID))).willReturn(List.of(template));
+        given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
+                .willAnswer(invocation -> {
+                    clock.advance(Duration.ofSeconds(80));
+                    throw new AiFaceException(404, "frame", "SESSION_NOT_FOUND");
+                })
+                .willAnswer(invocation -> {
+                    clock.advance(Duration.ofSeconds(25));
+                    return frame("UNKNOWN", null);
+                });
+
+        var response = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1});
+
+        assertThat(response.faces()).hasSize(1);
+        verify(sessionStore).extendFrame(eq(SESSION_ID), eq(ADMIN_ID), org.mockito.ArgumentMatchers.any(),
+                eq(NOW.plusSeconds(80)), eq(NOW.plusSeconds(206)));
+        verify(aiFaceClient).createSession(eq(SESSION_ID), any());
+    }
+
+    @Test
+    void AI_세션_생성_전에_DB_소유권을_저장해_삭제_실패를_재시도_대기열에_남긴다() throws Exception {
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(STUDENT_DB_ID);
+        given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
+        given(student.getDormitoryRoom()).willReturn(301);
+        given(student.hasRequiredConsent()).willReturn(true);
+        FaceTemplate template = mock(FaceTemplate.class);
+        given(template.getStudent()).willReturn(student);
+        given(template.getModelId()).willReturn("model-a");
+        given(template.getModelVersion()).willReturn("v1");
+        given(template.getDimension()).willReturn(256);
+        given(template.getNormalization()).willReturn("l2");
+        given(template.getVectorsJson()).willReturn(toVectorsJson());
+        given(templateRepository.findAllByOrderByStudent_IdAsc()).willReturn(List.of(template));
+        FaceSessionView pending = session(Set.of(STUDENT_DB_ID));
+        given(sessionStore.findOwnedIfPresent(any(), eq(ADMIN_ID))).willReturn(java.util.Optional.of(pending));
+        org.mockito.BDDMockito.willThrow(new AiFaceException(503, "session_create", "unavailable"))
+                .given(aiFaceClient).createSession(any(), any());
+        org.mockito.BDDMockito.willThrow(new AiFaceException(503, "session_delete", "unavailable"))
+                .given(aiFaceClient).deleteSession(any());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                .isInstanceOf(AiFaceException.class);
+
+        var order = inOrder(sessionStore, aiFaceClient);
+        order.verify(sessionStore).create(any(), eq(ADMIN_ID),
+                eq(com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY),
+                eq(List.of(STUDENT_DB_ID)), any(), any());
+        order.verify(aiFaceClient).createSession(any(), any());
+        verify(sessionStore).markInactive(any(), eq(ADMIN_ID));
+        verify(sessionStore, never()).delete(any());
+    }
+
+    private static String toVectorsJson() throws Exception {
+        List<Double> vector = new java.util.ArrayList<>(java.util.Collections.nCopies(256, 0.0));
+        vector.set(0, 1.0);
+        return tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(List.of(vector));
     }
 
     private static FaceSessionView session(Set<Long> candidates) {

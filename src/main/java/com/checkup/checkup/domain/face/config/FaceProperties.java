@@ -42,4 +42,9 @@ public record FaceProperties(
             throw new IllegalArgumentException(name + " must be positive");
         }
     }
+
+    /** Covers readiness, session recreation, and the retried frame after the first frame returns 404. */
+    public Duration frameRecoveryLease() {
+        return connectTimeout.plus(responseTimeout()).multipliedBy(3).plusSeconds(30);
+    }
 }
