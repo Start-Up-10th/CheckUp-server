@@ -2,6 +2,8 @@ package com.checkup.checkup.domain.attendance.repository;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +15,39 @@ import com.checkup.checkup.domain.attendance.entity.Attendance;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
+
+    @Query("""
+            SELECT a.student.id FROM Attendance a
+            WHERE a.student.id IN :studentIds
+              AND a.purpose = :purpose
+              AND a.operatingDay = :operatingDay
+              AND a.attended = true
+            """)
+    List<Long> findAttendedStudentIds(
+            @Param("studentIds") Collection<Long> studentIds,
+            @Param("purpose") AttendancePurpose purpose,
+            @Param("operatingDay") LocalDate operatingDay
+    );
+
+    /** Stores an administrator's current state without rewriting the first verified timestamp. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            INSERT INTO attendance
+                (student_id, purpose, operating_day, attended, first_verified_at, method, manual_updated_at)
+            VALUES
+                (:studentId, :purpose, :operatingDay, :attended, NULL, 'MANUAL', :manualUpdatedAt)
+            ON CONFLICT (student_id, purpose, operating_day) DO UPDATE
+            SET attended = EXCLUDED.attended,
+                method = COALESCE(attendance.method, EXCLUDED.method),
+                manual_updated_at = EXCLUDED.manual_updated_at
+            """, nativeQuery = true)
+    int saveManualAttendance(
+            @Param("studentId") Long studentId,
+            @Param("purpose") String purpose,
+            @Param("operatingDay") LocalDate operatingDay,
+            @Param("attended") boolean attended,
+            @Param("manualUpdatedAt") Instant manualUpdatedAt
+    );
 
     /**
      * 자동 인증(QR·얼굴)으로 출석을 기록한다. 학생·용도·운영일 유니크 제약으로 DB에서 원자적으로 처리한다.
