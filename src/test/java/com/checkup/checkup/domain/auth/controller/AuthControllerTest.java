@@ -23,13 +23,14 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.checkup.checkup.domain.auth.dto.response.CurrentStudentResponse;
+import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.auth.service.AuthService;
+import com.checkup.checkup.domain.auth.service.CurrentMemberService;
 import com.checkup.checkup.domain.auth.service.LoginResult;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
-import com.checkup.checkup.domain.consent.service.ConsentService;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.config.WebConfig;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -54,10 +55,7 @@ class AuthControllerTest {
     private LoginSessionService loginSessionService;
 
     @MockitoBean
-    private MemberService memberService;
-
-    @MockitoBean
-    private ConsentService consentService;
+    private CurrentMemberService currentMemberService;
 
     private final Member member = Member.create(100L, "학생", MemberRole.STUDENT);
 
@@ -138,26 +136,43 @@ class AuthControllerTest {
     }
 
     @Test
-    void 현재_회원은_이름_역할과_필수_동의_여부를_준다() throws Exception {
-        given(memberService.getById(7L)).willReturn(member);
-        given(consentService.hasRequiredConsent(7L)).willReturn(true);
+    void 현재_회원은_이름_역할_필수_동의_여부와_학생_정보를_준다() throws Exception {
+        given(currentMemberService.getCurrentMember(7L)).willReturn(new OAuthLoginResponse(
+                "학생", MemberRole.STUDENT, true,
+                new CurrentStudentResponse(1234L, 2, 4, 5, 2405, 412, 4)));
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .with(authentication(UsernamePasswordAuthenticationToken.authenticated(7L, null, List.of()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("학생"))
                 .andExpect(jsonPath("$.role").value("STUDENT"))
-                .andExpect(jsonPath("$.consented").value(true));
+                .andExpect(jsonPath("$.consented").value(true))
+                .andExpect(jsonPath("$.student.studentId").value(1234))
+                .andExpect(jsonPath("$.student.grade").value(2))
+                .andExpect(jsonPath("$.student.classNumber").value(4))
+                .andExpect(jsonPath("$.student.number").value(5))
+                .andExpect(jsonPath("$.student.studentNumber").value(2405))
+                .andExpect(jsonPath("$.student.dormitoryRoom").value(412))
+                .andExpect(jsonPath("$.student.dormitoryFloor").value(4));
     }
 
     @Test
-    void 동의하지_않은_회원은_consented가_false다() throws Exception {
-        given(memberService.getById(7L)).willReturn(member);
-        given(consentService.hasRequiredConsent(7L)).willReturn(false);
+    void 학생_정보가_없는_회원은_student가_null이다() throws Exception {
+        given(currentMemberService.getCurrentMember(7L))
+                .willReturn(new OAuthLoginResponse("교사", MemberRole.ADMIN, false, null));
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .with(authentication(UsernamePasswordAuthenticationToken.authenticated(7L, null, List.of()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.consented").value(false));
+                .andExpect(jsonPath("$.consented").value(false))
+                .andExpect(jsonPath("$.student").isEmpty());
+    }
+
+    @Test
+    void 로그인하지_않으면_현재_회원은_401() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized());
+
+        verify(currentMemberService, never()).getCurrentMember(any());
     }
 }
