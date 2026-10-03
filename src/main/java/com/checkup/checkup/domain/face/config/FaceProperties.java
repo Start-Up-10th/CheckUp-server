@@ -43,7 +43,7 @@ public record FaceProperties(
         }
     }
 
-    /** Covers readiness, session recreation, and the retried frame after the first frame returns 404. */
+    /** 첫 프레임이 404를 반환한 뒤 준비 상태 확인, 세션 재생성, 프레임 재시도를 마칠 시간을 포함한다. */
     public Duration frameRecoveryLease() {
         return connectTimeout.plus(responseTimeout()).multipliedBy(3).plusSeconds(30);
     }

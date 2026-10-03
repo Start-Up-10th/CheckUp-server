@@ -38,7 +38,7 @@ public class FaceController {
         return faceStudentService.consent(memberId);
     }
 
-    /** Accepts raw video bytes only. The upload buffer is cleared on every response path. */
+    /** 원본 영상 바이트만 받고, 모든 응답 경로에서 업로드 버퍼를 초기화한다. */
     @PostMapping(value = "/enrollments", consumes = {"video/webm", "video/mp4"})
     @ResponseStatus(HttpStatus.CREATED)
     public FaceEnrollmentResponse enroll(

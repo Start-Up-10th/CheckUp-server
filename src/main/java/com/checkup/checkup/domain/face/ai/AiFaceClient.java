@@ -30,7 +30,7 @@ public class AiFaceClient {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
 
-    /** Checks the public readiness endpoint before Spring creates or replaces an AI session. */
+    /** Spring이 AI 세션을 만들거나 교체하기 전에 공개 준비 상태 API를 확인한다. */
     public void ensureReady() {
         AiFaceStatusResponse response = invoke("readiness", () -> faceAiRestClient.get()
                 .uri("/health/ready")
