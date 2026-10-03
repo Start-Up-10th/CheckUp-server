@@ -23,6 +23,9 @@ import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 
+/**
+ * 현재 회원 조회가 세션 회원의 이름·역할·필수 동의 여부와 본인 학생 정보만 돌려주는지 검증한다.
+ */
 class CurrentMemberServiceTest {
 
     private static final Long MEMBER_ID = 7L;

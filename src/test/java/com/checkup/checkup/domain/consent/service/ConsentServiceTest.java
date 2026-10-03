@@ -20,6 +20,9 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 
+/**
+ * 로그인한 학생의 동의 기록과 필수 동의 완료 판정, 학생이 아닌 회원의 거부를 검증한다(REQ-AUTH-004).
+ */
 class ConsentServiceTest {
 
     private static final Long MEMBER_ID = 7L;

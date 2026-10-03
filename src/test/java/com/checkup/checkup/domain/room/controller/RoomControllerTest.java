@@ -25,6 +25,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+/**
+ * 호실 명단 API가 계약 필드로 응답하고, 파라미터 오류·미로그인·권한 오류를 공통 형식으로 응답하는지 검증한다.
+ */
 @WebMvcTest(RoomController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class RoomControllerTest {
@@ -39,7 +42,7 @@ class RoomControllerTest {
 
     @Test
     @DisplayName("호실 학생 명단을 계약에 정의된 JSON 필드의 배열로 반환한다")
-    void 호실_학생_명단을_요청된_JSON_필드로_반환한다() throws Exception {
+    void returnsRoomStudentsWithContractFields() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301))
                 .willReturn(List.of(new RoomStudentResponse("학생", 1, 1101)));
 
@@ -55,7 +58,7 @@ class RoomControllerTest {
 
     @Test
     @DisplayName("미인증 요청은 서비스를 호출하지 않고 401을 반환한다")
-    void 로그인하지_않으면_401이고_서비스를_호출하지_않는다() throws Exception {
+    void withoutLoginReturnsUnauthorizedWithoutService() throws Exception {
         mockMvc.perform(get("/api/v1/room/student").param("dormitoryRoom", "301"))
                 .andExpect(status().isUnauthorized());
 
@@ -64,7 +67,7 @@ class RoomControllerTest {
 
     @Test
     @DisplayName("호실 파라미터가 누락되거나 숫자가 아니거나 0 이하이면 400을 반환한다")
-    void 호실_파라미터_누락과_숫자오류_및_0이하는_400이다() throws Exception {
+    void invalidRoomParameterReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/v1/room/student").with(loginAs(MEMBER_ID)))
                 .andExpect(status().isBadRequest());
 
@@ -83,7 +86,7 @@ class RoomControllerTest {
 
     @Test
     @DisplayName("서비스의 권한 오류를 기존 오류 응답 형식으로 반환한다")
-    void 서비스_권한_오류를_기존_오류_응답으로_반환한다() throws Exception {
+    void serviceErrorUsesErrorResponse() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301))
                 .willThrow(new CustomException(ErrorCode.FORBIDDEN));
 

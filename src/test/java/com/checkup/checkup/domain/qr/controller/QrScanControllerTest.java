@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,6 +28,9 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.SecurityConfig;
 
+/**
+ * QR 스캔 API가 로그인한 학생 본인으로만 출석을 처리하고, 판정 결과를 200으로, 오류를 공통 형식으로 응답하는지 검증한다(REQ-ATT-005).
+ */
 @WebMvcTest(QrScanController.class)
 @Import(SecurityConfig.class)
 class QrScanControllerTest {
@@ -41,7 +45,8 @@ class QrScanControllerTest {
     private QrScanService qrScanService;
 
     @Test
-    void 판정_결과를_200으로_돌려준다() throws Exception {
+    @DisplayName("판정 결과를 200으로 돌려준다")
+    void returnsResultWithOk() throws Exception {
         given(qrScanService.scan(STUDENT_ID, TOKEN)).willReturn(QrScanResult.APPROVED);
 
         mockMvc.perform(post("/api/v1/qr/attendance")
@@ -53,7 +58,8 @@ class QrScanControllerTest {
     }
 
     @Test
-    void 만료_같은_판정도_200이다() throws Exception {
+    @DisplayName("만료 같은 판정도 200이다")
+    void expiredResultIsAlsoOk() throws Exception {
         given(qrScanService.scan(STUDENT_ID, TOKEN)).willReturn(QrScanResult.EXPIRED);
 
         mockMvc.perform(post("/api/v1/qr/attendance")
@@ -65,7 +71,8 @@ class QrScanControllerTest {
     }
 
     @Test
-    void 요청에_다른_학생_id를_넣어도_로그인한_학생으로_처리한다() throws Exception {
+    @DisplayName("요청에 다른 학생 id를 넣어도 로그인한 학생으로 처리한다")
+    void usesLoggedInStudentEvenIfBodyHasOtherId() throws Exception {
         given(qrScanService.scan(STUDENT_ID, TOKEN)).willReturn(QrScanResult.APPROVED);
 
         mockMvc.perform(post("/api/v1/qr/attendance")
@@ -78,7 +85,8 @@ class QrScanControllerTest {
     }
 
     @Test
-    void 로그인하지_않으면_401이다() throws Exception {
+    @DisplayName("로그인하지 않으면 401이다")
+    void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/qr/attendance")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"" + TOKEN + "\"}"))
@@ -88,7 +96,8 @@ class QrScanControllerTest {
     }
 
     @Test
-    void 학생이_아니면_403과_오류_코드다() throws Exception {
+    @DisplayName("학생이 아니면 403과 오류 코드다")
+    void nonStudentReturnsForbidden() throws Exception {
         given(qrScanService.scan(STUDENT_ID, TOKEN)).willThrow(new CustomException(ErrorCode.MISSING_STUDENT_INFO));
 
         mockMvc.perform(post("/api/v1/qr/attendance")
@@ -100,7 +109,8 @@ class QrScanControllerTest {
     }
 
     @Test
-    void 토큰이_없으면_400이다() throws Exception {
+    @DisplayName("토큰이 없으면 400이다")
+    void missingTokenReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/v1/qr/attendance")
                         .with(loginAs(STUDENT_ID))
                         .contentType(MediaType.APPLICATION_JSON)

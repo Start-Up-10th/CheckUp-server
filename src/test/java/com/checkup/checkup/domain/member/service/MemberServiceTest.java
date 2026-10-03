@@ -20,6 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import team.themoment.datagsm.sdk.oauth.model.UserInfo;
 
+/**
+ * 로그인할 때 DataGSM 학생 정보로 학생의 호실이 저장·갱신되는지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
 
@@ -41,7 +44,7 @@ class MemberServiceTest {
 
     @Test
     @DisplayName("로그인 학생의 DataGSM 호실을 dormitoryRoom으로 저장한다")
-    void 로그인_학생의_DataGSM_호실을_dormitoryRoom으로_저장한다() {
+    void savesDormitoryRoomOnLogin() {
         UserInfo userInfo = studentUser(301);
         given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.empty());
         given(memberRepository.save(any(Member.class)))
@@ -57,7 +60,7 @@ class MemberServiceTest {
 
     @Test
     @DisplayName("로그인 학생의 변경된 호실을 기존 dormitoryRoom에 반영한다")
-    void 로그인_학생의_호실_변경을_existing_dormitoryRoom으로_갱신한다() {
+    void updatesDormitoryRoomOnLogin() {
         Member member = Member.create(DATAGSM_USER_ID, "학생", MemberRole.STUDENT);
         Student savedStudent = Student.create(member, DATAGSM_STUDENT_ID, 1, 1, 1, 1101, 301);
         given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.of(member));

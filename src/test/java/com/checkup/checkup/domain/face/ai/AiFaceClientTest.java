@@ -1,16 +1,5 @@
 package com.checkup.checkup.domain.face.ai;
 
-import com.checkup.checkup.domain.face.config.FaceProperties;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
-import tools.jackson.databind.json.JsonMapper;
-
-import java.time.Duration;
-import java.util.List;
-import java.util.UUID;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -22,9 +11,25 @@ import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.http.HttpMethod.PUT;
 
+import com.checkup.checkup.domain.face.config.FaceProperties;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * 얼굴 AI 클라이언트의 준비 상태 확인, 영상 원본과 서비스 토큰 전송, 세션 요청 직렬화 형식을 검증한다.
+ */
 class AiFaceClientTest {
 
     @Test
+    @DisplayName("준비 상태 확인은 서비스 토큰 없이 공개 health 경로를 쓴다")
     void readinessUsesPublicHealthEndpointWithoutServiceBearer() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -44,6 +49,7 @@ class AiFaceClientTest {
     }
 
     @Test
+    @DisplayName("AI가 준비되지 않았으면 503으로 세션 준비를 거부한다")
     void notReadyResponseRejectsSessionSetup() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -64,7 +70,8 @@ class AiFaceClientTest {
     }
 
     @Test
-    void 영상_원본과_서비스_Bearer만_AI로_보낸다() {
+    @DisplayName("영상 원본과 서비스 Bearer만 AI로 보낸다")
+    void sendsOnlyVideoAndServiceBearerToAi() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
@@ -90,7 +97,8 @@ class AiFaceClientTest {
     }
 
     @Test
-    void 세션_요청은_FastAPI가_기대하는_snake_case_필드로_직렬화한다() {
+    @DisplayName("세션 요청은 FastAPI가 기대하는 snake_case 필드로 직렬화한다")
+    void sessionRequestUsesSnakeCaseFields() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",

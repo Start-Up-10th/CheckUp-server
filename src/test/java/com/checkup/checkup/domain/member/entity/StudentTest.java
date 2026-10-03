@@ -6,11 +6,14 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 학생 엔티티의 층 계산, 호실 비우기, DataGSM 이벤트 순서 판정, 동의 기록 규칙을 검증한다.
+ */
 class StudentTest {
 
     @Test
     @DisplayName("호실 번호에서 층을 정수로 계산한다")
-    void 호실에서_층을_정수로_계산한다() {
+    void floorIsCalculatedFromRoom() {
         Student thirdFloor = student(301);
         Student fourthFloor = student(425);
 
@@ -21,7 +24,7 @@ class StudentTest {
 
     @Test
     @DisplayName("호실이 미배정이면 층도 null을 반환한다")
-    void 호실이_없으면_층도_없다() {
+    void noRoomMeansNoFloor() {
         Student unassigned = student(null);
 
         assertThat(unassigned.getDormitoryRoom()).isNull();

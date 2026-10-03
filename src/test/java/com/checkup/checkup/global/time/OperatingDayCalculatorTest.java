@@ -8,8 +8,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 운영일이 Asia/Seoul 08:00 경계로 계산되는지(전날·당일 판정, 운영일 시작, 다음 경계, 월말·연말) 검증한다(DEC-006).
+ */
 class OperatingDayCalculatorTest {
 
     private static OperatingDayCalculator at(LocalDateTime kst) {
@@ -24,25 +28,29 @@ class OperatingDayCalculatorTest {
     }
 
     @Test
-    void 오전_8시_정각은_당일_운영일이다() {
+    @DisplayName("오전 8시 정각은 당일 운영일이다")
+    void eightOClockIsSameOperatingDay() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 8, 0)).today())
                 .isEqualTo(LocalDate.of(2026, 9, 26));
     }
 
     @Test
-    void 오전_8시_직전은_전날_운영일이다() {
+    @DisplayName("오전 8시 직전은 전날 운영일이다")
+    void justBefore8IsPreviousOperatingDay() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 7, 59, 59, 999_999_999)).today())
                 .isEqualTo(LocalDate.of(2026, 9, 25));
     }
 
     @Test
-    void 자정이_지나도_오전_8시_전이면_전날_운영일이다() {
+    @DisplayName("자정이 지나도 오전 8시 전이면 전날 운영일이다")
+    void afterMidnightBefore8IsPreviousOperatingDay() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 0, 30)).today())
                 .isEqualTo(LocalDate.of(2026, 9, 25));
     }
 
     @Test
-    void 서버_시계가_UTC여도_KST_기준으로_계산한다() {
+    @DisplayName("서버 시계가 UTC여도 KST 기준으로 계산한다")
+    void usesKstEvenWithUtcClock() {
         Instant utc = LocalDateTime.of(2026, 9, 25, 23, 0).toInstant(ZoneOffset.UTC);
 
         assertThat(at(LocalDateTime.of(2026, 1, 1, 12, 0)).of(utc))
@@ -50,25 +58,29 @@ class OperatingDayCalculatorTest {
     }
 
     @Test
-    void 운영일_시작_시각은_해당_날짜_오전_8시다() {
+    @DisplayName("운영일 시작 시각은 해당 날짜 오전 8시다")
+    void operatingDayStartsAt8() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 12, 0)).startOf(LocalDate.of(2026, 9, 26)))
                 .isEqualTo(kst(2026, 9, 26, 8, 0));
     }
 
     @Test
-    void 오전_8시_전의_다음_경계는_당일_오전_8시다() {
+    @DisplayName("오전 8시 전의 다음 경계는 당일 오전 8시다")
+    void nextBoundaryBefore8IsSameDay8() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 7, 50)).nextBoundary())
                 .isEqualTo(kst(2026, 9, 26, 8, 0));
     }
 
     @Test
-    void 오전_8시_정각의_다음_경계는_다음날_오전_8시다() {
+    @DisplayName("오전 8시 정각의 다음 경계는 다음날 오전 8시다")
+    void nextBoundaryAt8IsNextDay8() {
         assertThat(at(LocalDateTime.of(2026, 9, 26, 8, 0)).nextBoundary())
                 .isEqualTo(kst(2026, 9, 27, 8, 0));
     }
 
     @Test
-    void 월말_연말도_날짜를_넘긴다() {
+    @DisplayName("월말 연말도 날짜를 넘긴다")
+    void crossesMonthAndYearEnd() {
         assertThat(at(LocalDateTime.of(2027, 1, 1, 3, 0)).today())
                 .isEqualTo(LocalDate.of(2026, 12, 31));
         assertThat(at(LocalDateTime.of(2026, 12, 31, 23, 0)).nextBoundary())

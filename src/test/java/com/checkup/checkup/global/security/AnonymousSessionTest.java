@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -18,6 +19,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 로그인하지 않은 요청이 401로 막혀도 세션을 만들지 않는지 검증한다.
+ */
 @WebMvcTest(controllers = AnonymousSessionTest.ProbeController.class)
 @Import({SecurityConfig.class, AnonymousSessionTest.ProbeController.class})
 class AnonymousSessionTest {
@@ -28,7 +32,8 @@ class AnonymousSessionTest {
     private MockMvc mockMvc;
 
     @Test
-    void 로그인하지_않은_요청이_401로_막혀도_세션을_만들지_않는다() throws Exception {
+    @DisplayName("로그인하지 않은 요청이 401로 막혀도 세션을 만들지 않는다")
+    void unauthenticatedRequestDoesNotCreateSession() throws Exception {
         MvcResult result = mockMvc.perform(get(PROTECTED))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("Set-Cookie"))
@@ -38,7 +43,8 @@ class AnonymousSessionTest {
     }
 
     @Test
-    void 로그인한_요청은_그대로_처리된다() throws Exception {
+    @DisplayName("로그인한 요청은 그대로 처리된다")
+    void authenticatedRequestIsHandled() throws Exception {
         mockMvc.perform(get(PROTECTED)
                         .with(authentication(UsernamePasswordAuthenticationToken.authenticated(1L, null, List.of()))))
                 .andExpect(status().isOk());

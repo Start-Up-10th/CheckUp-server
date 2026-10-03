@@ -1,5 +1,9 @@
 package com.checkup.checkup.domain.face.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
 import com.checkup.checkup.domain.face.ai.AiFaceClient;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.domain.member.dto.StudentLeftEvent;
@@ -8,6 +12,7 @@ import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -29,10 +34,9 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
+/**
+ * 학생이 졸업·자퇴하면 이벤트 커밋 뒤에 얼굴 벡터와 인식 세션 후보가 삭제되는지 검증한다.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -81,7 +85,8 @@ class FaceStudentLeftListenerTest {
     private UUID sessionId;
 
     @Test
-    void 퇴사_이벤트_커밋_후_벡터와_세션_후보가_삭제된다() {
+    @DisplayName("퇴사 이벤트 커밋 후 벡터와 세션 후보가 삭제된다")
+    void studentLeftDeletesTemplateAndCandidatesAfterCommit() {
         insertFaceData();
 
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
