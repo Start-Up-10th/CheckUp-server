@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.face.controller;
 import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
 import com.checkup.checkup.domain.face.service.FaceStudentService;
 import com.checkup.checkup.global.security.SecurityConfig;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,7 +28,8 @@ class FaceControllerSecurityTest {
     private FaceEnrollmentService faceEnrollmentService;
 
     @Test
-    void 로그인하지_않은_얼굴_요청은_공통_401로_차단한다() throws Exception {
+    @DisplayName("로그인하지 않은 얼굴 요청은 공통 401로 차단한다")
+    void unauthenticatedFaceRequestReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/face/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
