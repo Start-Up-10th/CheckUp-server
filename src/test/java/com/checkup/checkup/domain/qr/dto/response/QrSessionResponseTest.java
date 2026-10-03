@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
+/**
+ * QR 세션 응답의 qrUrl이 학생 웹 /qr 경로와 fragment 토큰으로 만들어지는지 검증한다(DEC-018).
+ */
 class QrSessionResponseTest {
 
     private static final String TOKEN = "a".repeat(43);
