@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.face.ai.AiFaceModel;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import tools.jackson.databind.json.JsonMapper;
@@ -37,7 +38,8 @@ class FaceEnrollmentServiceTest {
             enrollmentStore, aiFaceClient, properties, JsonMapper.builder().build());
 
     @Test
-    void 동의가_없으면_AI를_호출하지_않는다() {
+    @DisplayName("동의가 없으면 AI를 호출하지 않는다")
+    void withoutConsentDoesNotCallAi() {
         given(enrollmentStore.status(MEMBER_ID))
                 .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(false, false, false));
 
@@ -49,7 +51,8 @@ class FaceEnrollmentServiceTest {
     }
 
     @Test
-    void 기존_등록이_있으면_AI를_호출하지_않는다() {
+    @DisplayName("기존 등록이 있으면 AI를 호출하지 않는다")
+    void alreadyEnrolledDoesNotCallAi() {
         given(enrollmentStore.status(MEMBER_ID))
                 .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, true));
 
@@ -61,7 +64,8 @@ class FaceEnrollmentServiceTest {
     }
 
     @Test
-    void 등록_대상_학생이_아니면_AI를_호출하지_않는다() {
+    @DisplayName("등록 대상 학생이 아니면 AI를 호출하지 않는다")
+    void nonStudentDoesNotCallAi() {
         given(enrollmentStore.status(MEMBER_ID))
                 .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, false, false));
 
@@ -73,7 +77,8 @@ class FaceEnrollmentServiceTest {
     }
 
     @Test
-    void 성공은_벡터와_모델정보를_저장하고_브라우저에는_상태만_준다() {
+    @DisplayName("성공은 벡터와 모델정보를 저장하고 브라우저에는 상태만 준다")
+    void successStoresVectorsAndReturnsStatusOnly() {
         given(enrollmentStore.status(MEMBER_ID))
                 .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, false));
         List<List<Double>> vectors = List.of(Collections.nCopies(256, 0.0625));
@@ -88,7 +93,8 @@ class FaceEnrollmentServiceTest {
     }
 
     @Test
-    void 잘못된_MIME은_AI로_전달하지_않는다() {
+    @DisplayName("잘못된 MIME은 AI로 전달하지 않는다")
+    void invalidMimeIsNotSentToAi() {
         given(enrollmentStore.status(MEMBER_ID))
                 .willReturn(new FaceEnrollmentStore.FaceStatusResponseData(true, true, false));
 
