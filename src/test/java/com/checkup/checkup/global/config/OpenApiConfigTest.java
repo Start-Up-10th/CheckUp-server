@@ -44,6 +44,8 @@ class OpenApiConfigTest {
                 .andExpect(jsonPath("$.components.securitySchemes.SESSION.in").value("cookie"))
                 .andExpect(jsonPath("$.components.securitySchemes.SESSION.name").value("SESSION"))
                 .andExpect(jsonPath("$.components.schemas.ErrorResponse.properties.code").exists())
+                .andExpect(jsonPath("$.components.schemas.FieldError.properties.field").exists())
+                .andExpect(jsonPath("$.components.schemas.FieldError.properties.reason").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/auth/me'].get.responses.default").exists());
     }
 

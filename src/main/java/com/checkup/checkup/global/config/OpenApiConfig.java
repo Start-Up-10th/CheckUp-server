@@ -53,7 +53,8 @@ public class OpenApiConfig {
     @Bean
     public OpenApiCustomizer errorResponseCustomizer() {
         return openApi -> {
-            ModelConverters.getInstance().read(ErrorResponse.class)
+            // readAll: ErrorResponse가 참조하는 FieldError 스키마까지 함께 등록한다.
+            ModelConverters.getInstance().readAll(ErrorResponse.class)
                     .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
 
             ApiResponse errorResponse = new ApiResponse()
