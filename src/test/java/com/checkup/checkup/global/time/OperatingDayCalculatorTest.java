@@ -11,6 +11,9 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 운영일이 Asia/Seoul 08:00 경계로 계산되는지(전날·당일 판정, 운영일 시작, 다음 경계, 월말·연말) 검증한다(DEC-006).
+ */
 class OperatingDayCalculatorTest {
 
     private static OperatingDayCalculator at(LocalDateTime kst) {
