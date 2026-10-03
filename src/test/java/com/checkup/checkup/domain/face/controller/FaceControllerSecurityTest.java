@@ -15,6 +15,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * 로그인하지 않은 얼굴 API 요청이 공통 401 응답으로 막히는지 검증한다.
+ */
 @WebMvcTest(FaceController.class)
 @Import(SecurityConfig.class)
 class FaceControllerSecurityTest {
