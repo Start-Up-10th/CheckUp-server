@@ -20,6 +20,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import team.themoment.datagsm.sdk.oauth.model.UserInfo;
 
+/**
+ * 로그인할 때 DataGSM 학생 정보로 학생의 호실이 저장·갱신되는지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
 
