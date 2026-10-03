@@ -35,6 +35,9 @@ import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 
+/**
+ * 실제 PostgreSQL에서 자동 인증 출석이 학생·용도·운영일마다 한 번만 기록되고, 수동 수정·늦은 인증·시계 오차 규칙(REQ-ATT-002·007)과 출석 완료 알림 생성을 지키는지 검증한다.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
