@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -34,7 +35,8 @@ class SecurityErrorHandlerTest {
     private ObjectMapper objectMapper;
 
     @Test
-    void 로그인하지_않은_요청은_401과_공통_오류_형식으로_응답한다() throws Exception {
+    @DisplayName("로그인하지 않은 요청은 401과 공통 오류 형식으로 응답한다")
+    void unauthenticatedReturnsCommonErrorResponse() throws Exception {
         mockMvc.perform(get(PROTECTED))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -44,7 +46,8 @@ class SecurityErrorHandlerTest {
     }
 
     @Test
-    void 권한이_없는_요청은_403과_공통_오류_형식으로_응답하고_예외_메시지를_넣지_않는다() throws Exception {
+    @DisplayName("권한이 없는 요청은 403과 공통 오류 형식으로 응답하고 예외 메시지를 넣지 않는다")
+    void forbiddenReturnsCommonErrorResponseWithoutMessage() throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         new SecurityErrorHandler(objectMapper)
