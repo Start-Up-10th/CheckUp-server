@@ -11,6 +11,9 @@ import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+/**
+ * OAuth state에 code_verifier와 돌아갈 경로가 함께 저장되고, 한 번만 꺼낼 수 있으며, 안전하지 않은 경로는 기본 경로로 바뀌는지 검증한다.
+ */
 @DataRedisTest
 @Import(OAuthStateService.class)
 class OAuthStateServiceTest {
