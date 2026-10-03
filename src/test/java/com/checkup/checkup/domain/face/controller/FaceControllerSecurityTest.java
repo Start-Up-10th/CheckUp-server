@@ -1,5 +1,9 @@
 package com.checkup.checkup.domain.face.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
 import com.checkup.checkup.domain.face.service.FaceStudentService;
 import com.checkup.checkup.global.security.SecurityConfig;
@@ -10,10 +14,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 로그인하지 않은 얼굴 API 요청이 공통 401 응답으로 막히는지 검증한다.
