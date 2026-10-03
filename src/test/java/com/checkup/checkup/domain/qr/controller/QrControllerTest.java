@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -59,7 +60,8 @@ class QrControllerTest {
     );
 
     @Test
-    void 관리자는_QR_세션을_만들고_201과_qrUrl을_받는다() throws Exception {
+    @DisplayName("관리자는 QR 세션을 만들고 201과 qrUrl을 받는다")
+    void adminCreatesSessionWithQrUrl() throws Exception {
         given(qrSessionService.create(ADMIN_ID, AttendancePurpose.DORMITORY)).willReturn(issue);
 
         mockMvc.perform(post("/api/v1/qr")
@@ -77,7 +79,8 @@ class QrControllerTest {
     }
 
     @Test
-    void 로그인하지_않으면_401이다() throws Exception {
+    @DisplayName("로그인하지 않으면 401이다")
+    void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/qr")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"purpose\":\"DORMITORY\"}"))
@@ -87,7 +90,8 @@ class QrControllerTest {
     }
 
     @Test
-    void 관리자가_아니면_403이고_세션을_만들지_않는다() throws Exception {
+    @DisplayName("관리자가 아니면 403이고 세션을 만들지 않는다")
+    void nonAdminReturnsForbiddenWithoutSession() throws Exception {
         willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(STUDENT_ID);
 
         mockMvc.perform(post("/api/v1/qr")
@@ -101,7 +105,8 @@ class QrControllerTest {
     }
 
     @Test
-    void 용도가_없거나_잘못되면_400이다() throws Exception {
+    @DisplayName("용도가 없거나 잘못되면 400이다")
+    void missingOrInvalidPurposeReturnsBadRequest() throws Exception {
         mockMvc.perform(post("/api/v1/qr")
                         .with(loginAs(ADMIN_ID))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +121,8 @@ class QrControllerTest {
     }
 
     @Test
-    void heartbeat는_현재_qrUrl을_돌려준다() throws Exception {
+    @DisplayName("heartbeat는 현재 qrUrl을 돌려준다")
+    void heartbeatReturnsCurrentQrUrl() throws Exception {
         given(qrSessionService.heartbeat(ADMIN_ID, "session-1")).willReturn(issue);
 
         mockMvc.perform(post("/api/v1/qr/session-1/heartbeat").with(loginAs(ADMIN_ID)))
@@ -125,7 +131,8 @@ class QrControllerTest {
     }
 
     @Test
-    void 없는_세션의_heartbeat는_404다() throws Exception {
+    @DisplayName("없는 세션의 heartbeat는 404다")
+    void heartbeatOnUnknownSessionReturnsNotFound() throws Exception {
         given(qrSessionService.heartbeat(ADMIN_ID, "gone"))
                 .willThrow(new CustomException(ErrorCode.QR_SESSION_NOT_FOUND));
 
@@ -135,7 +142,8 @@ class QrControllerTest {
     }
 
     @Test
-    void 종료는_204이고_해당_세션만_종료한다() throws Exception {
+    @DisplayName("종료는 204이고 해당 세션만 종료한다")
+    void closeReturnsNoContentForThatSessionOnly() throws Exception {
         mockMvc.perform(post("/api/v1/qr/session-1/close").with(loginAs(ADMIN_ID)))
                 .andExpect(status().isNoContent());
 
