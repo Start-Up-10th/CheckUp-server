@@ -27,6 +27,9 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
 
+/**
+ * QR 세션과 토큰의 수명(15분 토큰, lease, 08:00 경계)과 페이지·관리자별 독립 종료를 검증한다(REQ-ATT-003·004).
+ */
 @DataRedisTest
 @Import({
         QrSessionService.class,
