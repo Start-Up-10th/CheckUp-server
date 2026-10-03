@@ -26,6 +26,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+/**
+ * 학생 정보·봉사 횟수 조회 API의 응답 필드와 401·400·403·404 응답을 검증한다.
+ */
 @WebMvcTest(UserController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class UserControllerTest {
