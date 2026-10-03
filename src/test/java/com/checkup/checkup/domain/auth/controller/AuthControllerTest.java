@@ -39,6 +39,9 @@ import com.checkup.checkup.global.security.SecurityConfig;
 
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 
+/**
+ * 인증 API의 로그인 시작·콜백 리다이렉트(성공·실패 모두 웹으로 302)와 현재 회원 조회 응답·401을 검증한다(REQ-AUTH-001·004).
+ */
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, WebConfig.class})
 @TestPropertySource(properties = "checkup.web.base-url=https://web.test")
