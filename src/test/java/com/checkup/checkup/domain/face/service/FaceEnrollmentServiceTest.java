@@ -25,6 +25,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * 얼굴 등록이 동의·중복 등록·학생 여부·영상 형식을 AI 호출 전에 확인하고, 성공하면 벡터와 모델 정보만 저장하는지 검증한다.
+ */
 class FaceEnrollmentServiceTest {
     private static final Long MEMBER_ID = 7L;
     private static final AiFaceModel MODEL = new AiFaceModel("model-a", "v1", 256, "l2");
