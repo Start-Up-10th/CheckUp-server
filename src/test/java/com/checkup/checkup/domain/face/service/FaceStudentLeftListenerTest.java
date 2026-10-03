@@ -34,6 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+/**
+ * 학생이 졸업·자퇴하면 이벤트 커밋 뒤에 얼굴 벡터와 인식 세션 후보가 삭제되는지 검증한다.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
