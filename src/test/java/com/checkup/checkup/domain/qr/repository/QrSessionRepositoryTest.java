@@ -18,6 +18,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.qr.entity.QrSession;
 
+/**
+ * 실제 Redis에서 QR 세션 갱신이 종료된 세션을 되살리지 않는지 검증한다.
+ */
 @DataRedisTest
 @Import(QrSessionRepository.class)
 class QrSessionRepositoryTest {
