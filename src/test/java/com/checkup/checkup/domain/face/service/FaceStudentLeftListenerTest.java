@@ -8,6 +8,7 @@ import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -81,7 +82,8 @@ class FaceStudentLeftListenerTest {
     private UUID sessionId;
 
     @Test
-    void 퇴사_이벤트_커밋_후_벡터와_세션_후보가_삭제된다() {
+    @DisplayName("퇴사 이벤트 커밋 후 벡터와 세션 후보가 삭제된다")
+    void studentLeftDeletesTemplateAndCandidatesAfterCommit() {
         insertFaceData();
 
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
