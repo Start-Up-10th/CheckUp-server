@@ -21,6 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Spring Security가 막은 401·403 응답이 공통 오류 형식이고 예외 메시지를 담지 않는지 검증한다.
+ */
 @WebMvcTest(controllers = SecurityErrorHandlerTest.ProbeController.class)
 @Import({SecurityConfig.class, SecurityErrorHandlerTest.ProbeController.class})
 class SecurityErrorHandlerTest {
