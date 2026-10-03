@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -68,7 +69,8 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 관리자가_만든_QR로_학생이_출석하고_다시_찍으면_중복이다() throws Exception {
+    @DisplayName("관리자가 만든 QR로 학생이 출석하고 다시 찍으면 중복이다")
+    void studentAttendsWithAdminQrAndRescanIsDuplicate() throws Exception {
         String token = createQr("DORMITORY").token();
 
         scan(studentMemberId, token, "APPROVED");
@@ -80,7 +82,8 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 기숙사와_자습실_QR은_출석을_따로_기록한다() throws Exception {
+    @DisplayName("기숙사와 자습실 QR은 출석을 따로 기록한다")
+    void dormitoryAndStudyRoomQrRecordSeparately() throws Exception {
         scan(studentMemberId, createQr("DORMITORY").token(), "APPROVED");
         scan(studentMemberId, createQr("STUDY_ROOM").token(), "APPROVED");
 
@@ -89,7 +92,8 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 관리자가_QR_화면을_닫으면_CLOSED이고_출석하지_않는다() throws Exception {
+    @DisplayName("관리자가 QR 화면을 닫으면 CLOSED이고 출석하지 않는다")
+    void closedQrReturnsClosedWithoutAttendance() throws Exception {
         CreatedQr qr = createQr("DORMITORY");
         mockMvc.perform(post("/api/v1/qr/" + qr.sessionId() + "/close").with(loginAs(adminId)))
                 .andExpect(status().isNoContent());
@@ -101,12 +105,14 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 발급하지_않은_토큰은_INVALID다() throws Exception {
+    @DisplayName("발급하지 않은 토큰은 INVALID다")
+    void unknownTokenIsInvalid() throws Exception {
         scan(studentMemberId, "b".repeat(43), "INVALID");
     }
 
     @Test
-    void 학생_정보가_없는_계정은_403이다() throws Exception {
+    @DisplayName("학생 정보가 없는 계정은 403이다")
+    void accountWithoutStudentReturnsForbidden() throws Exception {
         String token = createQr("DORMITORY").token();
 
         mockMvc.perform(post("/api/v1/qr/attendance")
@@ -118,7 +124,8 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 학생은_QR을_만들_수_없다() throws Exception {
+    @DisplayName("학생은 QR을 만들 수 없다")
+    void studentCannotCreateQr() throws Exception {
         mockMvc.perform(post("/api/v1/qr")
                         .with(loginAs(studentMemberId))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +135,8 @@ class QrAttendanceFlowTest {
     }
 
     @Test
-    void 닫힌_QR_세션의_heartbeat는_404와_오류_코드다() throws Exception {
+    @DisplayName("닫힌 QR 세션의 heartbeat는 404와 오류 코드다")
+    void heartbeatOnClosedSessionReturnsNotFound() throws Exception {
         CreatedQr qr = createQr("DORMITORY");
         mockMvc.perform(post("/api/v1/qr/" + qr.sessionId() + "/close").with(loginAs(adminId)))
                 .andExpect(status().isNoContent());
