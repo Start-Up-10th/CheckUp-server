@@ -19,6 +19,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 로그인하지 않은 요청이 401로 막혀도 세션을 만들지 않는지 검증한다.
+ */
 @WebMvcTest(controllers = AnonymousSessionTest.ProbeController.class)
 @Import({SecurityConfig.class, AnonymousSessionTest.ProbeController.class})
 class AnonymousSessionTest {
