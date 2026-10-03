@@ -25,6 +25,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+/**
+ * 호실 명단 API가 계약 필드로 응답하고, 파라미터 오류·미로그인·권한 오류를 공통 형식으로 응답하는지 검증한다.
+ */
 @WebMvcTest(RoomController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class RoomControllerTest {
