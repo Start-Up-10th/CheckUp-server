@@ -89,6 +89,18 @@ public class NotificationService {
     }
 
     /**
+     * 알림 하나를 지운다. 없으면 아무것도 하지 않는다. 원본(당일 봉사자 지정 등)이 취소됐을 때 쓴다.
+     *
+     * @param studentId 알림을 받은 학생 id
+     * @param type      알림 유형
+     * @param sourceKey 알림 원본
+     */
+    @Transactional
+    public void delete(Long studentId, NotificationType type, String sourceKey) {
+        notificationRepository.deleteOne(studentId, type, sourceKey);
+    }
+
+    /**
      * 오늘 운영일 시작(08:00 KST) 전에 만든 출석 알림을 지운다. 출석 기록과 같은 경계로 폐기한다(DEC-009).
      *
      * @return 지운 알림 수
