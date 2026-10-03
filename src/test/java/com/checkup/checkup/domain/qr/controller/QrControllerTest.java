@@ -33,6 +33,9 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.security.SecurityConfig;
 
+/**
+ * 관리자 QR API가 관리자만 세션을 만들고 유지·종료하게 하며, 계약의 상태 코드와 오류 코드로 응답하는지 검증한다(REQ-ATT-003·004).
+ */
 @WebMvcTest(QrController.class)
 @Import({SecurityConfig.class, QrConfig.class})
 class QrControllerTest {
