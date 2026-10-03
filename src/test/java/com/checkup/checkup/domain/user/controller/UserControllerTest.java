@@ -44,7 +44,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("봉사 횟수를 studentId와 volunteerCount JSON으로 반환한다")
-    void 봉사횟수를_JSON으로_반환한다() throws Exception {
+    void returnsVolunteerCountAsJson() throws Exception {
         given(userVolunteerService.findVolunteer(MEMBER_ID, STUDENT_ID))
                 .willReturn(new UserVolunteerResponse(STUDENT_ID, 3));
 
@@ -56,7 +56,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("미인증 요청은 서비스를 호출하지 않고 401을 반환한다")
-    void 로그인하지_않으면_401이다() throws Exception {
+    void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/users/{studentId}/volunteer", STUDENT_ID))
                 .andExpect(status().isUnauthorized());
 
@@ -65,14 +65,14 @@ class UserControllerTest {
 
     @Test
     @DisplayName("학생 id가 숫자가 아니면 400을 반환한다")
-    void 학생_id가_숫자가_아니면_400이다() throws Exception {
+    void nonNumericStudentIdReturnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/v1/users/abc/volunteer").with(loginAs(MEMBER_ID)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("권한 오류는 FORBIDDEN 오류 응답으로 반환한다")
-    void 권한_오류를_오류_응답으로_반환한다() throws Exception {
+    void permissionErrorUsesErrorResponse() throws Exception {
         given(userVolunteerService.findVolunteer(MEMBER_ID, STUDENT_ID))
                 .willThrow(new CustomException(ErrorCode.FORBIDDEN));
 
@@ -83,7 +83,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("학생이 없으면 STUDENT_NOT_FOUND 오류 응답으로 반환한다")
-    void 학생이_없으면_404이다() throws Exception {
+    void missingStudentReturnsNotFound() throws Exception {
         given(userVolunteerService.findVolunteer(MEMBER_ID, STUDENT_ID))
                 .willThrow(new CustomException(ErrorCode.STUDENT_NOT_FOUND));
 
