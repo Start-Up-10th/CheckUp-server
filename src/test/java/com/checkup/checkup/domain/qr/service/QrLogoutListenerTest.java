@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.LogoutSuccessEvent;
 
+/**
+ * 로그아웃하면 그 관리자의 QR 세션만 모두 종료되는지 검증한다.
+ */
 class QrLogoutListenerTest {
 
     private final QrSessionService qrSessionService = mock(QrSessionService.class);
