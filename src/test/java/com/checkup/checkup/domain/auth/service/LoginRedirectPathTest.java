@@ -7,6 +7,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+/**
+ * 로그인 뒤 돌아갈 경로가 같은 웹 안의 상대 경로일 때만 쓰이고, 외부로 나갈 수 있거나 비정상인 값은 로그인 완료 화면으로 바뀌는지 검증한다.
+ */
 class LoginRedirectPathTest {
 
     @ParameterizedTest
