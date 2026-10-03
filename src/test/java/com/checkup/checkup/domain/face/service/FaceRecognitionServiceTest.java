@@ -15,6 +15,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.support.MutableClock;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -56,7 +57,8 @@ class FaceRecognitionServiceTest {
             tools.jackson.databind.json.JsonMapper.builder().build(), clock);
 
     @Test
-    void KNOWN_후보만_현재_출석_대상으로_기록한다() {
+    @DisplayName("KNOWN 후보만 현재 출석 대상으로 기록한다")
+    void recordsOnlyKnownCandidates() {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
@@ -89,7 +91,8 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    void AI가_현재_세션_후보가_아닌_학생을_반환하면_UNKNOWN으로_낮춘다() {
+    @DisplayName("AI가 현재 세션 후보가 아닌 학생을 반환하면 UNKNOWN으로 낮춘다")
+    void nonCandidateFromAiBecomesUnknown() {
         FaceSessionView session = session(Set.of(777L));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
@@ -109,7 +112,8 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    void UNKNOWN과_NOT_ATTEMPTED는_출석으로_기록하지_않는다() {
+    @DisplayName("UNKNOWN과 NOT_ATTEMPTED는 출석으로 기록하지 않는다")
+    void unknownAndNotAttemptedAreNotRecorded() {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
@@ -126,7 +130,8 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    void 얼굴_하나라도_응답_검증에_실패하면_어떤_얼굴도_출석_처리하지_않는다() {
+    @DisplayName("얼굴 하나라도 응답 검증에 실패하면 어떤 얼굴도 출석 처리하지 않는다")
+    void anyInvalidFaceRecordsNoAttendance() {
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
@@ -148,7 +153,8 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    void 복구가_원래_잠금_시간보다_길어도_프레임_잠금을_연장한다() throws Exception {
+    @DisplayName("복구가 원래 잠금 시간보다 길어도 프레임 잠금을 연장한다")
+    void recoveryExtendsFrameLock() throws Exception {
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
@@ -185,7 +191,8 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    void AI_세션_생성_전에_DB_소유권을_저장해_삭제_실패를_재시도_대기열에_남긴다() throws Exception {
+    @DisplayName("AI 세션 생성 전에 DB 소유권을 저장해 삭제 실패를 재시도 대기열에 남긴다")
+    void ownershipIsSavedBeforeAiSessionForCleanupRetry() throws Exception {
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
