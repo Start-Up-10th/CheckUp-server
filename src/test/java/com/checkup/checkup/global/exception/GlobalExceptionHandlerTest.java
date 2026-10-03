@@ -54,7 +54,8 @@ class GlobalExceptionHandlerTest {
     private ExceptionSource exceptionSource;
 
     @Test
-    void face_AI의_401_422_503은_사용자_로그인_오류와_분리한다() {
+    @DisplayName("얼굴 AI의 401·422·503은 사용자 로그인 오류와 분리한다")
+    void faceAiErrorsAreSeparateFromUserAuthErrors() {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
         var unauthorized = handler.handleFaceAi(new AiFaceException(401, "frame", "unauthorized"));
