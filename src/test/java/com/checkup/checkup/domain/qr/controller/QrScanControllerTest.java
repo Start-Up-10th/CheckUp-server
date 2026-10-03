@@ -28,6 +28,9 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.SecurityConfig;
 
+/**
+ * QR 스캔 API가 로그인한 학생 본인으로만 출석을 처리하고, 판정 결과를 200으로, 오류를 공통 형식으로 응답하는지 검증한다(REQ-ATT-005).
+ */
 @WebMvcTest(QrScanController.class)
 @Import(SecurityConfig.class)
 class QrScanControllerTest {
