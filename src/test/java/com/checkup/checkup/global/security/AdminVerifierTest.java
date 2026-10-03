@@ -18,6 +18,9 @@ import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 
+/**
+ * 관리자 확인이 요청마다 DB 역할로 관리자만 통과시키는지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class AdminVerifierTest {
 
