@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,14 +28,16 @@ class AdminVerifierTest {
     private AdminVerifier adminVerifier;
 
     @Test
-    void 관리자는_통과한다() {
+    @DisplayName("관리자는 통과한다")
+    void adminPasses() {
         given(memberService.getById(1L)).willReturn(Member.create(100L, "관리자", MemberRole.ADMIN));
 
         assertThatCode(() -> adminVerifier.verify(1L)).doesNotThrowAnyException();
     }
 
     @Test
-    void 학생은_403이다() {
+    @DisplayName("학생은 403이다")
+    void studentIsForbidden() {
         given(memberService.getById(2L)).willReturn(Member.create(200L, "학생", MemberRole.STUDENT));
 
         assertThatThrownBy(() -> adminVerifier.verify(2L))
@@ -43,7 +46,8 @@ class AdminVerifierTest {
     }
 
     @Test
-    void 없는_회원은_401이다() {
+    @DisplayName("없는 회원은 401이다")
+    void unknownMemberIsUnauthorized() {
         given(memberService.getById(3L))
                 .willThrow(new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
