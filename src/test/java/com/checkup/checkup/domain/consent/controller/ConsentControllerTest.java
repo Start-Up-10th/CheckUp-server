@@ -28,6 +28,9 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.SecurityConfig;
 
+/**
+ * 동의 API가 필수 두 항목을 검증하고, 로그인한 학생 본인의 동의만 저장하며, 401·403·400을 공통 오류 형식으로 응답하는지 검증한다(REQ-AUTH-004).
+ */
 @WebMvcTest(ConsentController.class)
 @Import(SecurityConfig.class)
 class ConsentControllerTest {
