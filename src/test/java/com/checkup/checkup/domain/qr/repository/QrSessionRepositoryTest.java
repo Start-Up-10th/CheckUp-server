@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.redis.test.autoconfigure.DataRedisTest;
@@ -48,7 +49,8 @@ class QrSessionRepositoryTest {
     }
 
     @Test
-    void 세션이_있으면_갱신하고_true를_반환한다() {
+    @DisplayName("세션이 있으면 갱신하고 true를 반환한다")
+    void existingSessionIsUpdated() {
         qrSessionRepository.save(session, TTL);
         QrSession renewed = session.withLease(Instant.parse("2026-09-27T03:02:00Z"));
 
@@ -60,7 +62,8 @@ class QrSessionRepositoryTest {
     }
 
     @Test
-    void heartbeat가_읽은_뒤_close되면_세션을_되살리지_않는다() {
+    @DisplayName("heartbeat가 읽은 뒤 close되면 세션을 되살리지 않는다")
+    void closeAfterHeartbeatReadDoesNotRevive() {
         qrSessionRepository.save(session, TTL);
         QrSession readByHeartbeat = qrSessionRepository.findById("session-1").orElseThrow();
 
