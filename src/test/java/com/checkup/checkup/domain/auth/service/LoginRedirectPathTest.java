@@ -40,7 +40,8 @@ class LoginRedirectPathTest {
             "/ma in",
             "/main\t"
     })
-    void 외부로_나갈_수_있는_값은_로그인_완료_화면으로_바꾼다(String path) {
+    @DisplayName("외부로 나갈 수 있는 값은 로그인 완료 화면으로 바꾼다")
+    void externalPathUsesDefault(String path) {
         assertThat(LoginRedirectPath.sanitize(path)).isEqualTo(LoginRedirectPath.DEFAULT);
     }
 
