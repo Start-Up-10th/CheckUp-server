@@ -23,6 +23,9 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+/**
+ * 학생 봉사 횟수를 관리자와 본인만 조회할 수 있고, 없는 학생은 404인지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class UserVolunteerServiceTest {
 
