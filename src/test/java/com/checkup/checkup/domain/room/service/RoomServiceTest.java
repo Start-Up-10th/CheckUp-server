@@ -23,6 +23,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * 호실 명단을 관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있는지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class RoomServiceTest {
 
