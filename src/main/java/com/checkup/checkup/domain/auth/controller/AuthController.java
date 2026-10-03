@@ -3,12 +3,10 @@ package com.checkup.checkup.domain.auth.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
-import com.checkup.checkup.domain.consent.service.ConsentService;
 import com.checkup.checkup.domain.auth.service.AuthService;
+import com.checkup.checkup.domain.auth.service.CurrentMemberService;
 import com.checkup.checkup.domain.auth.service.LoginResult;
 import com.checkup.checkup.domain.auth.service.LoginSessionService;
-import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.config.WebProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.DataGsmErrorCodes;
@@ -44,8 +42,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final LoginSessionService loginSessionService;
-    private final MemberService memberService;
-    private final ConsentService consentService;
+    private final CurrentMemberService currentMemberService;
     private final WebProperties webProperties;
 
     /**
@@ -101,13 +98,12 @@ public class AuthController {
      * 세션 쿠키로 현재 로그인한 회원을 조회한다. 로그인하지 않았으면 401을 반환한다.
      *
      * @param memberId 세션에 저장된 회원 id
-     * @return 현재 회원의 이름, 역할, 필수 동의 여부
+     * @return 현재 회원의 이름, 역할, 필수 동의 여부, 학생 정보(학생이 아니면 null)
      */
-    @Operation(summary = "현재 로그인 회원 조회", description = "SESSION 쿠키의 회원 정보와 필수 동의 여부(consented)를 돌려준다. 로그인하지 않았으면 401 UNAUTHORIZED.")
+    @Operation(summary = "현재 로그인 회원 조회", description = "SESSION 쿠키의 회원 정보, 필수 동의 여부(consented), 본인 학생 정보(student: DataGSM 학생 id·학년·반·번호·학번·호실·층)를 돌려준다. 학생 정보가 없는 회원(교사)은 student가 null이다. 로그인하지 않았으면 401 UNAUTHORIZED.")
     @GetMapping("/me")
     public OAuthLoginResponse me(@AuthenticationPrincipal Long memberId) {
-        Member member = memberService.getById(memberId);
-        return OAuthLoginResponse.from(member, consentService.hasRequiredConsent(memberId));
+        return currentMemberService.getCurrentMember(memberId);
     }
 
     private ResponseEntity<Void> redirectToLoginFailure(ErrorCode errorCode) {
