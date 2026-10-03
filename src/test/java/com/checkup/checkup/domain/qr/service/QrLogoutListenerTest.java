@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.LogoutSuccessEvent;
@@ -17,7 +18,8 @@ class QrLogoutListenerTest {
     private final QrLogoutListener listener = new QrLogoutListener(qrSessionService);
 
     @Test
-    void 로그아웃하면_그_회원의_QR_세션을_모두_종료한다() {
+    @DisplayName("로그아웃하면 그 회원의 QR 세션을 모두 종료한다")
+    void logoutClosesAllSessionsOfMember() {
         listener.onLogout(new LogoutSuccessEvent(
                 UsernamePasswordAuthenticationToken.authenticated(7L, null, List.of())));
 
@@ -25,7 +27,8 @@ class QrLogoutListenerTest {
     }
 
     @Test
-    void principal이_member_id가_아니면_아무것도_하지_않는다() {
+    @DisplayName("principal이 member id가 아니면 아무것도 하지 않는다")
+    void nonMemberPrincipalDoesNothing() {
         listener.onLogout(new LogoutSuccessEvent(
                 UsernamePasswordAuthenticationToken.authenticated("anonymous", null, List.of())));
 
