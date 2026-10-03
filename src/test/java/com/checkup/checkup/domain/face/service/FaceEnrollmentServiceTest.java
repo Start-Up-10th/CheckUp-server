@@ -1,5 +1,15 @@
 package com.checkup.checkup.domain.face.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
 import com.checkup.checkup.domain.face.ai.AiFaceClient;
 import com.checkup.checkup.domain.face.ai.AiFaceEnrollmentResponse;
 import com.checkup.checkup.domain.face.ai.AiFaceModel;
@@ -14,16 +24,6 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 /**
  * 얼굴 등록이 동의·중복 등록·학생 여부·영상 형식을 AI 호출 전에 확인하고, 성공하면 벡터와 모델 정보만 저장하는지 검증한다.
