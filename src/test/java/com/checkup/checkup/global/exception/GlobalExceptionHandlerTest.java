@@ -1,6 +1,5 @@
 package com.checkup.checkup.global.exception;
 
-import com.checkup.checkup.domain.face.ai.AiFaceException;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
@@ -12,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.checkup.checkup.domain.face.ai.AiFaceException;
 
 import com.checkup.checkup.global.security.SecurityConfig;
 import jakarta.validation.Valid;
