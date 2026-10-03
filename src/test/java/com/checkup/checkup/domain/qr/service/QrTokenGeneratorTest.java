@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class QrTokenGeneratorTest {
@@ -12,12 +13,14 @@ class QrTokenGeneratorTest {
     private final QrTokenGenerator generator = new QrTokenGenerator();
 
     @Test
-    void 토큰은_URL에_안전한_43자_문자열이다() {
+    @DisplayName("토큰은 URL에 안전한 43자 문자열이다")
+    void tokenIsUrlSafe43Characters() {
         assertThat(generator.generate()).matches("[A-Za-z0-9_-]{43}");
     }
 
     @Test
-    void 매번_다른_토큰을_만든다() {
+    @DisplayName("매번 다른 토큰을 만든다")
+    void generatesDifferentTokens() {
         Set<String> tokens = new HashSet<>();
         for (int i = 0; i < 1000; i++) {
             tokens.add(generator.generate());
@@ -27,14 +30,16 @@ class QrTokenGeneratorTest {
     }
 
     @Test
-    void 생성한_토큰은_항상_형식_검사를_통과한다() {
+    @DisplayName("생성한 토큰은 항상 형식 검사를 통과한다")
+    void generatedTokenIsWellFormed() {
         for (int i = 0; i < 1000; i++) {
             assertThat(QrTokenGenerator.isWellFormed(generator.generate())).isTrue();
         }
     }
 
     @Test
-    void 길이나_문자가_다른_값은_형식_검사를_통과하지_못한다() {
+    @DisplayName("길이나 문자가 다른 값은 형식 검사를 통과하지 못한다")
+    void wrongLengthOrCharactersIsNotWellFormed() {
         String token = generator.generate();
 
         assertThat(QrTokenGenerator.isWellFormed(token.substring(1))).isFalse();
