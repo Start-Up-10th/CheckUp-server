@@ -23,6 +23,9 @@ import static org.springframework.http.HttpMethod.GET;
 import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.http.HttpMethod.PUT;
 
+/**
+ * 얼굴 AI 클라이언트의 준비 상태 확인, 영상 원본과 서비스 토큰 전송, 세션 요청 직렬화 형식을 검증한다.
+ */
 class AiFaceClientTest {
 
     @Test
