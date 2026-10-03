@@ -8,6 +8,9 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * QR 토큰이 URL에 안전한 고정 길이 랜덤 값이고, 형식 검사가 다른 값을 거르는지 검증한다.
+ */
 class QrTokenGeneratorTest {
 
     private final QrTokenGenerator generator = new QrTokenGenerator();
