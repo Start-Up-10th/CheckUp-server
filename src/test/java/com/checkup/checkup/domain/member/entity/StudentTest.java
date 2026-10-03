@@ -6,6 +6,9 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * 학생 엔티티의 층 계산, 호실 비우기, DataGSM 이벤트 순서 판정, 동의 기록 규칙을 검증한다.
+ */
 class StudentTest {
 
     @Test
