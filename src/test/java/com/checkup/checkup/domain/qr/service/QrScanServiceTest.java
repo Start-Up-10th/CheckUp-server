@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
@@ -60,7 +61,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 학생이_아니면_403이고_토큰을_확인하지_않는다() {
+    @DisplayName("학생이 아니면 403이고 토큰을 확인하지 않는다")
+    void nonStudentReturnsForbiddenWithoutTokenLookup() {
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
@@ -70,7 +72,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 형식이_다른_토큰은_조회하지_않고_INVALID다() {
+    @DisplayName("형식이 다른 토큰은 조회하지 않고 INVALID다")
+    void malformedTokenIsInvalidWithoutLookup() {
         assertThat(qrScanService.scan(MEMBER_ID, "not-a-token")).isEqualTo(QrScanResult.INVALID);
         assertThat(qrScanService.scan(MEMBER_ID, "a".repeat(44))).isEqualTo(QrScanResult.INVALID);
 
@@ -78,7 +81,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 발급하지_않은_토큰은_INVALID다() {
+    @DisplayName("발급하지 않은 토큰은 INVALID다")
+    void unknownTokenIsInvalid() {
         given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.empty());
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.INVALID);
@@ -86,7 +90,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 만료_시각이_지난_토큰은_EXPIRED다() {
+    @DisplayName("만료 시각이 지난 토큰은 EXPIRED다")
+    void expiredTokenIsExpired() {
         given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant())));
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.EXPIRED);
@@ -94,7 +99,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 세션이_종료됐으면_CLOSED다() {
+    @DisplayName("세션이 종료됐으면 CLOSED다")
+    void closedSessionIsClosed() {
         given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(600))));
         given(qrSessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
 
@@ -103,7 +109,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 세션의_lease가_끝났으면_CLOSED다() {
+    @DisplayName("세션의 lease가 끝났으면 CLOSED다")
+    void expiredLeaseIsClosed() {
         given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(600))));
         given(qrSessionRepository.findById(SESSION_ID))
                 .willReturn(Optional.of(session(AttendancePurpose.DORMITORY, clock.instant())));
@@ -113,7 +120,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 처음_출석하면_세션_용도와_현재_운영일로_기록하고_APPROVED다() {
+    @DisplayName("처음 출석하면 세션 용도와 현재 운영일로 기록하고 APPROVED다")
+    void firstAttendanceIsApproved() {
         activeToken(AttendancePurpose.STUDY_ROOM);
         given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.RECORDED);
 
@@ -125,7 +133,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 이미_출석했으면_DUPLICATE다() {
+    @DisplayName("이미 출석했으면 DUPLICATE다")
+    void alreadyAttendedIsDuplicate() {
         activeToken(AttendancePurpose.DORMITORY);
         given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
 
@@ -133,7 +142,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 수동_수정에_밀린_인증은_DUPLICATE다() {
+    @DisplayName("수동 수정에 밀린 인증은 DUPLICATE다")
+    void supersededByManualIsDuplicate() {
         activeToken(AttendancePurpose.DORMITORY);
         given(attendanceService.markAttended(any(), any(), any(), any()))
                 .willReturn(AttendanceRecordResult.SUPERSEDED_BY_MANUAL);
@@ -142,7 +152,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 지난_운영일로_판정되면_EXPIRED다() {
+    @DisplayName("지난 운영일로 판정되면 EXPIRED다")
+    void staleIsExpired() {
         activeToken(AttendancePurpose.DORMITORY);
         given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.STALE);
 
@@ -150,7 +161,8 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 미래_시각으로_판정되면_INVALID다() {
+    @DisplayName("미래 시각으로 판정되면 INVALID다")
+    void futureIsInvalid() {
         activeToken(AttendancePurpose.DORMITORY);
         given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.FUTURE);
 
