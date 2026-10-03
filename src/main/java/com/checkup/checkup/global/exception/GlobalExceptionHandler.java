@@ -38,18 +38,31 @@ public class GlobalExceptionHandler {
         ErrorCode code = switch (e.getStatus()) {
             case 400 -> ErrorCode.FACE_INVALID_MEDIA;
             case 413 -> ErrorCode.FACE_UPLOAD_TOO_LARGE;
-            case 422 -> switch (e.getOperation()) {
-                case "enrollment" -> ErrorCode.FACE_ENROLLMENT_REJECTED;
-                case "frame" -> ErrorCode.FACE_INVALID_FRAME;
-                default -> ErrorCode.FACE_AI_BAD_GATEWAY;
-            };
+            case 422 -> mapFaceAiUnprocessable(e);
             case 404 -> "frame".equals(e.getOperation())
                     ? ErrorCode.FACE_SESSION_NOT_FOUND : ErrorCode.FACE_AI_BAD_GATEWAY;
-            case 503 -> ErrorCode.FACE_AI_UNAVAILABLE;
+            case 401, 500, 503 -> ErrorCode.FACE_AI_UNAVAILABLE;
             case 504 -> ErrorCode.FACE_AI_TIMEOUT;
             default -> ErrorCode.FACE_AI_BAD_GATEWAY;
         };
         return toResponse(code);
+    }
+
+    private static ErrorCode mapFaceAiUnprocessable(AiFaceException e) {
+        if ("MODEL_MISMATCH".equals(e.getErrorCode())) {
+            return ErrorCode.FACE_AI_BAD_GATEWAY;
+        }
+        if ("MULTIPLE_IDENTITIES".equals(e.getErrorCode()) && "enrollment".equals(e.getOperation())) {
+            return ErrorCode.FACE_ENROLLMENT_MULTIPLE_IDENTITIES;
+        }
+        if ("LOW_LIGHT".equals(e.getErrorCode()) && "enrollment".equals(e.getOperation())) {
+            return ErrorCode.FACE_ENROLLMENT_LOW_LIGHT;
+        }
+        return switch (e.getOperation()) {
+            case "enrollment" -> ErrorCode.FACE_ENROLLMENT_REJECTED;
+            case "frame" -> ErrorCode.FACE_INVALID_FRAME;
+            default -> ErrorCode.FACE_AI_BAD_GATEWAY;
+        };
     }
 
     /** {@code @Valid} 실패. MethodArgumentNotValidException도 BindException 하위라 함께 처리된다. */

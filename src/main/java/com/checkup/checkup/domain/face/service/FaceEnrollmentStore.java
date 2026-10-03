@@ -22,7 +22,7 @@ public class FaceEnrollmentStore {
     @Transactional(readOnly = true)
     public Student consent(Long memberId) {
         Student student = findStudent(memberId);
-        if (student.getFaceAgreedAt() == null) {
+        if (!student.hasRequiredConsent()) {
             throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
         }
         return student;
@@ -31,15 +31,18 @@ public class FaceEnrollmentStore {
     @Transactional(readOnly = true)
     public FaceStatusResponseData status(Long memberId) {
         Student student = findStudent(memberId);
-        return new FaceStatusResponseData(student.getFaceAgreedAt() != null,
+        return new FaceStatusResponseData(student.hasRequiredConsent(), isEligible(student),
                 faceTemplateRepository.existsByStudent_Id(student.getId()));
     }
 
     @Transactional
     public void saveTemplate(Long memberId, AiFaceModel model, String vectorsJson) {
         Student student = findStudent(memberId);
-        if (student.getFaceAgreedAt() == null) {
+        if (!student.hasRequiredConsent()) {
             throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        }
+        if (!isEligible(student)) {
+            throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
         }
         if (faceTemplateRepository.existsByStudent_Id(student.getId())) {
             throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
@@ -57,6 +60,11 @@ public class FaceEnrollmentStore {
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
     }
 
-    public record FaceStatusResponseData(boolean consented, boolean enrolled) {
+    private static boolean isEligible(Student student) {
+        return student.getDatagsmStudentId() != null && student.getDatagsmStudentId() > 0
+                && student.getDormitoryRoom() != null;
+    }
+
+    public record FaceStatusResponseData(boolean consented, boolean eligible, boolean enrolled) {
     }
 }

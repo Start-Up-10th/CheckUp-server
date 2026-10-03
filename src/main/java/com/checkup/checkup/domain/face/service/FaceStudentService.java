@@ -18,6 +18,7 @@ public class FaceStudentService {
 
     public FaceStatusResponse getStatus(Long memberId) {
         FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
-        return new FaceStatusResponse(status.consented(), status.enrolled());
+        return new FaceStatusResponse(status.enrolled() ? "REGISTERED" : "NOT_REGISTERED",
+                status.consented(), status.eligible(), status.enrolled());
     }
 }

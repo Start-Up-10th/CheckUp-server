@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,6 +28,9 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.SecurityConfig;
 
+/**
+ * 동의 API가 필수 두 항목을 검증하고, 로그인한 학생 본인의 동의만 저장하며, 401·403·400을 공통 오류 형식으로 응답하는지 검증한다(REQ-AUTH-004).
+ */
 @WebMvcTest(ConsentController.class)
 @Import(SecurityConfig.class)
 class ConsentControllerTest {
@@ -41,7 +45,8 @@ class ConsentControllerTest {
     private ConsentService consentService;
 
     @Test
-    void 필수_두_항목에_동의하면_204다() throws Exception {
+    @DisplayName("필수 두 항목에 동의하면 204다")
+    void requiredConsentReturnsNoContent() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .with(loginAs(MEMBER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -52,7 +57,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 공지_알림을_받지_않아도_필수_동의만_있으면_204다() throws Exception {
+    @DisplayName("공지 알림을 받지 않아도 필수 동의만 있으면 204다")
+    void requiredConsentWithoutNoticeAlarmReturnsNoContent() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .with(loginAs(MEMBER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -63,7 +69,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 필수_항목에_동의하지_않으면_400이고_저장하지_않는다() throws Exception {
+    @DisplayName("필수 항목에 동의하지 않으면 400이고 저장하지 않는다")
+    void missingRequiredConsentReturnsBadRequest() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .with(loginAs(MEMBER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -76,7 +83,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 항목이_빠지면_400이다() throws Exception {
+    @DisplayName("항목이 빠지면 400이다")
+    void missingFieldReturnsBadRequest() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .with(loginAs(MEMBER_ID))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +96,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 로그인하지_않으면_401이다() throws Exception {
+    @DisplayName("로그인하지 않으면 401이다")
+    void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"privacy\":true,\"face\":true,\"noticeAlarm\":true}"))
@@ -98,7 +107,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 학생이_아니면_403과_오류_코드다() throws Exception {
+    @DisplayName("학생이 아니면 403과 오류 코드다")
+    void nonStudentReturnsForbidden() throws Exception {
         willThrow(new CustomException(ErrorCode.MISSING_STUDENT_INFO)).given(consentService).agree(MEMBER_ID, true);
 
         mockMvc.perform(post(CONSENT)
@@ -110,7 +120,8 @@ class ConsentControllerTest {
     }
 
     @Test
-    void 요청에_다른_회원_id를_넣어도_로그인한_회원으로_처리한다() throws Exception {
+    @DisplayName("요청에 다른 회원 id를 넣어도 로그인한 회원으로 처리한다")
+    void usesLoggedInMemberEvenIfBodyHasOtherId() throws Exception {
         mockMvc.perform(post(CONSENT)
                         .with(loginAs(MEMBER_ID))
                         .contentType(MediaType.APPLICATION_JSON)

@@ -23,8 +23,8 @@ spring:
         namespace: checkup:session
   servlet:
     multipart:
-      max-file-size: ${FACE_MAX_UPLOAD_SIZE:20MB}
-      max-request-size: ${FACE_MAX_REQUEST_SIZE:21MB}
+      max-file-size: ${FACE_MAX_UPLOAD_SIZE:60MB}
+      max-request-size: ${FACE_MAX_REQUEST_SIZE:60MB}
 
 datagsm:
   client-id: ${DATAGSM_CLIENT_ID}
@@ -59,11 +59,12 @@ checkup:
     token-retention: 1h
     base-url: ${PUBLIC_ORIGIN}
   face:
+    # AI sessions are in-memory; use one AI process or routing sticky to the session_id.
     ai-base-url: ${FACE_AI_BASE_URL:http://localhost:8000}
     service-token: ${FACE_SERVICE_TOKEN}
     connect-timeout: ${FACE_AI_CONNECT_TIMEOUT:2s}
     response-timeout: ${FACE_AI_RESPONSE_TIMEOUT:30s}
-    max-upload-bytes: ${FACE_MAX_UPLOAD_BYTES:20971520}
+    max-upload-bytes: ${FACE_MAX_UPLOAD_BYTES:62914560}
     max-frame-bytes: ${FACE_MAX_FRAME_BYTES:2097152}
     min-frame-interval: ${FACE_MIN_FRAME_INTERVAL:200ms}
     max-concurrent-frames: ${FACE_MAX_CONCURRENT_FRAMES:4}

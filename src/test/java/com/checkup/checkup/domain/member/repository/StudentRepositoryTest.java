@@ -13,6 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
+/**
+ * 실제 PostgreSQL에서 학생 조회 쿼리의 정렬·필터와 회원 정보 함께 조회를 검증한다.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class StudentRepositoryTest {
@@ -28,7 +31,7 @@ class StudentRepositoryTest {
 
     @Test
     @DisplayName("같은 호실 학생을 이름과 학번순으로 조회하고 회원 정보를 함께 가져온다")
-    void 호실별_학생을_이름과_학번순으로_조회하고_회원_이름을_한번에_가져온다() {
+    void findsRoomStudentsInNameAndNumberOrderWithMember() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, 301);
         saveStudent("홍길동", 1101, 301);
@@ -46,7 +49,7 @@ class StudentRepositoryTest {
 
     @Test
     @DisplayName("호실이 미배정된 학생은 호실 조회 결과에 포함되지 않는다")
-    void 호실이_미배정된_학생은_호실_검색에_포함되지_않는다() {
+    void studentWithoutRoomIsNotInRoomSearch() {
         saveStudent("호실 없음", 1101, null);
 
         assertThat(studentRepository
@@ -55,7 +58,7 @@ class StudentRepositoryTest {
 
     @Test
     @DisplayName("DataGSM 학생 id로 학생을 조회하고 봉사 횟수는 0으로 저장된다")
-    void DataGSM_학생_id로_조회하고_봉사횟수_기본값은_0이다() {
+    void findsByDatagsmStudentIdWithZeroVolunteerCount() {
         saveStudent("홍길동", 1101, 301);
         studentRepository.flush();
 
@@ -66,7 +69,7 @@ class StudentRepositoryTest {
 
     @Test
     @DisplayName("DataGSM 학생 id가 있는 학생만 회원 정보와 함께 조회한다")
-    void DataGSM_학생_id가_있는_학생만_조회한다() {
+    void findsOnlyStudentsWithDatagsmStudentId() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, null);
         Member noId = memberRepository.save(Member.create(88_888L, "아이디 없음", MemberRole.STUDENT));

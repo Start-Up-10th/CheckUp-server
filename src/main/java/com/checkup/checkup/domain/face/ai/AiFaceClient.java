@@ -30,6 +30,18 @@ public class AiFaceClient {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
 
+    /** Spring이 AI 세션을 만들거나 교체하기 전에 공개 준비 상태 API를 확인한다. */
+    public void ensureReady() {
+        AiFaceStatusResponse response = invoke("readiness", () -> faceAiRestClient.get()
+                .uri("/health/ready")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(AiFaceStatusResponse.class));
+        if (response == null || !"ready".equals(response.status())) {
+            throw new AiFaceException(503, "readiness", "not_ready");
+        }
+    }
+
     public AiFaceEnrollmentResponse extract(byte[] video, MediaType contentType) {
         return invoke("enrollment", () -> faceAiRestClient.post()
                 .uri(ENROLLMENT_PATH)
@@ -42,6 +54,7 @@ public class AiFaceClient {
     }
 
     public void createSession(UUID sessionId, AiFaceSessionRequest request) {
+        ensureReady();
         AiFaceStatusResponse response = invoke("session_create", () -> faceAiRestClient.put()
                 .uri(SESSION_PATH, sessionId)
                 .headers(this::addServiceHeaders)

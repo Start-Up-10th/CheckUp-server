@@ -23,6 +23,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * 호실 명단을 관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있는지 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 class RoomServiceTest {
 
@@ -45,7 +48,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("학생 정보가 없는 교사 관리자도 호실 명단을 조회할 수 있다")
-    void 학생_정보가_없는_교사_관리자는_호실_명단을_조회할_수_있다() {
+    void teacherAdminCanReadAnyRoom() {
         Member admin = Member.create(10L, "사감", MemberRole.ADMIN);
         Student rosterStudent = student(20L, "학생", 1101, ROOM);
         given(memberService.getById(ADMIN_ID)).willReturn(admin);
@@ -60,7 +63,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("학생은 본인에게 배정된 호실의 명단을 조회할 수 있다")
-    void 학생은_본인_호실의_명단만_조회할_수_있다() {
+    void studentCanReadOwnRoom() {
         Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
         Student currentStudent = student(20L, "학생", 1101, ROOM);
         Student roommate = student(21L, "룸메이트", 1102, ROOM);
@@ -76,7 +79,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("학생의 다른 호실 접근은 명단 조회 전에 거부한다")
-    void 학생은_다른_호실을_조회하기_전에_거부된다() {
+    void studentIsRejectedForOtherRoom() {
         Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
         given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
         given(studentRepository.findByMember(currentMember))
@@ -92,7 +95,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("학생 정보가 없으면 403을 반환한다")
-    void 학생_정보가_없으면_403이다() {
+    void missingStudentReturnsForbidden() {
         Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
         given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
         given(studentRepository.findByMember(currentMember)).willReturn(Optional.empty());
@@ -107,7 +110,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("호실이 미배정된 학생에게 403을 반환한다")
-    void 호실이_배정되지_않은_학생은_403이다() {
+    void studentWithoutRoomReturnsForbidden() {
         Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
         given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
         given(studentRepository.findByMember(currentMember))
@@ -120,7 +123,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("조회한 호실에 학생이 없으면 403을 반환한다")
-    void 대상_호실에_학생이_없으면_403이다() {
+    void emptyRoomReturnsForbidden() {
         given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
         given(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of());
@@ -132,7 +135,7 @@ class RoomServiceTest {
 
     @Test
     @DisplayName("삭제된 회원의 요청은 401을 반환한다")
-    void 삭제된_회원은_401이다() {
+    void deletedMemberReturnsUnauthorized() {
         given(memberService.getById(STUDENT_ID))
                 .willThrow(new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 

@@ -16,6 +16,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -34,6 +35,9 @@ import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 
+/**
+ * 실제 PostgreSQL에서 자동 인증 출석이 학생·용도·운영일마다 한 번만 기록되고, 수동 수정·늦은 인증·시계 오차 규칙(REQ-ATT-002·007)과 출석 완료 알림 생성을 지키는지 검증한다.
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -84,7 +88,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 처음_인증하면_출석으로_기록한다() {
+    @DisplayName("처음 인증하면 출석으로 기록한다")
+    void firstVerificationRecordsAttendance() {
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
         assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
@@ -94,7 +99,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 이미_출석이면_다시_기록하지_않고_최초_시각을_유지한다() {
+    @DisplayName("이미 출석이면 다시 기록하지 않고 최초 시각을 유지한다")
+    void alreadyAttendedKeepsFirstVerifiedAt() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         clock.setInstant(AT.plusSeconds(60));
 
@@ -106,7 +112,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 용도가_다르면_따로_기록한다() {
+    @DisplayName("용도가 다르면 따로 기록한다")
+    void differentPurposesAreRecordedSeparately() {
         AttendanceRecordResult dormitory = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         AttendanceRecordResult studyRoom = mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
 
@@ -116,7 +123,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 운영일이_바뀌면_새_운영일에_따로_기록한다() {
+    @DisplayName("운영일이 바뀌면 새 운영일에 따로 기록한다")
+    void newOperatingDayIsRecordedSeparately() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         Instant nextDay = AT.plusSeconds(86_400);
         clock.setInstant(nextDay);
@@ -129,7 +137,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 동시에_여러_번_들어와도_한_번만_기록한다() throws Exception {
+    @DisplayName("동시에 여러 번 들어와도 한 번만 기록한다")
+    void concurrentRequestsRecordOnce() throws Exception {
         int requests = 10;
         ExecutorService executor = Executors.newFixedThreadPool(requests);
         CountDownLatch start = new CountDownLatch(1);
@@ -156,7 +165,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 수동_미출석_뒤에_발생한_인증은_다시_출석으로_바꾸고_최초_시각은_유지한다() {
+    @DisplayName("수동 미출석 뒤에 발생한 인증은 다시 출석으로 바꾸고 최초 시각은 유지한다")
+    void verificationAfterManualAbsentMarksAttendedAgain() {
         Instant firstAt = AT.minusSeconds(3600);
         Instant manualAt = AT.minusSeconds(600);
         insertManualAbsent(firstAt, manualAt);
@@ -170,7 +180,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 수동_미출석_전에_발생해_늦게_도착한_인증은_무시한다() {
+    @DisplayName("수동 미출석 전에 발생해 늦게 도착한 인증은 무시한다")
+    void lateVerificationBeforeManualAbsentIsIgnored() {
         insertManualAbsent(AT.minusSeconds(3600), AT);
 
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.minusSeconds(60), AttendanceMethod.FACE);
@@ -180,7 +191,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 어제_운영일_인증이_오늘_도착하면_기록하지_않는다() {
+    @DisplayName("어제 운영일 인증이 오늘 도착하면 기록하지 않는다")
+    void yesterdayVerificationArrivingTodayIsNotRecorded() {
         clock.setInstant(AT.plusSeconds(86_400));
 
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE);
@@ -190,7 +202,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 오전_8시_전_인증이_8시_뒤에_도착하면_기록하지_않는다() {
+    @DisplayName("오전 8시 전 인증이 8시 뒤에 도착하면 기록하지 않는다")
+    void verificationBefore8ArrivingAfter8IsNotRecorded() {
         Instant before8 = Instant.parse("2026-09-27T22:59:00Z");
         clock.setInstant(Instant.parse("2026-09-27T23:01:00Z"));
 
@@ -201,7 +214,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 오전_8시_전_인증은_전날_운영일로_기록한다() {
+    @DisplayName("오전 8시 전 인증은 전날 운영일로 기록한다")
+    void verificationBefore8IsRecordedOnPreviousDay() {
         Instant before8 = Instant.parse("2026-09-27T22:59:00Z");
         clock.setInstant(before8);
 
@@ -212,7 +226,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 서버_시각보다_5초_넘게_늦은_인증은_기록하지_않는다() {
+    @DisplayName("서버 시각보다 5초 넘게 늦은 인증은 기록하지 않는다")
+    void verificationMoreThan5SecondsAheadIsNotRecorded() {
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(6), AttendanceMethod.FACE);
 
         assertThat(result).isEqualTo(AttendanceRecordResult.FUTURE);
@@ -220,7 +235,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 서버_시각보다_5초_이내로_늦은_인증은_현재_시각으로_기록한다() {
+    @DisplayName("서버 시각보다 5초 이내로 늦은 인증은 현재 시각으로 기록한다")
+    void verificationWithin5SecondsAheadIsRecordedAtNow() {
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(5), AttendanceMethod.FACE);
 
         assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
@@ -228,7 +244,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 조금_미래인_인증도_현재_시각_이전의_수동_미출석은_덮어쓰지_않는다() {
+    @DisplayName("조금 미래인 인증도 현재 시각 이전의 수동 미출석은 덮어쓰지 않는다")
+    void slightlyFutureVerificationDoesNotOverrideEarlierManualAbsent() {
         insertManualAbsent(AT.minusSeconds(3600), AT);
 
         AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, AT.plusSeconds(3), AttendanceMethod.FACE);
@@ -238,7 +255,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 학생을_삭제하면_출석도_함께_삭제된다() {
+    @DisplayName("학생을 삭제하면 출석도 함께 삭제된다")
+    void deletingStudentDeletesAttendance() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
 
         jdbcTemplate.update("DELETE FROM student WHERE id = ?", studentId);
@@ -247,7 +265,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 새로_출석하면_용도와_운영일로_출석_완료_알림을_하나_만든다() {
+    @DisplayName("새로 출석하면 용도와 운영일로 출석 완료 알림을 하나 만든다")
+    void newAttendanceCreatesOneNotification() {
         mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
 
         assertThat(notificationCount()).isEqualTo(1);
@@ -260,7 +279,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 이미_출석한_뒤_다시_인증해도_출석_알림을_늘리지_않는다() {
+    @DisplayName("이미 출석한 뒤 다시 인증해도 출석 알림을 늘리지 않는다")
+    void repeatedVerificationDoesNotAddNotification() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         clock.setInstant(AT.plusSeconds(60));
 
@@ -270,7 +290,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 동시에_여러_번_들어와도_출석_알림은_하나다() throws Exception {
+    @DisplayName("동시에 여러 번 들어와도 출석 알림은 하나다")
+    void concurrentRequestsCreateOneNotification() throws Exception {
         int requests = 10;
         ExecutorService executor = Executors.newFixedThreadPool(requests);
         CountDownLatch start = new CountDownLatch(1);
@@ -291,7 +312,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    void 기록하지_않은_늦은_인증은_출석_알림을_만들지_않는다() {
+    @DisplayName("기록하지 않은 늦은 인증은 출석 알림을 만들지 않는다")
+    void staleVerificationCreatesNoNotification() {
         clock.setInstant(AT.plusSeconds(86_400));
 
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE);
