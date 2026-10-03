@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
@@ -23,21 +24,24 @@ class QrSessionResponseTest {
     );
 
     @Test
-    void qrUrl은_학생_웹_qr_경로와_fragment_토큰이다() {
+    @DisplayName("qrUrl은 학생 웹 qr 경로와 fragment 토큰이다")
+    void qrUrlUsesWebQrPathAndFragmentToken() {
         QrSessionResponse response = QrSessionResponse.of(issue, "https://checkup.example");
 
         assertThat(response.qrUrl()).isEqualTo("https://checkup.example/qr#t=" + TOKEN);
     }
 
     @Test
-    void 웹_주소_끝의_슬래시는_한_번만_쓴다() {
+    @DisplayName("웹 주소 끝의 슬래시는 한 번만 쓴다")
+    void trailingSlashOfWebUrlIsUsedOnce() {
         QrSessionResponse response = QrSessionResponse.of(issue, "http://localhost:3000/");
 
         assertThat(response.qrUrl()).isEqualTo("http://localhost:3000/qr#t=" + TOKEN);
     }
 
     @Test
-    void 세션_정보를_그대로_옮긴다() {
+    @DisplayName("세션 정보를 그대로 옮긴다")
+    void copiesSessionFields() {
         QrSessionResponse response = QrSessionResponse.of(issue, "http://localhost:3000");
 
         assertThat(response.sessionId()).isEqualTo("session-1");
