@@ -36,7 +36,7 @@ public class FaceSessionStore {
                 FaceRecognitionSession.create(sessionId, adminMemberId, purpose, createdAt, initialLastActivityAt));
         List<Student> students = studentRepository.findAllById(studentIds);
         if (students.size() != studentIds.size()) {
-            throw new CustomException(ErrorCode.FACE_NO_CANDIDATES);
+            throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
         candidateRepository.saveAll(students.stream()
                 .map(student -> FaceRecognitionSessionCandidate.create(session, student))
@@ -61,8 +61,19 @@ public class FaceSessionStore {
     }
 
     @Transactional
-    public boolean claimFrame(UUID sessionId, Long adminMemberId, Instant now, Instant cutoff) {
-        return sessionRepository.claimFrame(sessionId, adminMemberId, now, cutoff) == 1;
+    public boolean claimFrame(UUID sessionId, Long adminMemberId, Instant now, Instant cutoff,
+                              UUID token, Instant lockUntil) {
+        return sessionRepository.claimFrame(sessionId, adminMemberId, now, cutoff, token, lockUntil) == 1;
+    }
+
+    @Transactional
+    public boolean extendFrame(UUID sessionId, Long adminMemberId, UUID token, Instant now, Instant lockUntil) {
+        return sessionRepository.extendFrame(sessionId, adminMemberId, token, now, lockUntil) == 1;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void releaseFrame(UUID sessionId, Long adminMemberId, UUID token, Instant now) {
+        sessionRepository.releaseFrame(sessionId, adminMemberId, token, now);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -71,8 +82,8 @@ public class FaceSessionStore {
     }
 
     @Transactional
-    public boolean markInactiveIfIdle(UUID sessionId, Instant cutoff) {
-        return sessionRepository.markInactiveIfIdle(sessionId, cutoff) == 1;
+    public boolean markInactiveIfIdle(UUID sessionId, Instant cutoff, Instant now) {
+        return sessionRepository.markInactiveIfIdle(sessionId, cutoff, now) == 1;
     }
 
     @Transactional(readOnly = true)
@@ -92,8 +103,8 @@ public class FaceSessionStore {
     }
 
     @Transactional(readOnly = true)
-    public List<FaceSessionView> findIdleBefore(Instant cutoff) {
-        return sessionRepository.findIdleBefore(cutoff).stream()
+    public List<FaceSessionView> findIdleBefore(Instant cutoff, Instant now) {
+        return sessionRepository.findIdleBefore(cutoff, now).stream()
                 .map(session -> view(session, candidateRepository.findAllBySession_Id(session.getId())))
                 .toList();
     }

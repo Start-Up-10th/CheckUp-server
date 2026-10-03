@@ -18,7 +18,9 @@ public class FaceConfig {
 
     @Bean
     RestClient faceAiRestClient(RestClient.Builder builder, FaceProperties properties) {
+        // The internal FastAPI/Uvicorn listener does not negotiate cleartext HTTP/2 upgrades.
         HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.connectTimeout())
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);

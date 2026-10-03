@@ -40,6 +40,12 @@ public class FaceRecognitionSession {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(name = "frame_lock_token")
+    private UUID frameLockToken;
+
+    @Column(name = "frame_lock_until")
+    private Instant frameLockUntil;
+
     public static FaceRecognitionSession create(
             UUID id,
             Long adminMemberId,
