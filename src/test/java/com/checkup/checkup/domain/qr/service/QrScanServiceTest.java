@@ -34,6 +34,9 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import com.checkup.checkup.support.MutableClock;
 
+/**
+ * QR 스캔 판정 순서(INVALID → EXPIRED → CLOSED → APPROVED·DUPLICATE)와 출석 기록 결과의 판정 변환을 검증한다(DEC-018).
+ */
 class QrScanServiceTest {
 
     private static final Long MEMBER_ID = 7L;
