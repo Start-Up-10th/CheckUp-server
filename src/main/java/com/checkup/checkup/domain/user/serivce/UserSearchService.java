@@ -5,8 +5,9 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
@@ -37,10 +38,10 @@ public class UserSearchService {
         try {
             student = dataGsmOpenApiClient.students().getStudent(studentId);
         } catch (DataGsmException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "DataGSM 학생 조회에 실패했습니다.");
+            throw new CustomException(ErrorCode.DATAGSM_ERROR);
         }
         if (student == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다.");
+            throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
         }
         return UserSearchResponse.from(student);
     }
@@ -53,7 +54,7 @@ public class UserSearchService {
                 .map(s -> studentId.equals(s.getDatagsmStudentId()))
                 .orElse(false);
         if (!self) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "조회 권한이 없습니다.");
+            throw new CustomException(ErrorCode.FORBIDDEN);
         }
     }
 
