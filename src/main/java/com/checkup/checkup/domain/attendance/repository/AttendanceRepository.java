@@ -81,4 +81,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("purpose") AttendancePurpose purpose,
             @Param("operatingDay") LocalDate operatingDay
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM Attendance a WHERE a.operatingDay < :operatingDay")
+    int deleteByOperatingDayBefore(@Param("operatingDay") LocalDate operatingDay);
 }
