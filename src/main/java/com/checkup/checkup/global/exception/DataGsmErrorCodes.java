@@ -1,5 +1,6 @@
 package com.checkup.checkup.global.exception;
 
+import java.io.IOException;
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
 import team.themoment.datagsm.sdk.oauth.exception.DataGsmException;
 import team.themoment.datagsm.sdk.oauth.exception.RateLimitException;
@@ -9,6 +10,7 @@ import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
  * DataGSM SDK 예외를 서버 오류 코드로 바꾼다. 전역 예외 처리와 로그인 콜백 리다이렉트가 같은 기준을 쓴다.
  *
  * DataGSM 401·403은 서버 설정 문제라 클라이언트 인증 실패로 돌려주지 않는다.
+ * 연결 실패·시간 초과는 DataGSM 서버 오류와 같이 일시적으로 연결할 수 없는 상태로 본다.
  */
 public final class DataGsmErrorCodes {
 
@@ -23,7 +25,14 @@ public final class DataGsmErrorCodes {
             case BadRequestException ignored -> ErrorCode.DATAGSM_INVALID_CODE;
             case ServerErrorException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
             case RateLimitException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
-            default -> ErrorCode.DATAGSM_ERROR;
+            default -> isConnectionFailure(e) ? ErrorCode.DATAGSM_UNAVAILABLE : ErrorCode.DATAGSM_ERROR;
         };
+    }
+
+    /**
+     * DataGSM에 닿지 못했거나 시간 안에 응답을 받지 못한 경우다. SDK는 이때 HTTP 상태 없이 IOException을 감싸서 던진다.
+     */
+    private static boolean isConnectionFailure(DataGsmException e) {
+        return !e.hasStatusCode() && e.getCause() instanceof IOException;
     }
 }

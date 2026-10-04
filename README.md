@@ -93,6 +93,7 @@ checkup:
 운영 서버에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` 환경변수로 값을 넣습니다.
 `PUBLIC_ORIGIN`(웹 주소)도 반드시 넣습니다. QR 링크와 로그인 후 웹으로 돌아가는 주소에 쓰이며, 비어 있으면 서버가 기동하지 않습니다.
 로그인 콜백은 성공하면 `{PUBLIC_ORIGIN}/login/complete`(또는 `GET /api/v1/auth/login?redirect=/경로`로 정한 경로), 실패하면 `{PUBLIC_ORIGIN}/login?error=<오류 코드>`로 302 리다이렉트합니다.
+DataGSM 호출은 연결 3초·응답 5초까지만 기다립니다. `DATAGSM_CONNECT_TIMEOUT`, `DATAGSM_RESPONSE_TIMEOUT`(예: `5s`)으로 바꿀 수 있고, 시간 안에 응답이 없으면 `DATAGSM_UNAVAILABLE`로 응답합니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
 ## 명세·문서

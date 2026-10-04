@@ -17,6 +17,7 @@ import com.checkup.checkup.domain.face.ai.AiFaceException;
 import com.checkup.checkup.global.security.SecurityConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import java.net.SocketTimeoutException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.oauth.exception.BadRequestException;
+import team.themoment.datagsm.sdk.oauth.exception.DataGsmException;
 import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
 import team.themoment.datagsm.sdk.oauth.exception.UnauthorizedException;
 
@@ -116,6 +118,18 @@ class GlobalExceptionHandlerTest {
     @DisplayName("DataGSM 서버 오류는 503 DATAGSM_UNAVAILABLE로 응답한다")
     void dataGsmServerErrorIsUnavailable() throws Exception {
         willThrow(new ServerErrorException(UPSTREAM_MESSAGE)).given(exceptionSource).run();
+
+        mockMvc.perform(get(THROW).with(user("admin")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("DATAGSM_UNAVAILABLE"))
+                .andExpect(content().string(not(containsString(UPSTREAM_MESSAGE))));
+    }
+
+    @Test
+    @DisplayName("DataGSM 연결 실패·시간 초과는 503 DATAGSM_UNAVAILABLE로 응답한다")
+    void dataGsmConnectionFailureIsUnavailable() throws Exception {
+        willThrow(new DataGsmException(UPSTREAM_MESSAGE, new SocketTimeoutException("timeout")))
+                .given(exceptionSource).run();
 
         mockMvc.perform(get(THROW).with(user("admin")))
                 .andExpect(status().isServiceUnavailable())

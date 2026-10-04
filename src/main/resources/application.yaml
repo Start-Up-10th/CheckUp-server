@@ -1,4 +1,9 @@
 spring:
+  # @Scheduled 작업이 서로 기다리지 않도록 스레드 2개
+  task:
+    scheduling:
+      pool:
+        size: 2
   application:
     name: checkup
   # 개인 설정·secret은 커밋하지 않는 application-local.yaml에 둔다. 파일이 없으면 무시한다.
@@ -32,6 +37,8 @@ datagsm:
   api-key: ${DATAGSM_API_KEY} # DataGSM OpenAPI(학생 조회) 전용 키. OAuth client-id와 다른 값이다.
   webhook-secret: ${DATAGSM_WEBHOOK_SECRET}
   redirect-uri: ${DATAGSM_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}
+  connect-timeout: ${DATAGSM_CONNECT_TIMEOUT:3s} # DataGSM 연결 대기 시간
+  response-timeout: ${DATAGSM_RESPONSE_TIMEOUT:5s} # DataGSM 응답 대기 시간. 로그인 콜백은 DataGSM을 두 번 불러 최대 (연결+응답)×2 동안 기다린다
 
 server:
   servlet:
