@@ -73,7 +73,7 @@ class StudentRepositoryTest {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, null);
         Member noId = memberRepository.save(Member.create(88_888L, "아이디 없음", MemberRole.STUDENT));
-        studentRepository.saveAndFlush(Student.create(noId, null, 1, 1, 1, 1104, 301));
+        studentRepository.saveAndFlush(Student.create(noId, null, "아이디 없음", 1, 1, 1, 1104, 301));
 
         List<Student> students = studentRepository.findAllByDatagsmStudentIdIsNotNull();
 
@@ -82,9 +82,23 @@ class StudentRepositoryTest {
                 .isLoaded(student, "member")).isTrue());
     }
 
+    @Test
+    @DisplayName("계정이 없는 학생도 저장되고 호실·봉사 명단 조회에 포함된다")
+    void studentWithoutMemberIsSavedAndListed() {
+        saveStudent("홍길동", 1102, 301);
+        studentRepository.saveAndFlush(Student.createWithoutMember(77_001L, "계정없음", 1, 1, 1, 1103, 301));
+
+        assertThat(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(301))
+                .extracting(Student::getName).contains("홍길동", "계정없음");
+        assertThat(studentRepository.findAllByDatagsmStudentIdIsNotNull())
+                .extracting(Student::getName).contains("계정없음");
+        assertThat(studentRepository.findByDatagsmStudentId(77_001L))
+                .hasValueSatisfying(student -> assertThat(student.getMember()).isNull());
+    }
+
     private void saveStudent(String name, int studentNumber, Integer dormitoryRoom) {
         Long dataGsmId = Long.valueOf(studentNumber);
         Member member = memberRepository.save(Member.create(dataGsmId, name, MemberRole.STUDENT));
-        studentRepository.save(Student.create(member, dataGsmId, 1, 1, 1, studentNumber, dormitoryRoom));
+        studentRepository.save(Student.create(member, dataGsmId, name, 1, 1, 1, studentNumber, dormitoryRoom));
     }
 }
