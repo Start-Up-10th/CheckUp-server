@@ -2,6 +2,8 @@ package com.checkup.checkup.domain.attendance.repository;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -50,6 +52,21 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("operatingDay") LocalDate operatingDay,
             @Param("verifiedAt") Instant verifiedAt,
             @Param("method") String method
+    );
+
+    /**
+     * 주어진 학생들 중 해당 용도·운영일에 지금 출석 상태인 학생의 id를 읽는다. 호실 명단의 출석 표시에 쓴다.
+     * 행이 없거나 미출석(수동 수정 포함)인 학생은 포함하지 않는다.
+     */
+    @Query("""
+            SELECT a.student.id FROM Attendance a
+            WHERE a.student.id IN :studentIds AND a.purpose = :purpose
+              AND a.operatingDay = :operatingDay AND a.attended = TRUE
+            """)
+    List<Long> findAttendedStudentIds(
+            @Param("studentIds") Collection<Long> studentIds,
+            @Param("purpose") AttendancePurpose purpose,
+            @Param("operatingDay") LocalDate operatingDay
     );
 
     /**
