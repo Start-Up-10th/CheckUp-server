@@ -99,6 +99,26 @@ public class Student {
         return student;
     }
 
+    public static Student createWithoutMember(
+            Long datagsmStudentId,
+            String name,
+            int grade,
+            int classNumber,
+            int number,
+            int studentNumber,
+            Integer dormitoryRoom) {
+        Student student = new Student();
+        student.name = name;
+        student.datagsmStudentId = datagsmStudentId;
+        student.grade = grade;
+        student.classNumber = classNumber;
+        student.number = number;
+        student.studentNumber = studentNumber;
+        student.dormitoryRoom = dormitoryRoom;
+
+        return student;
+    }
+
     public void updateProfile(String email, Sex sex, Integer dormitoryFloor, String specialty) {
         this.email = email;
         this.sex = sex;
@@ -180,25 +200,5 @@ public class Student {
      */
     public boolean hasRequiredConsent() {
         return privacyAgreedAt != null && faceAgreedAt != null;
-    }
-
-    public static Student createWithoutMember(
-            Long datagsmStudentId,
-            String name,
-            int grade,
-            int classNumber,
-            int number,
-            int studentNumber,
-            Integer dormitoryRoom) {
-        Student student = new Student();
-        student.name = name;
-        student.datagsmStudentId = datagsmStudentId;
-        student.grade = grade;
-        student.classNumber = classNumber;
-        student.number = number;
-        student.studentNumber = studentNumber;
-        student.dormitoryRoom = dormitoryRoom;
-
-        return student;
     }
 }
