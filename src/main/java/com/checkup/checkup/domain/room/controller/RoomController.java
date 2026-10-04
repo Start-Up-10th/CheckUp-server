@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.room.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.domain.room.service.RoomService;
 import jakarta.validation.constraints.Positive;
@@ -23,17 +24,19 @@ public class RoomController {
     private final RoomService roomService;
 
     /**
-     * 관리자는 모든 호실을, 학생은 본인 호실의 학생 명단을 조회한다.
+     * 관리자는 모든 호실을, 학생은 본인 호실의 학생 명단과 오늘 출석 여부를 조회한다.
      *
      * @param memberId 세션의 현재 회원 id
      * @param dormitoryRoom 호실 번호
+     * @param purpose 출석 여부를 볼 용도. 없으면 기숙사 입소(DORMITORY)다
      * @return 해당 호실의 학생 명단
      */
-    @Operation(summary = "호실 학생 명단", description = "관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있다.")
+    @Operation(summary = "호실 학생 명단", description = "관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있다. attended는 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 여부다.")
     @GetMapping("/student")
     public List<RoomStudentResponse> getStudents(
             @AuthenticationPrincipal Long memberId,
-            @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom) {
-        return roomService.getStudents(memberId, dormitoryRoom);
+            @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom,
+            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
+        return roomService.getStudents(memberId, dormitoryRoom, purpose);
     }
 }
