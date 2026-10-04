@@ -141,7 +141,7 @@ class UserServiceTest {
     }
 
     private void givenOwnStudent(Member member, Long datagsmStudentId) {
-        Student student = Student.create(member, datagsmStudentId, 2, 3, 4, 2304, 301);
+        Student student = Student.create(member, datagsmStudentId, "홍길동", 2, 3, 4, 2304, 301);
         given(studentRepository.findByMember(member)).willReturn(Optional.of(student));
     }
 

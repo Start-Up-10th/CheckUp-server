@@ -121,9 +121,9 @@ class FaceStudentLeftListenerTest {
         adminMemberId = insertMember("ADMIN");
         studentMemberId = insertMember("STUDENT");
         studentId = jdbcTemplate.queryForObject("""
-                INSERT INTO student (member_id, number, grade, class_number, student_number, dormitory_room,
+                INSERT INTO student (member_id, name, number, grade, class_number, student_number, dormitory_room,
                                      face_agreed_at)
-                VALUES (?, 1, 1, 1, 1101, 301, now())
+                VALUES (?, '테스트학생', 1, 1, 1, 1101, 301, now())
                 RETURNING id
                 """, Long.class, studentMemberId);
         jdbcTemplate.update("""

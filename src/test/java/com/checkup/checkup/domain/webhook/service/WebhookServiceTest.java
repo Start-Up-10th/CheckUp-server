@@ -346,7 +346,7 @@ class WebhookServiceTest {
     /** DataGSM 학생 ID로 저장된 학생 한 명을 만들고 저장소가 돌려주게 한다. 학년 2, 반 1, 번호 5, 학번 2105. */
     private Student storedStudent(Long datagsmStudentId, String name, MemberRole role, Integer dormitoryRoom) {
         Member member = Member.create(datagsmStudentId + 1000, name, role);
-        Student student = Student.create(member, datagsmStudentId, 2, 1, 5, 2105, dormitoryRoom);
+        Student student = Student.create(member, datagsmStudentId, name, 2, 1, 5, 2105, dormitoryRoom);
         given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(student));
         return student;
     }

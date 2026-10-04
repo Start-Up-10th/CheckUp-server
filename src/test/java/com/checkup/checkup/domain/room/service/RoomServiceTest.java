@@ -191,6 +191,6 @@ class RoomServiceTest {
 
     private static Student student(long datagsmId, String name, int studentNumber, Integer dormitoryRoom) {
         Member member = Member.create(datagsmId, name, MemberRole.STUDENT);
-        return Student.create(member, datagsmId, 1, 1, 1, studentNumber, dormitoryRoom);
+        return Student.create(member, datagsmId, name, 1, 1, 1, studentNumber, dormitoryRoom);
     }
 }

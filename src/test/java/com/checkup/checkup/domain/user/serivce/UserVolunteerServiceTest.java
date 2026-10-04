@@ -100,6 +100,6 @@ class UserVolunteerServiceTest {
     }
 
     private Student student(Member member, Long datagsmStudentId) {
-        return Student.create(member, datagsmStudentId, 2, 3, 4, 2304, 301);
+        return Student.create(member, datagsmStudentId, "홍길동", 2, 3, 4, 2304, 301);
     }
 }

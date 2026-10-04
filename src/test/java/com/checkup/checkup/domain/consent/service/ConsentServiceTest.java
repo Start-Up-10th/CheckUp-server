@@ -78,6 +78,6 @@ class ConsentServiceTest {
     }
 
     private static Student student() {
-        return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, 1, 1, 1, 1101, 301);
+        return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, "학생", 1, 1, 1, 1101, 301);
     }
 }
