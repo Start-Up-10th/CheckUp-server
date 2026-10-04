@@ -89,4 +89,16 @@ public class AttendanceService {
             case STUDY_ROOM -> "자습실 출석이 완료됐어요";
         };
     }
+
+    /**
+     * 오늘 운영일 전의 출석 기록을 지운다. 수동 출석 상태도 같은 행에 있어 함께 지워진다(REQ-ATT-007).
+     * 지운 뒤 늦게 도착한 전날 인증은 {@link #markAttended}가 STALE로 버려 기록을 되살리지 않는다.
+     *
+     * @return 지운 행 수
+     */
+    @Transactional
+    public int deleteExpired() {
+        LocalDate today = operatingDayCalculator.today();
+        return attendanceRepository.deleteByOperatingDayBefore(today);
+    }
 }
