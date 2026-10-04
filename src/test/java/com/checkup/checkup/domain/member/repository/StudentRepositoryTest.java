@@ -38,9 +38,9 @@ class StudentRepositoryTest {
         saveStudent("다른 방", 1201, 401);
 
         List<Student> students = studentRepository
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(301);
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301);
 
-        assertThat(students).extracting(student -> student.getMember().getName())
+        assertThat(students).extracting(Student::getName)
                 .containsExactly("김학생", "홍길동", "홍길동");
         assertThat(students).extracting(Student::getStudentNumber).containsExactly(1103, 1101, 1102);
         assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
@@ -53,7 +53,7 @@ class StudentRepositoryTest {
         saveStudent("호실 없음", 1101, null);
 
         assertThat(studentRepository
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(301)).isEmpty();
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301)).isEmpty();
     }
 
     @Test
@@ -83,15 +83,15 @@ class StudentRepositoryTest {
     }
 
     @Test
-    @DisplayName("계정이 없는 학생도 저장되고 호실·봉사 명단 조회에 포함된다")
+    @DisplayName("계정이 없는 학생도 저장되고 호실 명단에 학생 이름순으로, 봉사 명단에도 포함된다")
     void studentWithoutMemberIsSavedAndListed() {
         saveStudent("홍길동", 1102, 301);
-        studentRepository.saveAndFlush(Student.createWithoutMember(77_001L, "계정없음", 1, 1, 1, 1103, 301));
+        studentRepository.saveAndFlush(Student.createWithoutMember(77_001L, "강학생", 1, 1, 1, 1103, 301));
 
-        assertThat(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(301))
-                .extracting(Student::getName).contains("홍길동", "계정없음");
+        assertThat(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301))
+                .extracting(Student::getName).containsExactly("강학생", "홍길동");
         assertThat(studentRepository.findAllByDatagsmStudentIdIsNotNull())
-                .extracting(Student::getName).contains("계정없음");
+                .extracting(Student::getName).contains("강학생");
         assertThat(studentRepository.findByDatagsmStudentId(77_001L))
                 .hasValueSatisfying(student -> assertThat(student.getMember()).isNull());
     }
