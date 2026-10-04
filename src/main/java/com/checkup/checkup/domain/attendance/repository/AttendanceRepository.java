@@ -82,6 +82,12 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             @Param("operatingDay") LocalDate operatingDay
     );
 
+    /**
+     * 주어진 운영일 전의 출석 행을 용도와 상관없이 한 번에 지운다. 08:00 KST 당일 기록 폐기에 쓴다(REQ-ATT-007).
+     * 주어진 운영일의 행은 남긴다.
+     *
+     * @return 지운 행 수
+     */
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM Attendance a WHERE a.operatingDay < :operatingDay")
     int deleteByOperatingDayBefore(@Param("operatingDay") LocalDate operatingDay);
