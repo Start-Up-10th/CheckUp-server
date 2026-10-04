@@ -18,8 +18,11 @@ public class Student {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "member_id", nullable = false, unique = true)
+    @JoinColumn(name = "member_id", unique = true)
     private Member member;
+
+    @Column(nullable = false, length = 50)
+    private String name;
 
     @Column(unique = true)
     private Long datagsmStudentId;
@@ -85,20 +88,14 @@ public class Student {
     public static Student create(
             Member member,
             Long datagsmStudentId,
+            String name,
             int grade,
             int classNumber,
             int number,
             int studentNumber,
             Integer dormitoryRoom) {
-        Student student = new Student();
+        Student student = createWithoutMember(datagsmStudentId, name, grade, classNumber, number, studentNumber, dormitoryRoom);
         student.member = member;
-        student.datagsmStudentId = datagsmStudentId;
-        student.grade = grade;
-        student.classNumber = classNumber;
-        student.number = number;
-        student.studentNumber = studentNumber;
-        student.dormitoryRoom = dormitoryRoom;
-
         return student;
     }
 
@@ -111,17 +108,23 @@ public class Student {
 
     public void update(
             Long datagsmStudentId,
+            String name,
             int grade,
             int classNumber,
             int number,
             int studentNumber,
             Integer dormitoryRoom) {
         this.datagsmStudentId = datagsmStudentId;
+        this.name = name;
         this.grade = grade;
         this.classNumber = classNumber;
         this.number = number;
         this.studentNumber = studentNumber;
         this.dormitoryRoom = dormitoryRoom;
+    }
+
+    public void linkMember(Member member) {
+        this.member = member;
     }
 
     /**
@@ -177,5 +180,25 @@ public class Student {
      */
     public boolean hasRequiredConsent() {
         return privacyAgreedAt != null && faceAgreedAt != null;
+    }
+
+    public static Student createWithoutMember(
+            Long datagsmStudentId,
+            String name,
+            int grade,
+            int classNumber,
+            int number,
+            int studentNumber,
+            Integer dormitoryRoom) {
+        Student student = new Student();
+        student.name = name;
+        student.datagsmStudentId = datagsmStudentId;
+        student.grade = grade;
+        student.classNumber = classNumber;
+        student.number = number;
+        student.studentNumber = studentNumber;
+        student.dormitoryRoom = dormitoryRoom;
+
+        return student;
     }
 }
