@@ -52,7 +52,13 @@ public class StudentSyncService {
         int synced = 0;
         for (StudentSyncData changed : students) {
             Student student = saved.get(changed.datagsmStudentId());
-            if (student == null || student.isStale(syncedAt)) {
+            if (student == null) {
+                if (create(changed, syncedAt)) {
+                    synced++;
+                }
+                continue;
+            }
+            if (student.isStale(syncedAt)) {
                 continue;
             }
             if (sync(student, changed)) {
@@ -61,6 +67,25 @@ public class StudentSyncService {
             }
         }
         return synced;
+    }
+
+    private boolean create(StudentSyncData changed, Instant syncedAt) {
+        if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
+            return false;
+        }
+        if (!isComplete(changed)) {
+            return false;
+        }
+        Student student = Student.createWithoutMember(
+                changed.datagsmStudentId(),
+                changed.name(), changed.grade(),
+                changed.classNum(), changed.number(),
+                changed.studentNumber(),
+                changed.dormitoryRoom()
+        );
+        student.markSynced(syncedAt);
+        studentRepository.save(student);
+        return true;
     }
 
     /**
@@ -76,7 +101,9 @@ public class StudentSyncService {
         Member member = student.getMember();
 
         if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
-            member.update(member.getName(), MemberRole.STUDENT);
+            if (member != null) {
+                member.update(member.getName(), MemberRole.STUDENT);
+            }
             student.leaveDormitory();
             eventPublisher.publishEvent(new StudentLeftEvent(student.getId(), changed.role()));
             log.info("Student left: studentId={}, role={}", changed.datagsmStudentId(), changed.role());
@@ -84,24 +111,35 @@ public class StudentSyncService {
         }
 
         MemberRole role = toMemberRole(changed.role());
-        if (role == null
-                || changed.name() == null
-                || changed.grade() == null
-                || changed.classNum() == null
-                || changed.number() == null
-                || changed.studentNumber() == null) {
-            log.warn("Skipped incomplete student: studentId={}", changed.datagsmStudentId());
+        if (!isComplete(changed)) {
             return false;
         }
 
-        member.update(changed.name(), role);
+        if (member != null) {
+            member.update(changed.name(), role);
+        }
         student.update(
                 changed.datagsmStudentId(),
+                changed.name(),
                 changed.grade(),
                 changed.classNum(),
                 changed.number(),
                 changed.studentNumber(),
                 changed.dormitoryRoom());
+        return true;
+    }
+
+    private static boolean isComplete(StudentSyncData changed) {
+        if (changed.name() == null
+                || changed.grade() == null
+                || changed.classNum() == null
+                || changed.number() == null
+                || changed.studentNumber() == null
+                || toMemberRole(changed.role()) == null
+        ) {
+            log.warn("Skipped incomplete student: studentId={}", changed.datagsmStudentId());
+            return false;
+        }
         return true;
     }
 
