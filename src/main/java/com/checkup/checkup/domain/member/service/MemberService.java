@@ -41,17 +41,24 @@ public class MemberService {
         member.update(name, role);
 
         if (dataGsmStudent != null) {
-            studentRepository.findByMember(member).ifPresentOrElse(
-                    student -> student.update(
-                            dataGsmStudent.getId(),
-                            dataGsmStudent.getGrade(),
-                            dataGsmStudent.getClassNum(),
-                            dataGsmStudent.getNumber(),
-                            dataGsmStudent.getStudentNumber(),
-                            dataGsmStudent.getDormitoryRoom()),
+            studentRepository.findByMember(member)
+                    .or(() -> studentRepository.findByDatagsmStudentId(dataGsmStudent.getId()))
+                    .ifPresentOrElse(
+                    student -> {
+                        student.linkMember(member);
+                        student.update(
+                                dataGsmStudent.getId(),
+                                name,
+                                dataGsmStudent.getGrade(),
+                                dataGsmStudent.getClassNum(),
+                                dataGsmStudent.getNumber(),
+                                dataGsmStudent.getStudentNumber(),
+                                dataGsmStudent.getDormitoryRoom());
+                    },
                     () -> studentRepository.save(Student.create(
                             member,
                             dataGsmStudent.getId(),
+                            name,
                             dataGsmStudent.getGrade(),
                             dataGsmStudent.getClassNum(),
                             dataGsmStudent.getNumber(),
