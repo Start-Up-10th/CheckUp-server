@@ -45,13 +45,14 @@ class RoomControllerTest {
     @DisplayName("호실 학생 명단을 계약에 정의된 JSON 필드의 배열로 반환한다")
     void returnsRoomStudentsWithContractFields() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301, AttendancePurpose.DORMITORY))
-                .willReturn(List.of(new RoomStudentResponse("학생", 1, 1101, true)));
+                .willReturn(List.of(new RoomStudentResponse("학생", 1, 1, 1101, true)));
 
         mockMvc.perform(get("/api/v1/room/student")
                         .param("dormitoryRoom", "301")
                         .with(loginAs(MEMBER_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].student_name").value("학생"))
+                .andExpect(jsonPath("$[0].student_grade").value(1))
                 .andExpect(jsonPath("$[0].student_class").value(1))
                 .andExpect(jsonPath("$[0].student_number").value(1101))
                 .andExpect(jsonPath("$[0].attended").value(true))
@@ -104,7 +105,7 @@ class RoomControllerTest {
     @DisplayName("용도를 주면 그 용도의 출석 여부로 조회한다")
     void purposeParameterIsPassedToService() throws Exception {
         given(roomService.getStudents(MEMBER_ID, 301, AttendancePurpose.STUDY_ROOM))
-                .willReturn(List.of(new RoomStudentResponse("학생", 1, 1101, false)));
+                .willReturn(List.of(new RoomStudentResponse("학생", 1, 1, 1101, false)));
 
         mockMvc.perform(get("/api/v1/room/student")
                         .param("dormitoryRoom", "301")
