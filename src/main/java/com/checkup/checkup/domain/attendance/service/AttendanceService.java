@@ -89,4 +89,10 @@ public class AttendanceService {
             case STUDY_ROOM -> "자습실 출석이 완료됐어요";
         };
     }
+
+    @Transactional
+    public int deleteExpired() {
+        LocalDate today = operatingDayCalculator.today();
+        return attendanceRepository.deleteByOperatingDayBefore(today);
+    }
 }
