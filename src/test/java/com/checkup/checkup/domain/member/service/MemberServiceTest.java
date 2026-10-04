@@ -21,7 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import team.themoment.datagsm.sdk.oauth.model.UserInfo;
 
 /**
- * 로그인할 때 DataGSM 학생 정보로 학생의 호실이 저장·갱신되는지 검증한다.
+ * 로그인할 때 DataGSM 학생 정보로 학생의 호실·이름이 저장·갱신되고, 동기화로 미리 저장된 학생에는 계정을 연결하는지 검증한다.
  */
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
@@ -62,7 +62,7 @@ class MemberServiceTest {
     @DisplayName("로그인 학생의 변경된 호실을 기존 dormitoryRoom에 반영한다")
     void updatesDormitoryRoomOnLogin() {
         Member member = Member.create(DATAGSM_USER_ID, "학생", MemberRole.STUDENT);
-        Student savedStudent = Student.create(member, DATAGSM_STUDENT_ID, 1, 1, 1, 1101, 301);
+        Student savedStudent = Student.create(member, DATAGSM_STUDENT_ID, "학생", 1, 1, 1, 1101, 301);
         given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.of(member));
         given(studentRepository.findByMember(member)).willReturn(Optional.of(savedStudent));
 
@@ -70,6 +70,24 @@ class MemberServiceTest {
 
         assertThat(savedStudent.getDormitoryRoom()).isEqualTo(425);
         assertThat(savedStudent.getDormitoryFloor()).isEqualTo(4);
+        verify(studentRepository, never()).save(any(Student.class));
+    }
+
+    @Test
+    @DisplayName("동기화로 미리 저장된 학생이 처음 로그인하면 새로 만들지 않고 계정을 연결한다")
+    void linksPreStoredStudentOnFirstLogin() {
+        Student preStored = Student.createWithoutMember(DATAGSM_STUDENT_ID, "옛이름", 1, 1, 1, 1101, 301);
+        given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.empty());
+        given(memberRepository.save(any(Member.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(studentRepository.findByMember(any(Member.class))).willReturn(Optional.empty());
+        given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(preStored));
+
+        Member member = memberService.saveOrUpdate(studentUser(425), MemberRole.STUDENT);
+
+        assertThat(preStored.getMember()).isSameAs(member);
+        assertThat(preStored.getName()).isEqualTo("학생");
+        assertThat(preStored.getDormitoryRoom()).isEqualTo(425);
         verify(studentRepository, never()).save(any(Student.class));
     }
 
