@@ -17,10 +17,12 @@ public class Student {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 로그인 계정. DataGSM 학생 목록으로 미리 저장한 뒤 아직 로그인하지 않은 학생은 null이다. */
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", unique = true)
     private Member member;
 
+    /** DataGSM 학생 이름. 로그인 계정이 없는 학생도 명단에 보여야 해서 회원이 아닌 학생에 둔다. */
     @Column(nullable = false, length = 50)
     private String name;
 
@@ -99,6 +101,10 @@ public class Student {
         return student;
     }
 
+    /**
+     * 로그인 계정 없이 학생을 만든다. DataGSM 학생 목록 동기화로 로그인 전 학생을 미리 저장할 때 쓴다.
+     * 학생이 처음 로그인하면 {@link #linkMember}로 계정을 연결한다.
+     */
     public static Student createWithoutMember(
             Long datagsmStudentId,
             String name,
@@ -143,6 +149,11 @@ public class Student {
         this.dormitoryRoom = dormitoryRoom;
     }
 
+    /**
+     * 로그인한 계정을 학생에 연결한다. 이미 같은 계정이 연결돼 있으면 바뀌지 않는다.
+     *
+     * @param member 로그인한 회원
+     */
     public void linkMember(Member member) {
         this.member = member;
     }
