@@ -12,12 +12,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AttendanceCleanupScheduler {
 
-        private final AttendanceService attendanceService;
+    private final AttendanceService attendanceService;
 
-        @EventListener(ApplicationReadyEvent.class)
-        @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
-        public void deleteExpiredAttendance() {
-            int deleted = attendanceService.deleteExpired();
-            log.info("Deleted expired attendance records: count={}", deleted);
-        }
+    @EventListener(ApplicationReadyEvent.class)
+    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
+    public void deleteExpiredAttendance() {
+        int deleted = attendanceService.deleteExpired();
+        log.info("Deleted expired attendance records: count={}", deleted);
+    }
 }
