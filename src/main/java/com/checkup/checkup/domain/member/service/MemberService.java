@@ -44,27 +44,27 @@ public class MemberService {
             studentRepository.findByMember(member)
                     .or(() -> studentRepository.findByDatagsmStudentId(dataGsmStudent.getId()))
                     .ifPresentOrElse(
-                    student -> {
-                        student.linkMember(member);
-                        student.update(
+                        student -> {
+                            student.linkMember(member);
+                            student.update(
+                                    dataGsmStudent.getId(),
+                                    name,
+                                    dataGsmStudent.getGrade(),
+                                    dataGsmStudent.getClassNum(),
+                                    dataGsmStudent.getNumber(),
+                                    dataGsmStudent.getStudentNumber(),
+                                    dataGsmStudent.getDormitoryRoom());
+                        },
+                        () -> studentRepository.save(Student.create(
+                                member,
                                 dataGsmStudent.getId(),
                                 name,
                                 dataGsmStudent.getGrade(),
                                 dataGsmStudent.getClassNum(),
                                 dataGsmStudent.getNumber(),
                                 dataGsmStudent.getStudentNumber(),
-                                dataGsmStudent.getDormitoryRoom());
-                    },
-                    () -> studentRepository.save(Student.create(
-                            member,
-                            dataGsmStudent.getId(),
-                            name,
-                            dataGsmStudent.getGrade(),
-                            dataGsmStudent.getClassNum(),
-                            dataGsmStudent.getNumber(),
-                            dataGsmStudent.getStudentNumber(),
-                            dataGsmStudent.getDormitoryRoom()))
-            );
+                                dataGsmStudent.getDormitoryRoom()))
+                    );
         }
 
         return member;
