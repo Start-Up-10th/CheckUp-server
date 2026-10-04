@@ -77,7 +77,7 @@ class VolunteerDutyRepositoryTest {
     @DisplayName("학생의 완료한 봉사만 최신 운영일부터 읽는다")
     void findCompletedNewestFirst() {
         Member other = memberRepository.save(Member.create(92_002L, "다른학생", MemberRole.STUDENT));
-        Long otherId = studentRepository.saveAndFlush(Student.create(other, 92_002L, 1, 1, 2, 92_002, 301)).getId();
+        Long otherId = studentRepository.saveAndFlush(Student.create(other, 92_002L, "다른학생", 1, 1, 2, 92_002, 301)).getId();
         dutyRepository.assign(studentId, DAY, T0);
         dutyRepository.assign(studentId, DAY.plusDays(2), T0);
         dutyRepository.assign(studentId, DAY.plusDays(5), T0);
