@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.volunteer.repository;
 
+import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -32,6 +33,11 @@ public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Lo
 
     /** 학생의 그 운영일 지정. */
     Optional<VolunteerDuty> findByStudentIdAndOperatingDay(Long studentId, LocalDate operatingDay);
+
+    /**
+     * 학생의 봉사 지정 중 한 상태인 것을 최신 운영일부터 읽는다. 학생 본인 봉사 완료 내역(REQ-COM-003)에 쓴다.
+     */
+    List<VolunteerDuty> findAllByStudentIdAndStatusOrderByOperatingDayDescIdDesc(Long studentId, DutyStatus status);
 
     /** 그 운영일에 지정된 모든 학생. 봉사 관리 명단의 지정 상태 표시에 쓴다. */
     List<VolunteerDuty> findAllByOperatingDay(LocalDate operatingDay);
