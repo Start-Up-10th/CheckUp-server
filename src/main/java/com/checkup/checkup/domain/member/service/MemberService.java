@@ -25,6 +25,9 @@ public class MemberService {
     /**
      * DataGSM 사용자 정보로 회원을 저장하거나 갱신한다. 학생이면 학생 정보도 함께 저장·갱신한다.
      *
+     * 학생은 계정으로 먼저 찾고, 없으면 동기화로 미리 저장된 학생을 DataGSM 학생 id로 찾아 계정을 연결한다.
+     * 둘 다 없을 때만 새로 저장한다.
+     *
      * @param userInfo DataGSM 사용자 정보
      * @param role     판정된 역할
      * @return 저장·갱신된 회원
