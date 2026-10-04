@@ -19,7 +19,6 @@ import com.checkup.checkup.domain.face.ai.AiFaceFrameResponse;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.domain.face.entity.FaceTemplate;
 import com.checkup.checkup.domain.member.entity.Student;
-import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
@@ -74,9 +73,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
-        Member member = mock(Member.class);
-        given(member.getName()).willReturn("Student Name");
-        given(student.getMember()).willReturn(member);
+        given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);

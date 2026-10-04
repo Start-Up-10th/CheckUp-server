@@ -15,14 +15,14 @@ import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
 import com.checkup.checkup.domain.user.entity.Sex;
 import com.checkup.checkup.domain.user.entity.StudentRole;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
@@ -89,49 +89,49 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("학생이 다른 학생을 조회하면 403이고 DataGSM을 호출하지 않는다")
+    @DisplayName("학생이 다른 학생을 조회하면 FORBIDDEN이고 DataGSM을 호출하지 않는다")
     void studentCannotFindOthers() {
         Member member = givenMember(MemberRole.STUDENT);
         givenOwnStudent(member, 999L);
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
         verify(dataGsmOpenApiClient, never()).students();
     }
 
     @Test
-    @DisplayName("학생 정보가 없는 STUDENT 회원은 403이다")
+    @DisplayName("학생 정보가 없는 STUDENT 회원은 FORBIDDEN이다")
     void studentWithoutStudentRecordIsForbidden() {
         Member member = givenMember(MemberRole.STUDENT);
         given(studentRepository.findByMember(member)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
     @Test
-    @DisplayName("DataGSM에 학생이 없으면 404다")
+    @DisplayName("DataGSM에 학생이 없으면 STUDENT_NOT_FOUND다")
     void notFoundWhenStudentMissing() {
         givenMember(MemberRole.ADMIN);
         givenDataGsmStudent(null);
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
     }
 
     @Test
-    @DisplayName("DataGSM 호출이 실패하면 502다")
+    @DisplayName("DataGSM 호출이 실패하면 DATAGSM_ERROR다")
     void badGatewayWhenDataGsmFails() {
         givenMember(MemberRole.ADMIN);
         given(dataGsmOpenApiClient.students()).willReturn(studentApi);
         given(studentApi.getStudent(anyLong())).willThrow(new DataGsmException("fail"));
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
-                .isInstanceOfSatisfying(ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_ERROR));
     }
 
     private Member givenMember(MemberRole role) {
@@ -141,7 +141,7 @@ class UserServiceTest {
     }
 
     private void givenOwnStudent(Member member, Long datagsmStudentId) {
-        Student student = Student.create(member, datagsmStudentId, 2, 3, 4, 2304, 301);
+        Student student = Student.create(member, datagsmStudentId, "홍길동", 2, 3, 4, 2304, 301);
         given(studentRepository.findByMember(member)).willReturn(Optional.of(student));
     }
 

@@ -60,7 +60,7 @@ class VolunteerServiceTest {
     @Test
     @DisplayName("전체 학생을 DataGSM id·이름·학번·호실·봉사 횟수로 응답하고 최근 활동은 비운다")
     void listIsConverted() {
-        Student student = Student.create(Member.create(100L, "학생", MemberRole.STUDENT), 200L, 2, 1, 5, 2105, 301);
+        Student student = Student.create(Member.create(100L, "학생", MemberRole.STUDENT), 200L, "학생", 2, 1, 5, 2105, 301);
         ReflectionTestUtils.setField(student, "volunteerCount", 2);
         given(studentRepository.findAllByDatagsmStudentIdIsNotNull()).willReturn(List.of(student));
 
@@ -438,7 +438,7 @@ class VolunteerServiceTest {
     }
 
     private static Student student(Long datagsmId, String name, int studentNumber, Integer room) {
-        return Student.create(Member.create(datagsmId + 1000, name, MemberRole.STUDENT), datagsmId, 2, 1, 1,
+        return Student.create(Member.create(datagsmId + 1000, name, MemberRole.STUDENT), datagsmId, name, 2, 1, 1,
                 studentNumber, room);
     }
 

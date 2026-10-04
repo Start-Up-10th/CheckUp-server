@@ -45,7 +45,7 @@ public class VolunteerService {
     /** 호실 → 이름 → 학번순. 호실이 없는 학생은 맨 뒤에 둔다. */
     private static final Comparator<Student> ROOM_ORDER = Comparator
             .comparing(Student::getDormitoryRoom, Comparator.nullsLast(Comparator.naturalOrder()))
-            .thenComparing(student -> student.getMember().getName())
+            .thenComparing(Student::getName)
             .thenComparing(Student::getStudentNumber);
 
     private final AdminVerifier adminVerifier;
@@ -297,6 +297,6 @@ public class VolunteerService {
                     ? KoreanNameMatcher.CONTAINS
                     : KoreanNameMatcher.NO_MATCH;
         }
-        return student -> KoreanNameMatcher.rank(student.getMember().getName(), keyword);
+        return student -> KoreanNameMatcher.rank(student.getName(), keyword);
     }
 }

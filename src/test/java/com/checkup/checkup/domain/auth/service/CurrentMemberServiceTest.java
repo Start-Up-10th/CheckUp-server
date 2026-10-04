@@ -39,7 +39,7 @@ class CurrentMemberServiceTest {
     @DisplayName("학생은 세션 회원의 학생 정보(DataGSM 학생 id·학년·반·번호·학번·호실·층)를 받는다")
     void studentGetsOwnStudentInfo() {
         Member member = Member.create(100L, "학생", MemberRole.STUDENT);
-        Student student = Student.create(member, 1234L, 2, 4, 5, 2405, 412);
+        Student student = Student.create(member, 1234L, "학생", 2, 4, 5, 2405, 412);
         given(memberService.getById(MEMBER_ID)).willReturn(member);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
 
@@ -56,7 +56,7 @@ class CurrentMemberServiceTest {
     @DisplayName("필수 동의를 마친 학생은 consented가 true다")
     void consentedAfterRequiredConsent() {
         Member member = Member.create(100L, "학생", MemberRole.STUDENT);
-        Student student = Student.create(member, 1234L, 2, 4, 5, 2405, 412);
+        Student student = Student.create(member, 1234L, "학생", 2, 4, 5, 2405, 412);
         student.agree(false, Instant.parse("2026-10-03T00:00:00Z"), "v1");
         given(memberService.getById(MEMBER_ID)).willReturn(member);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
@@ -68,7 +68,7 @@ class CurrentMemberServiceTest {
     @DisplayName("호실이 배정되지 않은 학생은 호실과 층이 null이다")
     void studentWithoutRoomHasNullRoomAndFloor() {
         Member member = Member.create(100L, "학생", MemberRole.STUDENT);
-        Student student = Student.create(member, 1234L, 1, 1, 1, 1101, null);
+        Student student = Student.create(member, 1234L, "학생", 1, 1, 1, 1101, null);
         given(memberService.getById(MEMBER_ID)).willReturn(member);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
 
@@ -82,7 +82,7 @@ class CurrentMemberServiceTest {
     @DisplayName("기숙사 자치위원은 ADMIN이면서 학생 정보가 있다")
     void dormitoryManagerIsAdminWithStudentInfo() {
         Member member = Member.create(100L, "자치위원", MemberRole.ADMIN);
-        Student student = Student.create(member, 1234L, 3, 1, 2, 3102, 301);
+        Student student = Student.create(member, 1234L, "자치위원", 3, 1, 2, 3102, 301);
         given(memberService.getById(MEMBER_ID)).willReturn(member);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
 

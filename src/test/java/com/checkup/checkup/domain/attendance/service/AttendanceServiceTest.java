@@ -36,7 +36,8 @@ import com.checkup.checkup.support.MutableClock;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 
 /**
- * 실제 PostgreSQL에서 자동 인증 출석이 학생·용도·운영일마다 한 번만 기록되고, 수동 수정·늦은 인증·시계 오차 규칙(REQ-ATT-002·007)과 출석 완료 알림 생성을 지키는지 검증한다.
+ * 실제 PostgreSQL에서 자동 인증 출석이 학생·용도·운영일마다 한 번만 기록되고, 수동 수정·늦은 인증·시계 오차 규칙(REQ-ATT-002·007)과 출석 완료 알림 생성을 지키는지,
+ * 08:00 경계에 지난 운영일 출석을 지우고 지운 기록을 늦은 인증으로 되살리지 않는지 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -47,6 +48,10 @@ class AttendanceServiceTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 9, 27);
     private static final Instant AT = Instant.parse("2026-09-27T12:00:00Z");
+    /** 삭제 테스트용 시각. 같은 DB의 다른 출석 행을 지우지 않도록 실제 운영일보다 훨씬 이른 날을 쓴다. 2000-01-01 21:00 KST. */
+    private static final Instant PURGE_AT = Instant.parse("2000-01-01T12:00:00Z");
+    /** {@link #PURGE_AT} 다음 운영일. 2000-01-02 09:00 KST. */
+    private static final Instant PURGE_NEXT_DAY = Instant.parse("2000-01-02T00:00:00Z");
 
     @TestConfiguration
     static class ClockTestConfig {
@@ -76,7 +81,7 @@ class AttendanceServiceTest {
                 "INSERT INTO member (datagsm_id, name, role) VALUES (?, '테스트학생', 'STUDENT') RETURNING id",
                 Long.class, datagsmId);
         studentId = jdbcTemplate.queryForObject(
-                "INSERT INTO student (member_id, number, grade, class_number, student_number) VALUES (?, 1, 1, 1, 1101) RETURNING id",
+                "INSERT INTO student (member_id, name, number, grade, class_number, student_number) VALUES (?, '테스트학생', 1, 1, 1, 1101) RETURNING id",
                 Long.class, memberId);
     }
 
@@ -319,6 +324,36 @@ class AttendanceServiceTest {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE);
 
         assertThat(notificationCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("지난 운영일 출석을 지우면 오늘 운영일 출석만 남는다")
+    void deleteExpiredKeepsOnlyToday() {
+        clock.setInstant(PURGE_AT);
+        mark(AttendancePurpose.DORMITORY, PURGE_AT, AttendanceMethod.QR);
+        clock.setInstant(PURGE_NEXT_DAY);
+        mark(AttendancePurpose.DORMITORY, PURGE_NEXT_DAY, AttendanceMethod.QR);
+
+        int deleted = attendanceService.deleteExpired();
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT operating_day FROM attendance WHERE student_id = ?", LocalDate.class, studentId))
+                .containsExactly(LocalDate.of(2000, 1, 2));
+    }
+
+    @Test
+    @DisplayName("지난 운영일 출석을 지운 뒤 늦게 도착한 전날 인증은 기록을 되살리지 않는다")
+    void lateVerificationDoesNotReviveDeletedAttendance() {
+        clock.setInstant(PURGE_AT);
+        mark(AttendancePurpose.DORMITORY, PURGE_AT, AttendanceMethod.QR);
+        clock.setInstant(PURGE_NEXT_DAY);
+        attendanceService.deleteExpired();
+
+        AttendanceRecordResult result = mark(AttendancePurpose.DORMITORY, PURGE_AT, AttendanceMethod.FACE);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.STALE);
+        assertThat(rowCount()).isZero();
     }
 
     private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {

@@ -65,7 +65,7 @@ class RoomServiceTest {
         Member admin = Member.create(10L, "사감", MemberRole.ADMIN);
         Student rosterStudent = student(20L, "학생", 1101, ROOM);
         given(memberService.getById(ADMIN_ID)).willReturn(admin);
-        given(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of(rosterStudent));
 
         given(operatingDayCalculator.today()).willReturn(TODAY);
@@ -84,7 +84,7 @@ class RoomServiceTest {
         Student roommate = student(21L, "룸메이트", 1102, ROOM);
         given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
         given(studentRepository.findByMember(currentMember)).willReturn(Optional.of(currentStudent));
-        given(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of(roommate, currentStudent));
 
         given(operatingDayCalculator.today()).willReturn(TODAY);
@@ -107,7 +107,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(401);
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(401);
     }
 
     @Test
@@ -122,7 +122,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM);
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM);
     }
 
     @Test
@@ -142,7 +142,7 @@ class RoomServiceTest {
     @DisplayName("조회한 호실에 학생이 없으면 403을 반환한다")
     void emptyRoomReturnsForbidden() {
         given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
-        given(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of());
 
         assertThatThrownBy(() -> roomService.getStudents(ADMIN_ID, ROOM, DORMITORY))
@@ -161,7 +161,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM);
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM);
     }
 
     @Test
@@ -171,7 +171,7 @@ class RoomServiceTest {
         Student attendedStudent = withId(student(20L, "출석", 1101, ROOM), 100L);
         Student absentStudent = withId(student(21L, "미출석", 1102, ROOM), 101L);
         given(memberService.getById(ADMIN_ID)).willReturn(admin);
-        given(studentRepository.findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of(absentStudent, attendedStudent));
         given(operatingDayCalculator.today()).willReturn(TODAY);
         given(attendanceRepository.findAttendedStudentIds(List.of(101L, 100L), AttendancePurpose.STUDY_ROOM, TODAY))
@@ -191,6 +191,6 @@ class RoomServiceTest {
 
     private static Student student(long datagsmId, String name, int studentNumber, Integer dormitoryRoom) {
         Member member = Member.create(datagsmId, name, MemberRole.STUDENT);
-        return Student.create(member, datagsmId, 1, 1, 1, studentNumber, dormitoryRoom);
+        return Student.create(member, datagsmId, name, 1, 1, 1, studentNumber, dormitoryRoom);
     }
 }

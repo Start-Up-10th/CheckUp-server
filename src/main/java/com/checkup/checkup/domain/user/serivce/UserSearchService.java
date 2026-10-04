@@ -5,10 +5,10 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
 import team.themoment.datagsm.sdk.openapi.model.Student;
@@ -27,7 +27,9 @@ public class UserSearchService {
     /**
      * @param memberId  세션의 로그인 회원 id
      * @param studentId 조회할 DataGSM 학생 id
-     * @throws ResponseStatusException 권한이 없으면 403, 학생이 없으면 404, DataGSM 호출이 실패하면 502
+     * @throws CustomException 관리자도 본인도 아니면 {@link ErrorCode#FORBIDDEN}(403),
+     *                         DataGSM에 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         DataGSM 호출이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
     public UserSearchResponse findUser(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
@@ -37,10 +39,10 @@ public class UserSearchService {
         try {
             student = dataGsmOpenApiClient.students().getStudent(studentId);
         } catch (DataGsmException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "DataGSM 학생 조회에 실패했습니다.");
+            throw new CustomException(ErrorCode.DATAGSM_ERROR);
         }
         if (student == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다.");
+            throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
         }
         return UserSearchResponse.from(student);
     }
@@ -53,7 +55,7 @@ public class UserSearchService {
                 .map(s -> studentId.equals(s.getDatagsmStudentId()))
                 .orElse(false);
         if (!self) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "조회 권한이 없습니다.");
+            throw new CustomException(ErrorCode.FORBIDDEN);
         }
     }
 

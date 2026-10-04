@@ -20,7 +20,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 
 /**
  * 실제 PostgreSQL에서 당일 봉사자 지정이 학생·운영일마다 하나이고,
- * 완료는 한 번만 반영되며 완료한 지정은 취소되지 않는지 검증한다.
+ * 완료는 한 번만 반영되며 완료한 지정은 취소되지 않는지, 학생의 완료 내역을 최신 운영일부터 읽는지 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -43,7 +43,7 @@ class VolunteerDutyRepositoryTest {
     @BeforeEach
     void setUp() {
         Member member = memberRepository.save(Member.create(92_001L, "학생", MemberRole.STUDENT));
-        studentId = studentRepository.saveAndFlush(Student.create(member, 92_001L, 1, 1, 1, 92_001, 301)).getId();
+        studentId = studentRepository.saveAndFlush(Student.create(member, 92_001L, "학생", 1, 1, 1, 92_001, 301)).getId();
     }
 
     @Test
@@ -71,6 +71,29 @@ class VolunteerDutyRepositoryTest {
         VolunteerDuty duty = dutyRepository.findById(id).orElseThrow();
         assertThat(duty.getStatus()).isEqualTo(DutyStatus.COMPLETED);
         assertThat(duty.getCompletedAt()).isEqualTo(T0.plusSeconds(60));
+    }
+
+    @Test
+    @DisplayName("학생의 완료한 봉사만 최신 운영일부터 읽는다")
+    void findCompletedNewestFirst() {
+        Member other = memberRepository.save(Member.create(92_002L, "다른학생", MemberRole.STUDENT));
+        Long otherId = studentRepository.saveAndFlush(Student.create(other, 92_002L, "다른학생", 1, 1, 2, 92_002, 301)).getId();
+        dutyRepository.assign(studentId, DAY, T0);
+        dutyRepository.assign(studentId, DAY.plusDays(2), T0);
+        dutyRepository.assign(studentId, DAY.plusDays(5), T0);
+        dutyRepository.assign(otherId, DAY.plusDays(3), T0);
+        complete(studentId, DAY);
+        complete(studentId, DAY.plusDays(2));
+        complete(otherId, DAY.plusDays(3));
+
+        assertThat(dutyRepository.findAllByStudentIdAndStatusOrderByOperatingDayDescIdDesc(studentId, DutyStatus.COMPLETED))
+                .extracting(VolunteerDuty::getOperatingDay)
+                .containsExactly(DAY.plusDays(2), DAY);
+    }
+
+    private void complete(Long student, LocalDate day) {
+        Long id = dutyRepository.findByStudentIdAndOperatingDay(student, day).orElseThrow().getId();
+        dutyRepository.complete(id, T0.plusSeconds(60));
     }
 
     @Test
