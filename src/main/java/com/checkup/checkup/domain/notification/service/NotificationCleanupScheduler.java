@@ -2,6 +2,8 @@ package com.checkup.checkup.domain.notification.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,7 @@ public class NotificationCleanupScheduler {
 
     private final NotificationService notificationService;
 
+    @EventListener(ApplicationReadyEvent.class)
     @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
     public void deleteExpiredAttendance() {
         int deleted = notificationService.deleteExpiredAttendance();
