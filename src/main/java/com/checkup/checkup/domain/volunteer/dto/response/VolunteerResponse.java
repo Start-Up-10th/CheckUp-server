@@ -35,7 +35,7 @@ public record VolunteerResponse(
     public static VolunteerResponse of(Student student, Instant lastActivityAt, DutyStatus todayDuty) {
         return new VolunteerResponse(
                 student.getDatagsmStudentId(),
-                student.getMember().getName(),
+                student.getName(),
                 student.getStudentNumber(),
                 student.getDormitoryRoom(),
                 student.getVolunteerCount(),

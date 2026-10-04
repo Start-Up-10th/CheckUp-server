@@ -20,7 +20,7 @@ public record RoomStudentResponse(
 
     public static RoomStudentResponse from(Student student, boolean attended) {
         return new RoomStudentResponse(
-                student.getMember().getName(),
+                student.getName(),
                 student.getClassNumber(),
                 student.getStudentNumber(),
                 attended

@@ -131,6 +131,6 @@ class NotificationRepositoryTest {
     private Student saveStudent(int studentNumber) {
         Long dataGsmId = Long.valueOf(studentNumber);
         Member member = memberRepository.save(Member.create(dataGsmId, "학생", MemberRole.STUDENT));
-        return studentRepository.saveAndFlush(Student.create(member, dataGsmId, 1, 1, 1, studentNumber, 301));
+        return studentRepository.saveAndFlush(Student.create(member, dataGsmId, "학생", 1, 1, 1, studentNumber, 301));
     }
 }

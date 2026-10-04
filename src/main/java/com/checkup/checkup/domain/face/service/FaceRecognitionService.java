@@ -252,7 +252,7 @@ public class FaceRecognitionService {
             if (student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
                     && student.get().getDormitoryRoom() != null) {
-                studentName = student.get().getMember().getName();
+                studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttended(
                         student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);

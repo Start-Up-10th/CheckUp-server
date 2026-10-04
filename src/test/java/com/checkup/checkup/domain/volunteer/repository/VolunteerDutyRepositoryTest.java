@@ -43,7 +43,7 @@ class VolunteerDutyRepositoryTest {
     @BeforeEach
     void setUp() {
         Member member = memberRepository.save(Member.create(92_001L, "학생", MemberRole.STUDENT));
-        studentId = studentRepository.saveAndFlush(Student.create(member, 92_001L, 1, 1, 1, 92_001, 301)).getId();
+        studentId = studentRepository.saveAndFlush(Student.create(member, 92_001L, "학생", 1, 1, 1, 92_001, 301)).getId();
     }
 
     @Test

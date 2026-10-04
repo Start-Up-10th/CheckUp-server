@@ -101,7 +101,7 @@ class StudentTest {
     }
 
     private static Student student(Integer dormitoryRoom) {
-        return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, 1, 1, 1, 1101,
+        return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, "학생", 1, 1, 1, 1101,
                 dormitoryRoom);
     }
 }

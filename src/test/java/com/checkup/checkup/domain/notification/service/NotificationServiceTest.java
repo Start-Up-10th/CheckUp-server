@@ -130,7 +130,7 @@ class NotificationServiceTest {
 
     private void givenStudent() {
         Student student = Student.create(
-                Member.create(100L, "학생", MemberRole.STUDENT), 200L, 2, 1, 5, 2105, 301);
+                Member.create(100L, "학생", MemberRole.STUDENT), 200L, "학생", 2, 1, 5, 2105, 301);
         ReflectionTestUtils.setField(student, "id", STUDENT_ID);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
     }

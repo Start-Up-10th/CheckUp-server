@@ -81,7 +81,7 @@ class AttendanceServiceTest {
                 "INSERT INTO member (datagsm_id, name, role) VALUES (?, '테스트학생', 'STUDENT') RETURNING id",
                 Long.class, datagsmId);
         studentId = jdbcTemplate.queryForObject(
-                "INSERT INTO student (member_id, number, grade, class_number, student_number) VALUES (?, 1, 1, 1, 1101) RETURNING id",
+                "INSERT INTO student (member_id, name, number, grade, class_number, student_number) VALUES (?, '테스트학생', 1, 1, 1, 1101) RETURNING id",
                 Long.class, memberId);
     }
 
