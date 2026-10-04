@@ -50,7 +50,7 @@ public class RoomService {
         }
 
         List<Student> students = studentRepository
-                .findAllByDormitoryRoomOrderByMember_NameAscStudentNumberAscIdAsc(dormitoryRoom);
+                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(dormitoryRoom);
         if (students.isEmpty()) {
             throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
         }
