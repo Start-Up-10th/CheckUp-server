@@ -1,4 +1,9 @@
 spring:
+  # @Scheduled 작업이 서로 기다리지 않도록 스레드 2개
+  task:
+    scheduling:
+      pool:
+        size: 2
   application:
     name: checkup
   # 개인 설정·secret은 커밋하지 않는 application-local.yaml에 둔다. 파일이 없으면 무시한다.
