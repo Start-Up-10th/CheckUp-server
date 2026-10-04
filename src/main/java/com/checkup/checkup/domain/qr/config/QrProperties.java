@@ -7,6 +7,8 @@ import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotBlank;
 
+import com.checkup.checkup.global.config.OriginValidator;
+
 /**
  * QR 세션·토큰 수명과 QR 링크 설정.
  *
@@ -18,6 +20,7 @@ import jakarta.validation.constraints.NotBlank;
  *                       Redis는 {@code maxmemory-policy noeviction}으로 운영한다.
  * @param baseUrl      QR 링크의 학생 웹 주소. QR 값은 {@code {baseUrl}/qr#t=<토큰>}이다.
  *                     기본값이 없어, 비어 있으면 잘못된 QR을 내보내지 않도록 기동에 실패한다.
+ *                     http(s) 주소가 아니거나 경로·쿼리·주석이 붙어 있어도 기동에 실패한다({@link OriginValidator}).
  */
 @Validated
 @ConfigurationProperties("checkup.qr")
@@ -28,4 +31,8 @@ public record QrProperties(
         Duration tokenRetention,
         @NotBlank String baseUrl
 ) {
+
+    public QrProperties {
+        OriginValidator.requireOrigin(baseUrl);
+    }
 }
