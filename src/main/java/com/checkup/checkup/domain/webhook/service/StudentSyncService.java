@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
+import com.checkup.checkup.global.config.AdminProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,6 +35,7 @@ public class StudentSyncService {
 
     private final StudentRepository studentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AdminProperties adminProperties;
 
     /**
      * 받은 학생들을 반영한다. {@code syncedAt}보다 새로운 정보를 이미 반영한 학생은 건너뛴다.
@@ -97,7 +99,7 @@ public class StudentSyncService {
     /**
      * 학생 한 명의 변경을 반영한다. 관리자 권한은 요청마다 DB 역할로 확인하므로 기존 로그인 세션에도 바로 반영된다.
      *
-     * 로그인 계정이 없는 학생은 회원 이름·권한 없이 학생 정보만 바꾼다.
+     * 로그인 계정이 없는 학생은 회원 이름·권한 없이 학생 정보만 바꾼다. 관리자 허용 목록 회원은 ADMIN을 유지한다.
      * 졸업·자퇴는 학년 등이 {@code null}로 오므로 학년·반·번호는 그대로 두고, 관리자 권한을 빼고 호실을 비운 뒤
      * {@link StudentLeftEvent}를 발행한다.
      * 재학생인데 필요한 값이 없으면 부분 데이터로 보고 건너뛴다.
@@ -109,7 +111,7 @@ public class StudentSyncService {
 
         if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
             if (member != null) {
-                member.update(member.getName(), MemberRole.STUDENT);
+                member.update(member.getName(), roleFor(member, MemberRole.STUDENT));
             }
             student.leaveDormitory();
             eventPublisher.publishEvent(new StudentLeftEvent(student.getId(), changed.role()));
@@ -123,7 +125,7 @@ public class StudentSyncService {
         }
 
         if (member != null) {
-            member.update(changed.name(), role);
+            member.update(changed.name(), roleFor(member, role));
         }
         student.update(
                 changed.datagsmStudentId(),
@@ -167,5 +169,12 @@ public class StudentSyncService {
             case "GENERAL_STUDENT", "STUDENT_COUNCIL" -> MemberRole.STUDENT;
             default -> null;
         };
+    }
+
+    /**
+     * 회원에게 줄 권한을 정한다. 관리자 허용 목록에 있으면 DataGSM 역할과 상관없이 ADMIN이다.
+     */
+    private MemberRole roleFor(Member member, MemberRole role) {
+        return adminProperties.isAllowed(member.getDatagsmId()) ? MemberRole.ADMIN : role;
     }
 }

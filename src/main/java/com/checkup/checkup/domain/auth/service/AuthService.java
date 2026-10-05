@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.config.AdminProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,16 +24,19 @@ public class AuthService {
     private final OAuthStateService oAuthStateService;
     private final String redirectUri;
     private final MemberService memberService;
+    private final AdminProperties adminProperties;
 
     public AuthService(
             DataGsmOAuthClient dataGsmOAuthClient,
             OAuthStateService oAuthStateService,
-            @Value("${datagsm.redirect-uri}") String redirectUri, MemberService memberService
+            @Value("${datagsm.redirect-uri}") String redirectUri, MemberService memberService,
+            AdminProperties adminProperties
     ) {
         this.dataGsmOAuthClient = dataGsmOAuthClient;
         this.oAuthStateService = oAuthStateService;
         this.redirectUri = redirectUri;
         this.memberService = memberService;
+        this.adminProperties = adminProperties;
     }
 
     /**
@@ -54,6 +58,7 @@ public class AuthService {
 
     /**
      * state를 검증하고 code를 토큰으로 교환한 뒤 사용자 정보로 회원을 저장·갱신한다.
+     * 거절 규칙을 먼저 적용한 뒤, 관리자 허용 목록에 있는 계정은 ADMIN으로 정한다.
      *
      * @param code  DataGSM 인가 코드
      * @param state 로그인 요청 때 발급한 state
@@ -67,6 +72,9 @@ public class AuthService {
         TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, saved.codeVerifier());
         UserInfo userInfo = dataGsmOAuthClient.getUserInfo(token.getAccessToken());
         MemberRole role = resolveRole(userInfo);
+        if (adminProperties.isAllowed(userInfo.getId())) {
+            role = MemberRole.ADMIN;
+        }
         return new LoginResult(memberService.saveOrUpdate(userInfo, role), saved.redirectPath());
     }
 

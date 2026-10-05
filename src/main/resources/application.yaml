@@ -57,6 +57,8 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:true}
 
 checkup:
+  admin:
+    datagsm-ids: ${CHECKUP_ADMIN_DATAGSM_IDS:}   # 개발·테스트용 관리자 DataGSM 계정 id, 쉼표 구분. 운영 전 비운다
   web:
     base-url: ${PUBLIC_ORIGIN}
   qr:
