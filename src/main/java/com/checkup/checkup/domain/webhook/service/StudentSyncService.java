@@ -99,7 +99,7 @@ public class StudentSyncService {
     /**
      * 학생 한 명의 변경을 반영한다. 관리자 권한은 요청마다 DB 역할로 확인하므로 기존 로그인 세션에도 바로 반영된다.
      *
-     * 로그인 계정이 없는 학생은 회원 이름·권한 없이 학생 정보만 바꾼다.
+     * 로그인 계정이 없는 학생은 회원 이름·권한 없이 학생 정보만 바꾼다. 관리자 허용 목록 회원은 ADMIN을 유지한다.
      * 졸업·자퇴는 학년 등이 {@code null}로 오므로 학년·반·번호는 그대로 두고, 관리자 권한을 빼고 호실을 비운 뒤
      * {@link StudentLeftEvent}를 발행한다.
      * 재학생인데 필요한 값이 없으면 부분 데이터로 보고 건너뛴다.
@@ -171,6 +171,9 @@ public class StudentSyncService {
         };
     }
 
+    /**
+     * 회원에게 줄 권한을 정한다. 관리자 허용 목록에 있으면 DataGSM 역할과 상관없이 ADMIN이다.
+     */
     private MemberRole roleFor(Member member, MemberRole role) {
         return adminProperties.isAllowed(member.getDatagsmId()) ? MemberRole.ADMIN : role;
     }

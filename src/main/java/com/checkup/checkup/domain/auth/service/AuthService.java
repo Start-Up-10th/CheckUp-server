@@ -58,6 +58,7 @@ public class AuthService {
 
     /**
      * state를 검증하고 code를 토큰으로 교환한 뒤 사용자 정보로 회원을 저장·갱신한다.
+     * 거절 규칙을 먼저 적용한 뒤, 관리자 허용 목록에 있는 계정은 ADMIN으로 정한다.
      *
      * @param code  DataGSM 인가 코드
      * @param state 로그인 요청 때 발급한 state
