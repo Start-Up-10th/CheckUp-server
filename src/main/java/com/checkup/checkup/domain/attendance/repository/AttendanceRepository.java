@@ -163,4 +163,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM Attendance a WHERE a.operatingDay < :operatingDay")
     int deleteByOperatingDayBefore(@Param("operatingDay") LocalDate operatingDay);
+
+    /**
+     * 학생의 해당 운영일 출석 행을 모두 읽는다. 용도마다 하나라 많아야 두 개다. 학생 본인의 오늘 출석 조회에 쓴다.
+     */
+    List<Attendance> findAllByStudentIdAndOperatingDay(Long studentId, LocalDate operatingDay);
 }
