@@ -1,8 +1,5 @@
 package com.checkup.checkup.domain.user.dto.Response;
 
-import com.checkup.checkup.domain.user.entity.DataGsmStudentMapper;
-import com.checkup.checkup.domain.user.entity.Sex;
-import com.checkup.checkup.domain.user.entity.StudentRole;
 import team.themoment.datagsm.sdk.openapi.model.Student;
 
 public record UserSearchResponse(
@@ -23,11 +20,34 @@ public record UserSearchResponse(
                 student.getName(),
                 student.getEmail(),
                 student.getDormitoryRoom().orElse(null),
-                DataGsmStudentMapper.toSex(student.getSex()),
+                toSex(student.getSex()),
                 student.getGrade().orElse(null),
                 student.getClassNum().orElse(null),
                 student.getNumber().orElse(null),
-                DataGsmStudentMapper.toRole(student.getRole())
+                toRole(student.getRole())
         );
+    }
+
+    private static Sex toSex(team.themoment.datagsm.sdk.openapi.model.Sex sdk) {
+        if (sdk == null) {
+            return null;
+        }
+        return switch (sdk) {
+            case MAN -> Sex.MAN;
+            case WOMAN -> Sex.WOMAN;
+        };
+    }
+
+    private static StudentRole toRole(team.themoment.datagsm.sdk.openapi.model.StudentRole sdk) {
+        if (sdk == null) {
+            return null;
+        }
+        return switch (sdk) {
+            case GENERAL_STUDENT -> StudentRole.GENERAL_STUDENT;
+            case STUDENT_COUNCIL -> StudentRole.STUDENT_COUNCIL;
+            case DORMITORY_MANAGER -> StudentRole.DORMITORY_MANAGER;
+            case GRADUATE -> StudentRole.GRADUATE;
+            case WITHDRAWN -> StudentRole.WITHDRAWN;
+        };
     }
 }
