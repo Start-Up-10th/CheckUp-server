@@ -10,18 +10,24 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.checkup.checkup.domain.attendance.dto.response.MyAttendanceResponse;
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
+import com.checkup.checkup.domain.member.entity.Student;
+import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.notification.service.NotificationService;
+import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * 출석 기록을 담당한다. QR·얼굴 인식은 인증 성공 후 이 서비스로 출석을 확정하고, 관리자 수동 수정도 이 서비스로 저장한다.
+ * 학생 본인의 오늘 출석 조회도 여기서 한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -33,6 +39,7 @@ public class AttendanceService {
     private final OperatingDayCalculator operatingDayCalculator;
     private final Clock clock;
     private final NotificationService notificationService;
+    private final StudentRepository studentRepository;
 
     /**
      * 자동 인증 성공을 출석으로 기록한다. 동시에 여러 요청이 와도 한 번만 기록된다.
@@ -113,6 +120,23 @@ public class AttendanceService {
                         attendanceMessage(purpose));
             }
         });
+    }
+
+    /**
+     * 로그인한 학생 본인의 오늘 운영일 출석 상태를 용도별로 조회한다. 기록이 없는 용도는 미출석이다.
+     * 학생은 요청 값이 아니라 세션의 회원으로 정해, 다른 학생의 출석을 볼 수 없다.
+     *
+     * @param memberId 세션의 회원 id
+     * @return 오늘 운영일과 기숙사 입소·자습실 출석 상태
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403)
+     */
+    @Transactional(readOnly = true)
+    public MyAttendanceResponse getMyToday(Long memberId) {
+        Student student = studentRepository.findByMemberId(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
+        LocalDate operatingDay = operatingDayCalculator.today();
+        return MyAttendanceResponse.of(operatingDay,
+                attendanceRepository.findAllByStudentIdAndOperatingDay(student.getId(), operatingDay));
     }
 
     /** 출석 완료 알림 문구. */
