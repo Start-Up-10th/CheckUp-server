@@ -34,7 +34,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 얼굴 인식이 현재 세션 후보인 KNOWN 학생만 출석으로 기록하고, 후보 밖 학생이나 잘못된 AI 응답으로는 출석을 만들지 않는지 검증한다.
+ * 얼굴 인식이 현재 세션 후보인 KNOWN 학생만 출석으로 기록하고, 후보 밖 학생이나 잘못된 AI 응답으로는 출석을 만들지 않는지,
+ * 호실 없는 후보는 프레임마다 쿼리 한 번으로 확인해 세션을 닫는지 검증한다.
  */
 class FaceRecognitionServiceTest {
     private static final Long ADMIN_ID = 12L;
@@ -76,7 +77,7 @@ class FaceRecognitionServiceTest {
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
-        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.RECORDED);
 
@@ -102,7 +103,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDormitoryRoom()).willReturn(301);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
-        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(777L)).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(777L))).willReturn(1L);
 
         var response = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1});
 
@@ -116,7 +117,7 @@ class FaceRecognitionServiceTest {
     void unknownAndNotAttemptedAreNotRecorded() {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
-        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
                 .willReturn(new AiFaceFrameResponse("frame-1", List.of(
@@ -133,7 +134,7 @@ class FaceRecognitionServiceTest {
     @DisplayName("얼굴 하나라도 응답 검증에 실패하면 어떤 얼굴도 출석 처리하지 않는다")
     void anyInvalidFaceRecordsNoAttendance() {
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
-        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         AiFaceFrameResponse.FaceResult invalid = new AiFaceFrameResponse.FaceResult(
                 "track-2", List.of(0.95, 0.2, 0.2, 0.4), List.of(List.of(4.0, 5.0)),
@@ -156,7 +157,7 @@ class FaceRecognitionServiceTest {
     @DisplayName("복구가 원래 잠금 시간보다 길어도 프레임 잠금을 연장한다")
     void recoveryExtendsFrameLock() throws Exception {
         given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(Set.of(STUDENT_DB_ID)));
-        given(studentRepository.existsByIdAndDormitoryRoomIsNotNull(STUDENT_DB_ID)).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
         given(sessionStore.extendFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any())).willReturn(true);
         Student student = mock(Student.class);
@@ -230,6 +231,24 @@ class FaceRecognitionServiceTest {
         List<Double> vector = new java.util.ArrayList<>(java.util.Collections.nCopies(256, 0.0));
         vector.set(0, 1.0);
         return tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(List.of(vector));
+    }
+
+    @Test
+    @DisplayName("호실이 비었거나 저장되지 않은 후보가 있으면 쿼리 한 번으로 확인해 세션을 닫고 AI를 부르지 않는다")
+    void candidateWithoutRoomClosesSession() {
+        Set<Long> candidates = Set.of(STUDENT_DB_ID, 41L);
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session(candidates));
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(candidates)).willReturn(1L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1}))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.FACE_SESSION_NOT_FOUND));
+
+        verify(studentRepository).countByIdInAndDormitoryRoomIsNotNull(candidates);
+        verify(sessionStore).markInactive(SESSION_ID, ADMIN_ID);
+        verify(aiFaceClient, never()).recognize(any(), any(), any(), any());
     }
 
     private static FaceSessionView session(Set<Long> candidates) {
