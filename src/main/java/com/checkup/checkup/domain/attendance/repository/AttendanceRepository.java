@@ -70,6 +70,31 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     );
 
     /**
+     * 호실 번호가 주어진 범위에 있는 호실마다 배정 인원과 해당 용도·운영일의 출석 인원을 한 번에 센다.
+     * 관리자 전개도의 층 단위 현황에 쓴다. 호실 번호 오름차순이다.
+     *
+     * 배정 인원은 호실이 배정된 학생 수라 4명으로 고정하지 않는다(REQ-UI-001). 호실이 없는 학생은 세지 않는다.
+     * 출석 행이 없거나 미출석(수동 수정 포함)인 학생은 배정 인원에만 들어간다.
+     * 학생·용도·운영일마다 출석 행이 하나라 학생이 두 번 세어지지 않는다.
+     */
+    @Query("""
+            SELECT s.dormitoryRoom AS dormitoryRoom, COUNT(s) AS assigned, COUNT(a) AS attended
+            FROM Student s
+            LEFT JOIN Attendance a
+              ON a.student = s AND a.purpose = :purpose
+             AND a.operatingDay = :operatingDay AND a.attended = TRUE
+            WHERE s.dormitoryRoom BETWEEN :firstRoom AND :lastRoom
+            GROUP BY s.dormitoryRoom
+            ORDER BY s.dormitoryRoom
+            """)
+    List<RoomAttendanceCount> countByRoom(
+            @Param("firstRoom") int firstRoom,
+            @Param("lastRoom") int lastRoom,
+            @Param("purpose") AttendancePurpose purpose,
+            @Param("operatingDay") LocalDate operatingDay
+    );
+
+    /**
      * 학생·용도·운영일의 현재 출석 여부만 DB에서 읽는다. 영속성 컨텍스트에 캐시된 엔티티를 거치지 않는다.
      */
     @Query("""

@@ -3,8 +3,10 @@ package com.checkup.checkup.domain.room.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.domain.room.service.RoomService;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -14,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 호실 학생 명단 조회 API. */
-@Tag(name = "호실", description = "호실 학생 명단")
+/** 호실 학생 명단과 층 단위 출석 현황 조회 API. */
+@Tag(name = "호실", description = "호실 학생 명단, 층 단위 출석 현황")
 @RestController
 @RequestMapping("/api/v1/room")
 @RequiredArgsConstructor
@@ -38,5 +40,22 @@ public class RoomController {
             @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom,
             @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
         return roomService.getStudents(memberId, dormitoryRoom, purpose);
+    }
+
+    /**
+     * 관리자가 전개도에 쓸 한 층의 호실별 배정 인원과 오늘 출석 인원을 조회한다.
+     *
+     * @param memberId 세션의 현재 회원 id
+     * @param floor 층. 호실 번호의 백의 자리 이상이다(예: 301호는 3층)
+     * @param purpose 출석 용도. 없으면 기숙사 입소(DORMITORY)다
+     * @return 층 전체 출석·미출석 인원과 호실별 현황
+     */
+    @Operation(summary = "층 단위 출석 현황", description = "관리자만 조회할 수 있다. 한 층의 호실마다 배정 인원(assigned)과 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 인원(attended)을 호실 번호 오름차순으로 준다. 층 전체 출석·미출석 인원도 함께 준다. 배정된 학생이 없는 층은 rooms가 빈 배열이다.")
+    @GetMapping("/floor")
+    public RoomFloorResponse getFloor(
+            @AuthenticationPrincipal Long memberId,
+            @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
+            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
+        return roomService.getFloor(memberId, floor, purpose);
     }
 }
