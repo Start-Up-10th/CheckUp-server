@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,7 +30,6 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED}
       FACE_SERVICE_TOKEN: ${FACE_SERVICE_TOKEN}
       FACE_AI_BASE_URL: ${FACE_AI_BASE_URL}
-      
 
   postgres:
     image: postgres:17
@@ -66,5 +67,4 @@ volumes:
 networks:
   default:
     driver_opts:
-      # 배포 VM eth0 MTU(1400)에 맞춘다. 기본값 1500이면 큰 패킷이 VM 밖에서 버려져 DataGSM 연결이 시간 초과된다.
       com.docker.network.driver.mtu: "1400"
