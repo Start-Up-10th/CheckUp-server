@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.qr.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -61,7 +62,7 @@ public class QrController {
     @PostMapping("/{sessionId}/heartbeat")
     public QrSessionResponse heartbeat(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable String sessionId
+            @Parameter(description = "QR 세션 생성 응답의 세션 id", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") @PathVariable String sessionId
     ) {
         adminVerifier.verify(memberId);
         return QrSessionResponse.of(qrSessionService.heartbeat(memberId, sessionId), qrProperties.baseUrl());
@@ -78,7 +79,7 @@ public class QrController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void close(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable String sessionId
+            @Parameter(description = "QR 세션 생성 응답의 세션 id", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") @PathVariable String sessionId
     ) {
         adminVerifier.verify(memberId);
         qrSessionService.close(memberId, sessionId);
