@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.face.dto.FaceStatusResponse;
 import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
 import com.checkup.checkup.domain.face.service.FaceStudentService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -52,7 +53,7 @@ public class FaceController {
     @ResponseStatus(HttpStatus.CREATED)
     public FaceEnrollmentResponse enroll(
             @AuthenticationPrincipal Long memberId,
-            @RequestHeader("Content-Type") String contentType,
+            @Parameter(description = "video/webm 또는 video/mp4", example = "video/webm") @RequestHeader("Content-Type") String contentType,
             @RequestBody byte[] video
     ) {
         try {
