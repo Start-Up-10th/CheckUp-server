@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.attendance.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
 /**
  * 실제 PostgreSQL에서 호실 명단용 출석 조회가 요청한 학생·용도·운영일의 출석 상태만 돌려주는지,
+ * 층 현황 집계가 그 층 호실의 배정 인원과 요청한 용도·운영일의 출석 인원만 세는지,
  * 지난 운영일 출석 삭제가 기준 운영일 전의 행만 지우는지 검증한다.
  */
 @DataJpaTest
@@ -107,6 +109,58 @@ class AttendanceRepositoryTest {
         assertThat(jdbcTemplate.queryForList(
                 "SELECT operating_day FROM attendance WHERE student_id = ?", LocalDate.class, student))
                 .containsExactly(PURGE_DAY);
+    }
+
+    @Test
+    @DisplayName("층의 호실마다 배정 인원과 요청한 용도·운영일의 출석 인원을 호실 번호순으로 센다")
+    void countsAssignedAndAttendedByRoom() {
+        Long attended = studentInRoom(1101, 9702);
+        Long manuallyAbsent = studentInRoom(1102, 9702);
+        Long studyRoomOnly = studentInRoom(1103, 9702);
+        Long yesterdayOnly = studentInRoom(1104, 9701);
+        studentInRoom(1105, 9701);
+        Long lowerFloor = studentInRoom(1201, 9699);
+        Long upperFloor = studentInRoom(1202, 9800);
+        Long unassigned = student(1203);
+        attendance(attended, AttendancePurpose.DORMITORY, DAY, true);
+        attendance(manuallyAbsent, AttendancePurpose.DORMITORY, DAY, false);
+        attendance(studyRoomOnly, AttendancePurpose.STUDY_ROOM, DAY, true);
+        attendance(yesterdayOnly, AttendancePurpose.DORMITORY, DAY.minusDays(1), true);
+        attendance(lowerFloor, AttendancePurpose.DORMITORY, DAY, true);
+        attendance(upperFloor, AttendancePurpose.DORMITORY, DAY, true);
+        attendance(unassigned, AttendancePurpose.DORMITORY, DAY, true);
+
+        List<RoomAttendanceCount> result = attendanceRepository.countByRoom(
+                9700, 9799, AttendancePurpose.DORMITORY, DAY);
+
+        assertThat(result)
+                .extracting(RoomAttendanceCount::getDormitoryRoom, RoomAttendanceCount::getAssigned,
+                        RoomAttendanceCount::getAttended)
+                .containsExactly(tuple(9701, 2L, 0L), tuple(9702, 3L, 1L));
+    }
+
+    @Test
+    @DisplayName("층 현황도 자습실 용도로 물으면 자습실 출석만 센다")
+    void countByRoomSeparatesPurpose() {
+        Long dormitoryOnly = studentInRoom(1101, 9701);
+        Long both = studentInRoom(1102, 9701);
+        attendance(dormitoryOnly, AttendancePurpose.DORMITORY, DAY, true);
+        attendance(both, AttendancePurpose.DORMITORY, DAY, true);
+        attendance(both, AttendancePurpose.STUDY_ROOM, DAY, true);
+
+        List<RoomAttendanceCount> result = attendanceRepository.countByRoom(
+                9700, 9799, AttendancePurpose.STUDY_ROOM, DAY);
+
+        assertThat(result)
+                .extracting(RoomAttendanceCount::getDormitoryRoom, RoomAttendanceCount::getAssigned,
+                        RoomAttendanceCount::getAttended)
+                .containsExactly(tuple(9701, 2L, 1L));
+    }
+
+    private Long studentInRoom(int studentNumber, int dormitoryRoom) {
+        Long studentId = student(studentNumber);
+        jdbcTemplate.update("UPDATE student SET dormitory_room = ? WHERE id = ?", dormitoryRoom, studentId);
+        return studentId;
     }
 
     private Long student(int studentNumber) {
