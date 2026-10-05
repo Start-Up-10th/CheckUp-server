@@ -19,7 +19,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @EntityGraph(attributePaths = "member")
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
 
-    boolean existsByIdAndDormitoryRoomIsNotNull(Long id);
+    long countByIdInAndDormitoryRoomIsNotNull(Collection<Long> ids);
 
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(Integer dormitoryRoom);
