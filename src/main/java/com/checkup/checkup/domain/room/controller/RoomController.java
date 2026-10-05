@@ -3,21 +3,27 @@ package com.checkup.checkup.domain.room.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.domain.room.service.RoomService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 호실 학생 명단과 층 단위 출석 현황 조회 API. */
-@Tag(name = "호실", description = "호실 학생 명단, 층 단위 출석 현황")
+/** 호실 학생 명단·층 단위 출석 현황 조회와 호실 수동 출석 저장 API. */
+@Tag(name = "호실", description = "호실 학생 명단, 층 단위 출석 현황, 수동 출석 저장")
 @RestController
 @RequestMapping("/api/v1/room")
 @RequiredArgsConstructor
@@ -57,5 +63,25 @@ public class RoomController {
             @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
             @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
         return roomService.getFloor(memberId, floor, purpose);
+    }
+
+    /**
+     * 관리자가 호실 상세에서 고른 학생별 출석·미출석을 오늘 운영일에 저장한다.
+     *
+     * @param memberId 세션의 현재 회원 id
+     * @param dormitoryRoom 호실 번호
+     * @param purpose 출석 용도. 없으면 기숙사 입소(DORMITORY)다
+     * @param request 학생별 출석 상태
+     * @return 본문 없는 204 응답
+     */
+    @Operation(summary = "호실 수동 출석 저장", description = "관리자만 저장할 수 있다. students의 studentId는 호실 명단의 student_id(DataGSM 학생 id)다. purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 상태를 바꾸며, 이미 같은 상태인 학생은 그대로 둔다. 그 호실 학생이 아닌 학생이 있으면 400 STUDENT_NOT_IN_ROOM이고 아무것도 저장하지 않는다. 성공하면 204다.")
+    @PutMapping("/{dormitoryRoom}/attendance")
+    public ResponseEntity<Void> saveAttendance(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable @Positive Integer dormitoryRoom,
+            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
+            @Valid @RequestBody RoomAttendanceRequest request) {
+        roomService.saveAttendance(memberId, dormitoryRoom, purpose, request);
+        return ResponseEntity.noContent().build();
     }
 }
