@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
+import com.checkup.checkup.global.config.AdminProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,6 +35,7 @@ public class StudentSyncService {
 
     private final StudentRepository studentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final AdminProperties adminProperties;
 
     /**
      * 받은 학생들을 반영한다. {@code syncedAt}보다 새로운 정보를 이미 반영한 학생은 건너뛴다.
@@ -109,7 +111,7 @@ public class StudentSyncService {
 
         if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
             if (member != null) {
-                member.update(member.getName(), MemberRole.STUDENT);
+                member.update(member.getName(), roleFor(member, MemberRole.STUDENT));
             }
             student.leaveDormitory();
             eventPublisher.publishEvent(new StudentLeftEvent(student.getId(), changed.role()));
@@ -123,7 +125,7 @@ public class StudentSyncService {
         }
 
         if (member != null) {
-            member.update(changed.name(), role);
+            member.update(changed.name(), roleFor(member, role));
         }
         student.update(
                 changed.datagsmStudentId(),
@@ -167,5 +169,9 @@ public class StudentSyncService {
             case "GENERAL_STUDENT", "STUDENT_COUNCIL" -> MemberRole.STUDENT;
             default -> null;
         };
+    }
+
+    private MemberRole roleFor(Member member, MemberRole role) {
+        return adminProperties.isAllowed(member.getDatagsmId()) ? MemberRole.ADMIN : role;
     }
 }
