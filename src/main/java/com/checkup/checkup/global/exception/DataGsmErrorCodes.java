@@ -7,7 +7,7 @@ import team.themoment.datagsm.sdk.oauth.exception.RateLimitException;
 import team.themoment.datagsm.sdk.oauth.exception.ServerErrorException;
 
 /**
- * DataGSM SDK 예외를 서버 오류 코드로 바꾼다. 전역 예외 처리와 로그인 콜백 리다이렉트가 같은 기준을 쓴다.
+ * DataGSM SDK 예외를 서버 오류 코드로 바꾼다. 전역 예외 처리, 로그인 콜백 리다이렉트, 학생 조회가 같은 기준을 쓴다.
  *
  * DataGSM 401·403은 서버 설정 문제라 클라이언트 인증 실패로 돌려주지 않는다.
  * 연결 실패·시간 초과는 DataGSM 서버 오류와 같이 일시적으로 연결할 수 없는 상태로 본다.
@@ -26,6 +26,20 @@ public final class DataGsmErrorCodes {
             case ServerErrorException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
             case RateLimitException ignored -> ErrorCode.DATAGSM_UNAVAILABLE;
             default -> isConnectionFailure(e) ? ErrorCode.DATAGSM_UNAVAILABLE : ErrorCode.DATAGSM_ERROR;
+        };
+    }
+
+    /**
+     * DataGSM OpenAPI(학생 조회) 예외에 맞는 오류 코드를 반환한다. 로그인(OAuth)과 같은 기준이다.
+     * OpenAPI에는 인가 코드가 없어 잘못된 요청(400)도 {@code DATAGSM_ERROR}다.
+     */
+    public static ErrorCode of(team.themoment.datagsm.sdk.openapi.exception.DataGsmException e) {
+        return switch (e) {
+            case team.themoment.datagsm.sdk.openapi.exception.ServerErrorException ignored ->
+                    ErrorCode.DATAGSM_UNAVAILABLE;
+            case team.themoment.datagsm.sdk.openapi.exception.RateLimitException ignored ->
+                    ErrorCode.DATAGSM_UNAVAILABLE;
+            default -> e.getCause() instanceof IOException ? ErrorCode.DATAGSM_UNAVAILABLE : ErrorCode.DATAGSM_ERROR;
         };
     }
 
