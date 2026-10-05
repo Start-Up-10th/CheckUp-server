@@ -55,6 +55,53 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     );
 
     /**
+     * 관리자 수동 수정으로 학생을 출석 상태로 바꾼다(REQ-ATT-006). 지금 미출석이거나 행이 없을 때만 바꾼다.
+     *
+     * 최초 유효 인증 시각은 건드리지 않는다. 자동 인증 없이 수동으로만 출석한 학생은 그 시각이 비어 있다.
+     * 인증 방식은 이미 있으면 유지하고 없을 때만 MANUAL로 둔다.
+     *
+     * @return 출석으로 바꿨으면 1, 이미 출석이라 그대로면 0
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO attendance (student_id, purpose, operating_day, attended, method, manual_updated_at)
+            VALUES (:studentId, :purpose, :operatingDay, TRUE, 'MANUAL', :updatedAt)
+            ON CONFLICT (student_id, purpose, operating_day) DO UPDATE
+            SET attended = TRUE,
+                method = COALESCE(attendance.method, 'MANUAL'),
+                manual_updated_at = EXCLUDED.manual_updated_at
+            WHERE attendance.attended = FALSE
+            """, nativeQuery = true)
+    int markManuallyAttended(
+            @Param("studentId") Long studentId,
+            @Param("purpose") String purpose,
+            @Param("operatingDay") LocalDate operatingDay,
+            @Param("updatedAt") Instant updatedAt
+    );
+
+    /**
+     * 관리자 수동 수정으로 학생을 미출석 상태로 바꾼다(REQ-ATT-006). 지금 출석 상태일 때만 바꾼다.
+     *
+     * 행을 지우지 않고 최초 유효 인증 시각과 방식을 남긴다. 수정 시각을 기록해 그 전에 발생한 인증이
+     * 늦게 도착해도 다시 출석으로 바뀌지 않게 한다(DEC-008). 출석 행이 없는 학생은 이미 미출석이라 행을 만들지 않는다.
+     *
+     * @return 미출석으로 바꿨으면 1, 이미 미출석이라 그대로면 0
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            UPDATE attendance
+            SET attended = FALSE, manual_updated_at = :updatedAt
+            WHERE student_id = :studentId AND purpose = :purpose
+              AND operating_day = :operatingDay AND attended = TRUE
+            """, nativeQuery = true)
+    int markManuallyAbsent(
+            @Param("studentId") Long studentId,
+            @Param("purpose") String purpose,
+            @Param("operatingDay") LocalDate operatingDay,
+            @Param("updatedAt") Instant updatedAt
+    );
+
+    /**
      * 주어진 학생들 중 해당 용도·운영일에 지금 출석 상태인 학생의 id를 읽는다. 호실 명단의 출석 표시에 쓴다.
      * 행이 없거나 미출석(수동 수정 포함)인 학생은 포함하지 않는다.
      */
