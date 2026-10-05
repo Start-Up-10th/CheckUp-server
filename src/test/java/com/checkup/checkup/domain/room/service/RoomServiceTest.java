@@ -72,7 +72,7 @@ class RoomServiceTest {
 
         List<RoomStudentResponse> response = roomService.getStudents(ADMIN_ID, ROOM, DORMITORY);
 
-        assertThat(response).containsExactly(new RoomStudentResponse("학생", 1, 1101, false));
+        assertThat(response).containsExactly(new RoomStudentResponse("학생", 1, 1, 1101, false));
         verify(studentRepository, never()).findByMember(admin);
     }
 
@@ -180,8 +180,8 @@ class RoomServiceTest {
         List<RoomStudentResponse> response = roomService.getStudents(ADMIN_ID, ROOM, AttendancePurpose.STUDY_ROOM);
 
         assertThat(response).containsExactly(
-                new RoomStudentResponse("미출석", 1, 1102, false),
-                new RoomStudentResponse("출석", 1, 1101, true));
+                new RoomStudentResponse("미출석", 1, 1, 1102, false),
+                new RoomStudentResponse("출석", 1, 1, 1101, true));
     }
 
     private static Student withId(Student student, long id) {
