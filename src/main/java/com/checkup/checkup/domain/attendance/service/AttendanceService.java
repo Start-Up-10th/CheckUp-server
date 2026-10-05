@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
+import java.util.TreeMap;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +21,7 @@ import com.checkup.checkup.global.time.OperatingDayCalculator;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 출석 기록을 담당한다. QR·얼굴 인식은 인증 성공 후 이 서비스로 출석을 확정한다.
+ * 출석 기록을 담당한다. QR·얼굴 인식은 인증 성공 후 이 서비스로 출석을 확정하고, 관리자 수동 수정도 이 서비스로 저장한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -80,6 +82,37 @@ public class AttendanceService {
         }
         boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
+    }
+
+    /**
+     * 관리자가 고른 학생별 출석 상태를 오늘 운영일에 저장한다(REQ-ATT-006).
+     *
+     * 상태가 실제로 바뀌는 학생만 수정하고 수정 시각을 남긴다. 이미 같은 상태인 학생은 건드리지 않아,
+     * 관리자가 바꾸지 않은 학생의 늦은 인증까지 막지 않는다(DEC-008).
+     * 수동으로 새로 출석이 된 학생에게는 자동 인증과 같이 출석 완료 알림을 만든다. 같은 용도·운영일의 알림은 하나다.
+     * 여러 관리자가 동시에 저장해도 서로 기다리다 멈추지 않도록 학생 id 순서로 처리한다.
+     *
+     * @param attendedByStudentId 학생 id별 출석 여부. 출석이면 true
+     * @param purpose             출석 용도
+     */
+    @Transactional
+    public void saveManually(Map<Long, Boolean> attendedByStudentId, AttendancePurpose purpose) {
+        Instant now = clock.instant();
+        LocalDate operatingDay = operatingDayCalculator.of(now);
+        new TreeMap<>(attendedByStudentId).forEach((studentId, attended) -> {
+            if (!attended) {
+                attendanceRepository.markManuallyAbsent(studentId, purpose.name(), operatingDay, now);
+                return;
+            }
+            int changed = attendanceRepository.markManuallyAttended(studentId, purpose.name(), operatingDay, now);
+            if (changed == 1) {
+                notificationService.create(
+                        studentId,
+                        NotificationType.ATTENDANCE,
+                        purpose.name() + ":" + operatingDay,
+                        attendanceMessage(purpose));
+            }
+        });
     }
 
     /** 출석 완료 알림 문구. */
