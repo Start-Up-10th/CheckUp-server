@@ -81,6 +81,8 @@ public class AuthService {
     /**
      * 기숙사 자치위원 학생과 기숙사부 교사는 ADMIN, 그 외 활성 학생은 STUDENT로 판정한다.
      * 비활성 계정이나 그 밖의 계정은 403으로 거부한다.
+     * 이름·학년·반·번호·학번이 하나라도 없는 학생도 403으로 거부한다. 졸업·자퇴하면 이 값이 비어 올 수 있고,
+     * 값 없이는 학생을 저장할 수 없어 회원도 만들지 않는다.
      */
     private MemberRole resolveRole(UserInfo userInfo) {
         Student student = userInfo.getStudent();
@@ -90,11 +92,24 @@ public class AuthService {
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
                 && (student == null || student.getRole() == null)) throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
+                && !hasProfile(student)) throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
+        if (userInfo.getObjectType() == AccountObjectType.STUDENT
                 && student.getRole() == StudentRole.DORMITORY_MANAGER) return MemberRole.ADMIN;
         if (userInfo.getObjectType() == AccountObjectType.STUDENT) return MemberRole.STUDENT;
         if (userInfo.getObjectType() == AccountObjectType.TEACHER
                 && teacher != null
                 && teacher.getDepartment() == TeacherDepartment.DORMITORY) return MemberRole.ADMIN;
         throw new CustomException(ErrorCode.UNSUPPORTED_ACCOUNT);
+    }
+
+    /**
+     * 학생을 저장하는 데 필요한 이름·학년·반·번호·학번이 모두 있는지 확인한다.
+     */
+    private static boolean hasProfile(Student student) {
+        return student.getName() != null
+                && student.getGrade() != null
+                && student.getClassNum() != null
+                && student.getNumber() != null
+                && student.getStudentNumber() != null;
     }
 }
