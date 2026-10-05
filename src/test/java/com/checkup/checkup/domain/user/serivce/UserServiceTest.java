@@ -26,7 +26,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
+import team.themoment.datagsm.sdk.openapi.exception.ServerErrorException;
 
+import java.net.SocketTimeoutException;
 import java.util.Optional;
 
 /**
@@ -123,7 +125,7 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("DataGSM 호출이 실패하면 DATAGSM_ERROR다")
+    @DisplayName("그 밖의 DataGSM 호출 실패는 DATAGSM_ERROR다")
     void badGatewayWhenDataGsmFails() {
         givenMember(MemberRole.ADMIN);
         given(dataGsmOpenApiClient.students()).willReturn(studentApi);
@@ -132,6 +134,31 @@ class UserServiceTest {
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_ERROR));
+    }
+
+    @Test
+    @DisplayName("DataGSM에 닿지 못하거나 시간이 초과되면 DATAGSM_UNAVAILABLE이다")
+    void unavailableWhenDataGsmTimesOut() {
+        givenMember(MemberRole.ADMIN);
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudent(anyLong()))
+                .willThrow(new DataGsmException("fail", new SocketTimeoutException("timeout")));
+
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("DataGSM 서버 오류면 DATAGSM_UNAVAILABLE이다")
+    void unavailableWhenDataGsmServerFails() {
+        givenMember(MemberRole.ADMIN);
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudent(anyLong())).willThrow(new ServerErrorException("fail"));
+
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_UNAVAILABLE));
     }
 
     private Member givenMember(MemberRole role) {
