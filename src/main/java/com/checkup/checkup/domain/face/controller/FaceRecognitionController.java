@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.face.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.face.dto.FaceFrameResponse;
 import com.checkup.checkup.domain.face.dto.FaceSessionCreateRequest;
@@ -44,9 +45,9 @@ public class FaceRecognitionController {
     @PostMapping(value = "/{sessionId}/frames", consumes = {"image/jpeg", "image/webp"})
     public FaceFrameResponse recognize(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable UUID sessionId,
-            @RequestHeader(name = "X-Frame-Id", required = false) String frameId,
-            @RequestHeader(name = "Content-Type") String contentType,
+            @Parameter(description = "얼굴 인식 세션 생성 응답의 세션 id", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") @PathVariable UUID sessionId,
+            @Parameter(description = "프레임 id(선택, 최대 128자). 없으면 서버가 만든다. 응답의 frameId로 돌아온다", example = "frame-1") @RequestHeader(name = "X-Frame-Id", required = false) String frameId,
+            @Parameter(description = "image/jpeg 또는 image/webp", example = "image/jpeg") @RequestHeader(name = "Content-Type") String contentType,
             @RequestBody byte[] image
     ) {
         try {
@@ -61,7 +62,7 @@ public class FaceRecognitionController {
     @Operation(summary = "얼굴 인식 세션 종료", description = "이 페이지의 세션만 종료한다. 성공 204.")
     @DeleteMapping("/{sessionId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void close(@AuthenticationPrincipal Long memberId, @PathVariable UUID sessionId) {
+    public void close(@AuthenticationPrincipal Long memberId, @Parameter(description = "얼굴 인식 세션 생성 응답의 세션 id", example = "3fa85f64-5717-4562-b3fc-2c963f66afa6") @PathVariable UUID sessionId) {
         faceRecognitionService.close(memberId, sessionId);
     }
 }

@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.user.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
 import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
@@ -26,9 +27,9 @@ public class UserController {
     /**
      * DataGSM 학생 id로 학생 정보를 조회한다. 관리자 또는 본인만 조회할 수 있다.
      */
-    @Operation(summary = "학생 정보 조회", description = "DataGSM 학생 id로 조회한다. 관리자 또는 본인만 조회할 수 있다.")
+    @Operation(summary = "학생 정보 조회", description = "DataGSM 학생 id로 조회한다. 관리자 또는 본인만 조회할 수 있고, 그 밖에는 403 FORBIDDEN. DataGSM에 학생이 없으면 404 STUDENT_NOT_FOUND. DataGSM 연결 실패·시간 초과·5xx·요청 과다는 503 DATAGSM_UNAVAILABLE, 그 밖의 DataGSM 오류는 502 DATAGSM_ERROR.")
     @GetMapping("/{studentId}")
-    public UserSearchResponse findUser(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+    public UserSearchResponse findUser(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return userSearchService.findUser(memberId, studentId);
     }
 
@@ -37,7 +38,7 @@ public class UserController {
      */
     @Operation(summary = "학생 봉사 횟수 조회", description = "앞으로 해야 할 봉사 횟수다. 관리자 또는 본인만 조회할 수 있다.")
     @GetMapping("/{studentId}/volunteer")
-    public UserVolunteerResponse findVolunteer(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+    public UserVolunteerResponse findVolunteer(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return userVolunteerService.findVolunteer(memberId, studentId);
     }
 
@@ -47,7 +48,7 @@ public class UserController {
     @Operation(summary = "학생 봉사 완료 내역 조회", description = "자치위원이 완료를 확인한 당일 봉사를 최신 운영일부터 돌려준다. 한 건이 봉사 1회다. 관리자 또는 본인만 조회할 수 있다.")
     @GetMapping("/{studentId}/volunteer/history")
     public UserVolunteerHistoryResponse findVolunteerHistory(
-            @AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+            @AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return userVolunteerService.findVolunteerHistory(memberId, studentId);
     }
 }

@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.user.dto.Response;
 
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,7 +13,10 @@ import java.util.List;
  * @param studentId DataGSM 학생 id
  * @param history   완료한 봉사 목록
  */
-public record UserVolunteerHistoryResponse(Long studentId, List<Item> history) {
+public record UserVolunteerHistoryResponse(
+        @Schema(description = "DataGSM 학생 id", example = "1") Long studentId,
+        @Schema(description = "완료한 봉사 목록. 최신 운영일부터, 한 건이 봉사 1회") List<Item> history
+) {
 
     /**
      * 완료한 봉사 한 건.
@@ -20,7 +24,10 @@ public record UserVolunteerHistoryResponse(Long studentId, List<Item> history) {
      * @param operatingDay 봉사한 운영일(08:00 KST 기준 날짜)
      * @param completedAt  완료를 확인한 시각(UTC)
      */
-    public record Item(LocalDate operatingDay, Instant completedAt) {
+    public record Item(
+            @Schema(description = "봉사한 운영일(08:00 KST 기준 날짜)", example = "2026-10-06") LocalDate operatingDay,
+            @Schema(description = "완료를 확인한 시각(UTC)", example = "2026-10-06T12:00:00Z") Instant completedAt
+    ) {
 
         public static Item from(VolunteerDuty duty) {
             return new Item(duty.getOperatingDay(), duty.getCompletedAt());

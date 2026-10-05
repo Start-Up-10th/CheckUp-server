@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.qr.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -8,6 +9,6 @@ import jakarta.validation.constraints.NotBlank;
  * @param token QR 링크의 {@code #t=} 뒤 토큰
  */
 public record QrScanRequest(
-        @NotBlank String token
+        @Schema(description = "QR 링크의 #t= 뒤 토큰") @NotBlank String token
 ) {
 }

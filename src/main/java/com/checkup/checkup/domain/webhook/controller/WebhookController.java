@@ -58,7 +58,7 @@ public class WebhookController {
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
      *                         DataGSM 요청이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
-    @Operation(summary = "DataGSM 학생 수동 동기화", description = "관리자 전용. 놓친 웹훅 변경을 DataGSM 학생 목록으로 다시 반영한다. DataGSM 요청이 실패하면 502 DATAGSM_ERROR.")
+    @Operation(summary = "DataGSM 학생 수동 동기화", description = "관리자 전용. 놓친 웹훅 변경을 DataGSM 학생 목록으로 다시 반영하고, 저장되지 않은 재학생은 로그인 계정 없이 새로 저장한다. 관리자가 아니면 403 ADMIN_ONLY. DataGSM 연결 실패·시간 초과·5xx·요청 과다는 503 DATAGSM_UNAVAILABLE, 그 밖의 DataGSM 오류는 502 DATAGSM_ERROR.")
     @PostMapping("/sync")
     public StudentSyncResponse syncStudents(@AuthenticationPrincipal Long memberId) {
         return studentManualSyncService.sync(memberId);
