@@ -137,8 +137,8 @@ public class FaceRecognitionService {
                 closeOwned(session);
                 throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
-            if (session.candidateStudentIds().stream()
-                    .anyMatch(id -> !studentRepository.existsByIdAndDormitoryRoomIsNotNull(id))) {
+            Set<Long> candidates = session.candidateStudentIds();
+            if (studentRepository.countByIdInAndDormitoryRoomIsNotNull(candidates) != candidates.size()) {
                 closeOwned(session);
                 throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
