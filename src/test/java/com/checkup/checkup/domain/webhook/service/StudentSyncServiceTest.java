@@ -13,8 +13,10 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
+import com.checkup.checkup.global.config.AdminProperties;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +24,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * 받은 목록에 있는 학생만 조회·반영하고 목록에 없는 학생은 삭제·졸업 처리하지 않는지,
- * 저장되지 않은 재학생은 계정 없이 새로 저장하는지, 실제로 반영한 학생 수만 돌려주는지 검증한다. 학생 한 명의 반영 규칙은 {@code WebhookServiceTest}에서 검증한다.
+ * 저장되지 않은 재학생은 계정 없이 새로 저장하는지, 실제로 반영한 학생 수만 돌려주는지,
+ * 관리자 허용 목록 회원은 동기화 뒤에도 ADMIN을 유지하는지 검증한다. 학생 한 명의 반영 규칙은 {@code WebhookServiceTest}에서 검증한다.
  */
 class StudentSyncServiceTest {
 
@@ -30,7 +33,9 @@ class StudentSyncServiceTest {
 
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-    private final StudentSyncService service = new StudentSyncService(studentRepository, eventPublisher);
+    /** 허용 목록: DataGSM 계정 id 1060(학생 60의 회원). */
+    private final StudentSyncService service = new StudentSyncService(studentRepository, eventPublisher,
+            new AdminProperties(Set.of(1060L)));
 
     @Test
     @DisplayName("목록에 없는 저장된 학생은 조회하지도 바꾸지도 않는다")
@@ -131,6 +136,33 @@ class StudentSyncServiceTest {
         assertThat(count).isEqualTo(1);
         assertThat(student.getDormitoryRoom()).isNull();
         assertThat(student.getStudentNumber()).isEqualTo(3105);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록 회원은 재학생 동기화 뒤에도 ADMIN을 유지하고, 목록에 없는 관리자는 STUDENT가 된다")
+    void allowlistedMemberKeepsAdminOnSync() {
+        Student allowlisted = student(60L, MemberRole.ADMIN, 301);
+        Student notListed = student(61L, MemberRole.ADMIN, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(allowlisted, notListed));
+
+        service.syncAll(List.of(enrolled(60L, 302), enrolled(61L, 302)), SYNCED_AT);
+
+        assertThat(allowlisted.getMember().getRole()).isEqualTo(MemberRole.ADMIN);
+        assertThat(allowlisted.getDormitoryRoom()).isEqualTo(302);
+        assertThat(notListed.getMember().getRole()).isEqualTo(MemberRole.STUDENT);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록 회원은 졸업 처리 뒤에도 ADMIN을 유지한다")
+    void allowlistedMemberKeepsAdminWhenLeaving() {
+        Student allowlisted = student(60L, MemberRole.ADMIN, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(allowlisted));
+
+        service.syncAll(List.of(
+                new StudentSyncData(60L, "학생", null, null, null, null, null, "GRADUATE")), SYNCED_AT);
+
+        assertThat(allowlisted.getMember().getRole()).isEqualTo(MemberRole.ADMIN);
+        assertThat(allowlisted.getDormitoryRoom()).isNull();
     }
 
     private static Student student(Long datagsmStudentId, MemberRole role, Integer dormitoryRoom) {
