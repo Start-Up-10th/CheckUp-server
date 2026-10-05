@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.room.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -12,7 +13,7 @@ import java.util.List;
  * @param students 저장할 학생별 출석 상태. 호실 학생 전부를 보내도 되고 바꿀 학생만 보내도 된다
  */
 public record RoomAttendanceRequest(
-        @NotEmpty @Size(max = 50) @Valid List<Item> students
+        @Schema(description = "저장할 학생별 출석 상태(1~50명). 호실 학생 전부를 보내도 되고 바꿀 학생만 보내도 된다") @NotEmpty @Size(max = 50) @Valid List<Item> students
 ) {
 
     /**
@@ -22,8 +23,8 @@ public record RoomAttendanceRequest(
      * @param attended  출석이면 true, 미출석이면 false
      */
     public record Item(
-            @NotNull Long studentId,
-            @NotNull Boolean attended
+            @Schema(description = "DataGSM 학생 id. 호실 명단 응답의 student_id다", example = "1") @NotNull Long studentId,
+            @Schema(description = "출석이면 true, 미출석이면 false", example = "true") @NotNull Boolean attended
     ) {
     }
 }
