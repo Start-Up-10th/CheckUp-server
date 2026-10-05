@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.webhook.service;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.domain.webhook.dto.response.StudentSyncResponse;
 import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,8 @@ public class StudentManualSyncService {
      * @param memberId 세션의 회원 id
      * @return 받은 학생 수와 반영한 학생 수
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
-     *                         DataGSM 요청이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
+     *                         DataGSM에 닿지 못하거나 DataGSM 서버 오류면 {@link ErrorCode#DATAGSM_UNAVAILABLE}(503),
+     *                         그 밖의 DataGSM 요청 실패는 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
     public StudentSyncResponse sync(Long memberId) {
         adminVerifier.verify(memberId);
@@ -70,7 +72,8 @@ public class StudentManualSyncService {
     /**
      * 졸업·자퇴생을 포함한 학생 목록을 마지막 페이지까지 받는다. 한 페이지라도 실패하면 아무것도 반영하지 않도록 예외를 던진다.
      *
-     * @throws CustomException DataGSM 요청이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
+     * @throws CustomException DataGSM에 닿지 못하거나 DataGSM 서버 오류면 {@link ErrorCode#DATAGSM_UNAVAILABLE}(503),
+     *                         그 밖의 DataGSM 요청 실패는 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
     private List<Student> fetchAll() {
         int page = 0;
@@ -89,7 +92,7 @@ public class StudentManualSyncService {
                 page++;
             } while (page < response.getTotalPages());
         } catch (DataGsmException e) {
-            throw new CustomException(ErrorCode.DATAGSM_ERROR);
+            throw new CustomException(DataGsmErrorCodes.of(e));
         }
         return students;
     }
