@@ -96,6 +96,21 @@ class StudentRepositoryTest {
                 .hasValueSatisfying(student -> assertThat(student.getMember()).isNull());
     }
 
+    @Test
+    @DisplayName("주어진 id 중 호실이 있는 학생 수만 센다. 호실이 없거나 저장되지 않은 id는 세지 않고 빈 목록은 0이다")
+    void countsOnlyStudentsWithRoomAmongIds() {
+        Long withRoom = studentRepository.saveAndFlush(
+                Student.createWithoutMember(77_101L, "호실있음", 1, 1, 1, 1101, 301)).getId();
+        Long withoutRoom = studentRepository.saveAndFlush(
+                Student.createWithoutMember(77_102L, "호실없음", 1, 1, 2, 1102, null)).getId();
+        Long missing = -1L;
+
+        assertThat(studentRepository.countByIdInAndDormitoryRoomIsNotNull(List.of(withRoom, withoutRoom, missing)))
+                .isEqualTo(1L);
+        assertThat(studentRepository.countByIdInAndDormitoryRoomIsNotNull(List.of(withRoom))).isEqualTo(1L);
+        assertThat(studentRepository.countByIdInAndDormitoryRoomIsNotNull(List.of())).isZero();
+    }
+
     private void saveStudent(String name, int studentNumber, Integer dormitoryRoom) {
         Long dataGsmId = Long.valueOf(studentNumber);
         Member member = memberRepository.save(Member.create(dataGsmId, name, MemberRole.STUDENT));

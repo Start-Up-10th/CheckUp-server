@@ -19,7 +19,14 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @EntityGraph(attributePaths = "member")
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
 
-    boolean existsByIdAndDormitoryRoomIsNotNull(Long id);
+    /**
+     * 주어진 학생 id 중 호실이 배정된 학생 수를 쿼리 한 번으로 센다. 얼굴 인식 프레임마다 후보 확인에 쓴다.
+     * 저장되지 않은 id와 호실이 없는 학생은 세지 않으므로, 결과가 id 수보다 작으면 그런 후보가 있다는 뜻이다.
+     *
+     * @param ids 학생 id 목록. 비어 있으면 0이다.
+     * @return 호실이 있는 학생 수
+     */
+    long countByIdInAndDormitoryRoomIsNotNull(Collection<Long> ids);
 
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(Integer dormitoryRoom);
