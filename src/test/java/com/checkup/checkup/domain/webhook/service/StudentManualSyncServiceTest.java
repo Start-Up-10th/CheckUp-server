@@ -15,6 +15,7 @@ import com.checkup.checkup.domain.webhook.dto.response.StudentSyncResponse;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
+import java.net.SocketTimeoutException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -145,6 +146,20 @@ class StudentManualSyncServiceTest {
         assertThatThrownBy(() -> service.sync(MEMBER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_ERROR));
+        verify(studentSyncService, never()).syncAll(any(), any());
+    }
+
+    @Test
+    @DisplayName("중간 페이지에서 DataGSM 응답 시간이 초과되면 아무것도 반영하지 않고 503으로 끝난다")
+    void dataGsmTimeoutSyncsNothing() {
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudents(any()))
+                .willReturn(page(2, enrolled(1L)))
+                .willThrow(new DataGsmException("fail", new SocketTimeoutException("timeout")));
+
+        assertThatThrownBy(() -> service.sync(MEMBER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_UNAVAILABLE));
         verify(studentSyncService, never()).syncAll(any(), any());
     }
 

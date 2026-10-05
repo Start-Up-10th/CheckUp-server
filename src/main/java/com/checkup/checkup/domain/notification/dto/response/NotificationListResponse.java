@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.notification.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 
 /**
@@ -9,6 +10,6 @@ import java.util.List;
  * @param notifications 최신순 알림 목록
  */
 public record NotificationListResponse(
-        boolean hasUnread,
-        List<NotificationResponse> notifications
+        @Schema(description = "읽지 않은 알림이 하나라도 있으면 true") boolean hasUnread,
+        @Schema(description = "최근 50개 알림, 최신순") List<NotificationResponse> notifications
 ) {}

@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.auth.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.auth.service.AuthService;
@@ -55,7 +56,7 @@ public class AuthController {
     @SecurityRequirements
     @Operation(summary = "DataGSM 로그인 시작", description = "DataGSM 로그인 페이지로 302 리다이렉트한다. redirect는 로그인 뒤 돌아갈 웹 경로(선택)이며, 없거나 안전하지 않으면 /login/complete로 돌아간다.")
     @GetMapping("/login")
-    public ResponseEntity<Void> login(@RequestParam(required = false) String redirect) {
+    public ResponseEntity<Void> login(@Parameter(description = "로그인 뒤 돌아갈 웹 경로(선택). 같은 웹 안의 상대 경로만 받고, 없거나 안전하지 않으면 /login/complete", example = "/admin") @RequestParam(required = false) String redirect) {
         String url = authService.createLoginUrl(redirect);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
     }
@@ -74,8 +75,8 @@ public class AuthController {
     @Operation(summary = "DataGSM 로그인 콜백", description = "DataGSM이 호출한다. 회원을 저장하고 SESSION 쿠키를 만든 뒤 웹으로 302 리다이렉트한다. 실패도 웹 /login?error=<ErrorCode>로 보낸다.")
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) String state,
+            @Parameter(description = "DataGSM 인가 코드. DataGSM이 붙여 보낸다") @RequestParam(required = false) String code,
+            @Parameter(description = "로그인 시작 때 발급한 state. DataGSM이 붙여 보낸다") @RequestParam(required = false) String state,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {

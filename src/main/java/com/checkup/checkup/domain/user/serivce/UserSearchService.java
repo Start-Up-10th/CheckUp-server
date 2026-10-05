@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
 import com.checkup.checkup.global.exception.CustomException;
+import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,8 @@ public class UserSearchService {
      * @param studentId 조회할 DataGSM 학생 id
      * @throws CustomException 관리자도 본인도 아니면 {@link ErrorCode#FORBIDDEN}(403),
      *                         DataGSM에 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
-     *                         DataGSM 호출이 실패하면 {@link ErrorCode#DATAGSM_ERROR}(502)
+     *                         DataGSM에 닿지 못하거나 DataGSM 서버 오류면 {@link ErrorCode#DATAGSM_UNAVAILABLE}(503),
+     *                         그 밖의 DataGSM 호출 실패는 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
     public UserSearchResponse findUser(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
@@ -39,7 +41,7 @@ public class UserSearchService {
         try {
             student = dataGsmOpenApiClient.students().getStudent(studentId);
         } catch (DataGsmException e) {
-            throw new CustomException(ErrorCode.DATAGSM_ERROR);
+            throw new CustomException(DataGsmErrorCodes.of(e));
         }
         if (student == null) {
             throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);

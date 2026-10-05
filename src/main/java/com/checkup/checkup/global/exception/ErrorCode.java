@@ -36,6 +36,7 @@ public enum ErrorCode {
 
     // 학생
     STUDENT_NOT_FOUND(HttpStatus.NOT_FOUND, "학생을 찾을 수 없습니다."),
+    STUDENT_NOT_IN_ROOM(HttpStatus.BAD_REQUEST, "해당 호실의 학생이 아닙니다."),
 
     // 봉사
     VOLUNTEER_COUNT_ZERO(HttpStatus.CONFLICT, "봉사 횟수가 0이라 차감할 수 없습니다."),

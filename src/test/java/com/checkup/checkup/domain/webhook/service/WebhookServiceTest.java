@@ -19,6 +19,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
 import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
+import com.checkup.checkup.global.config.AdminProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,7 +91,7 @@ class WebhookServiceTest {
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final WebhookService webhookService = new WebhookService(
             objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC),
-            new StudentSyncService(studentRepository, eventPublisher));
+            new StudentSyncService(studentRepository, eventPublisher, new AdminProperties(Set.of())));
 
     @BeforeEach
     void setUp() {

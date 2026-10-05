@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.volunteer.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
@@ -43,10 +44,10 @@ public class VolunteerController {
     @GetMapping
     public List<VolunteerResponse> getVolunteers(
             @AuthenticationPrincipal Long memberId,
-            @RequestParam(required = false) Integer floor,
-            @RequestParam(required = false) String q,
-            @RequestParam(required = false) Integer minCount,
-            @RequestParam(required = false) Boolean onDuty
+            @Parameter(description = "층으로 거르기(선택). 값이 있으면 호실 미배정 학생은 빠진다", example = "3") @RequestParam(required = false) Integer floor,
+            @Parameter(description = "검색어(선택). 숫자면 호실·학번 정확 일치, 그 밖에는 이름(포함 → 초성 → 오타 1개)", example = "홍길동") @RequestParam(required = false) String q,
+            @Parameter(description = "남은 봉사 횟수가 이 값 이상인 학생만(선택). 1이면 당일 봉사자 후보", example = "1") @RequestParam(required = false) Integer minCount,
+            @Parameter(description = "true면 오늘 당일 봉사자로 지정된 학생만(완료 포함, 선택)", example = "true") @RequestParam(required = false) Boolean onDuty
     ) {
         return volunteerService.getVolunteers(memberId, floor, q, minCount, onDuty);
     }
@@ -63,8 +64,8 @@ public class VolunteerController {
     @PatchMapping("/{studentId}/count/increase")
     public VolunteerResponse increase(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable Long studentId,
-            @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
     ) {
         return volunteerService.increase(memberId, studentId, idempotencyKey);
     }
@@ -81,8 +82,8 @@ public class VolunteerController {
     @PatchMapping("/{studentId}/count/decrease")
     public VolunteerResponse decrease(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable Long studentId,
-            @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
     ) {
         return volunteerService.decrease(memberId, studentId, idempotencyKey);
     }
@@ -96,7 +97,7 @@ public class VolunteerController {
      */
     @Operation(summary = "당일 봉사자 지정", description = "학생에게 봉사 알림을 만든다. 봉사 0회면 409 NO_VOLUNTEER_LEFT(봉사가 없습니다.), 이미 지정됐으면 409 ALREADY_ON_DUTY.")
     @PostMapping("/{studentId}/duty")
-    public VolunteerResponse assignDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+    public VolunteerResponse assignDuty(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return volunteerService.assignDuty(memberId, studentId);
     }
 
@@ -109,7 +110,7 @@ public class VolunteerController {
      */
     @Operation(summary = "당일 봉사자 지정 취소", description = "그 지정의 알림을 지운다. 지정이 없으면 404 NOT_ON_DUTY, 완료했으면 409 DUTY_ALREADY_COMPLETED.")
     @DeleteMapping("/{studentId}/duty")
-    public VolunteerResponse cancelDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+    public VolunteerResponse cancelDuty(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return volunteerService.cancelDuty(memberId, studentId);
     }
 
@@ -122,7 +123,7 @@ public class VolunteerController {
      */
     @Operation(summary = "당일 봉사 완료", description = "자치위원이 봉사를 확인했을 때 누른다. 완료 표시와 봉사 −1을 함께 하며 한 번만 반영된다. 두 번째는 409 DUTY_ALREADY_COMPLETED.")
     @PostMapping("/{studentId}/duty/complete")
-    public VolunteerResponse completeDuty(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
+    public VolunteerResponse completeDuty(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return volunteerService.completeDuty(memberId, studentId);
     }
 }

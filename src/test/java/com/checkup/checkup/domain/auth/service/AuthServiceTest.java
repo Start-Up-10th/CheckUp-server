@@ -10,11 +10,14 @@ import static org.mockito.Mockito.verify;
 
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.config.AdminProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,9 +25,11 @@ import team.themoment.datagsm.sdk.oauth.DataGsmOAuthClient;
 import team.themoment.datagsm.sdk.oauth.model.*;
 
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * DataGSM 사용자 정보로 서비스 역할을 판정하는 규칙(REQ-AUTH-003)을 검증한다.
+ * DataGSM 사용자 정보로 서비스 역할을 판정하는 규칙(REQ-AUTH-003)과, 관리자 허용 목록 계정이 거절 규칙을 지킨 뒤 ADMIN이 되는지 검증한다.
+ * 이름·학년·반·번호·학번이 빠진 학생 계정은 저장하지 않고 거부하는지도 검증한다(#95).
  */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -49,7 +54,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(dataGsmOAuthClient, oAuthStateService, REDIRECT_URI, memberService);
+        authService = authServiceAllowing();
     }
 
     @Test
@@ -154,6 +159,35 @@ class AuthServiceTest {
         assertRejectedWith(ErrorCode.MISSING_STUDENT_INFO);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"name", "grade", "classNum", "number", "studentNumber"})
+    @DisplayName("이름·학년·반·번호·학번 중 하나라도 없는 학생 계정은 500이 아니라 403으로 거부하고 회원을 저장하지 않는다")
+    void studentWithMissingProfileIsForbidden(String missing) {
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        Student student = userInfo.getStudent();
+        switch (missing) {
+            case "name" -> student.setName(null);
+            case "grade" -> student.setGrade(null);
+            case "classNum" -> student.setClassNum(null);
+            case "number" -> student.setNumber(null);
+            default -> student.setStudentNumber(null);
+        }
+        givenLoginReturns(userInfo);
+
+        assertRejectedWith(ErrorCode.MISSING_STUDENT_INFO);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 있어도 학년 등이 없는 학생 계정은 403으로 거부한다")
+    void allowlistedStudentWithMissingProfileIsForbidden() {
+        authService = authServiceAllowing(100L);
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        userInfo.getStudent().setGrade(null);
+        givenLoginReturns(userInfo);
+
+        assertRejectedWith(ErrorCode.MISSING_STUDENT_INFO);
+    }
+
     @Test
     @DisplayName("state가 없거나 만료되었으면 400으로 거부하고 토큰을 교환하지 않는다")
     void invalidStateIsBadRequest() {
@@ -161,6 +195,55 @@ class AuthServiceTest {
 
         assertRejectedWith(ErrorCode.INVALID_OAUTH_STATE);
         verify(dataGsmOAuthClient, never()).exchangeCodeForToken(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 있는 일반 학생은 ADMIN이다")
+    void allowlistedStudentIsAdmin() {
+        authService = authServiceAllowing(100L);
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        givenLoginReturns(userInfo);
+
+        authService.completeLogin(CODE, STATE);
+
+        verify(memberService).saveOrUpdate(userInfo, MemberRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 없는 일반 학생은 그대로 STUDENT다")
+    void studentNotInAllowlistStaysStudent() {
+        authService = authServiceAllowing(999L);
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        givenLoginReturns(userInfo);
+
+        authService.completeLogin(CODE, STATE);
+
+        verify(memberService).saveOrUpdate(userInfo, MemberRole.STUDENT);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 있어도 ACTIVE가 아닌 계정은 403으로 거부한다")
+    void allowlistedInactiveAccountIsForbidden() {
+        authService = authServiceAllowing(100L);
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        userInfo.setStatus(AccountStatus.PENDING);
+        givenLoginReturns(userInfo);
+
+        assertRejectedWith(ErrorCode.INACTIVE_ACCOUNT);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 있어도 기숙사부가 아닌 교사는 403으로 거부한다")
+    void allowlistedUnsupportedTeacherIsForbidden() {
+        authService = authServiceAllowing(200L);
+        givenLoginReturns(teacherUser(TeacherDepartment.GRADE));
+
+        assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
+    }
+
+    private AuthService authServiceAllowing(Long... adminDatagsmIds) {
+        return new AuthService(dataGsmOAuthClient, oAuthStateService, REDIRECT_URI, memberService,
+                new AdminProperties(Set.of(adminDatagsmIds)));
     }
 
     private void givenLoginReturns(UserInfo userInfo) {
@@ -182,6 +265,10 @@ class AuthServiceTest {
         Student student = new Student();
         student.setId(1L);
         student.setName("학생");
+        student.setGrade(2);
+        student.setClassNum(4);
+        student.setNumber(5);
+        student.setStudentNumber(2405);
         student.setRole(role);
 
         UserInfo userInfo = new UserInfo();

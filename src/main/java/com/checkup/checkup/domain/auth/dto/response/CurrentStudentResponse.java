@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.auth.dto.response;
 
 import com.checkup.checkup.domain.member.entity.Student;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * 현재 회원의 학생 정보. 학생 화면(홈·마이페이지·봉사)이 본인 학번·호실을 보여 주고 본인 데이터를 조회할 때 쓴다.
@@ -14,13 +15,13 @@ import com.checkup.checkup.domain.member.entity.Student;
  * @param dormitoryFloor 호실 번호로 계산한 층. 호실이 없으면 null
  */
 public record CurrentStudentResponse(
-        Long studentId,
-        int grade,
-        int classNumber,
-        int number,
-        int studentNumber,
-        Integer dormitoryRoom,
-        Integer dormitoryFloor
+        @Schema(description = "DataGSM 학생 id. /api/v1/users/{studentId} 경로에 쓴다. 받은 적 없으면 null", example = "1") Long studentId,
+        @Schema(description = "학년", example = "2") int grade,
+        @Schema(description = "반", example = "4") int classNumber,
+        @Schema(description = "번호", example = "5") int number,
+        @Schema(description = "화면 표시용 학번", example = "2405") int studentNumber,
+        @Schema(description = "기숙사 호실 번호. 배정되지 않았으면 null", example = "301") Integer dormitoryRoom,
+        @Schema(description = "호실 번호로 계산한 층. 호실이 없으면 null", example = "3") Integer dormitoryFloor
 ) {
     public static CurrentStudentResponse from(Student student) {
         return new CurrentStudentResponse(

@@ -58,19 +58,6 @@ public class Student {
         return dormitoryRoom == null ? null : dormitoryRoom / 100;
     }
 
-    @Column(nullable = true)
-    private String email;
-
-    @Column(nullable = true)
-    @Enumerated(EnumType.STRING)
-    private Sex sex;
-
-    @Column(nullable = true)
-    private Integer dormitoryFloor;
-
-    @Column(nullable = true)
-    private String specialty;
-
     /** 앞으로 해야 할 봉사 횟수(DEC-020). DataGSM 값이 아니라 우리 서버가 관리하므로 동기화 갱신에서 건드리지 않는다. */
     @Column(nullable = false)
     private int volunteerCount;
@@ -123,13 +110,6 @@ public class Student {
         student.dormitoryRoom = dormitoryRoom;
 
         return student;
-    }
-
-    public void updateProfile(String email, Sex sex, Integer dormitoryFloor, String specialty) {
-        this.email = email;
-        this.sex = sex;
-        this.dormitoryFloor = dormitoryFloor;
-        this.specialty = specialty;
     }
 
     public void update(
