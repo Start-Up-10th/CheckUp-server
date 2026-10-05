@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.room.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
@@ -43,8 +44,8 @@ public class RoomController {
     @GetMapping("/student")
     public List<RoomStudentResponse> getStudents(
             @AuthenticationPrincipal Long memberId,
-            @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom,
-            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
+            @Parameter(description = "호실 번호", example = "301") @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom,
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
         return roomService.getStudents(memberId, dormitoryRoom, purpose);
     }
 
@@ -60,8 +61,8 @@ public class RoomController {
     @GetMapping("/floor")
     public RoomFloorResponse getFloor(
             @AuthenticationPrincipal Long memberId,
-            @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
-            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
+            @Parameter(description = "층(호실 번호를 100으로 나눈 값)", example = "3") @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
         return roomService.getFloor(memberId, floor, purpose);
     }
 
@@ -78,8 +79,8 @@ public class RoomController {
     @PutMapping("/{dormitoryRoom}/attendance")
     public ResponseEntity<Void> saveAttendance(
             @AuthenticationPrincipal Long memberId,
-            @PathVariable @Positive Integer dormitoryRoom,
-            @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
+            @Parameter(description = "출석을 저장할 호실 번호", example = "301") @PathVariable @Positive Integer dormitoryRoom,
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
             @Valid @RequestBody RoomAttendanceRequest request) {
         roomService.saveAttendance(memberId, dormitoryRoom, purpose, request);
         return ResponseEntity.noContent().build();
