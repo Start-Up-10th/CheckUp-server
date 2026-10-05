@@ -26,7 +26,7 @@ public class UserController {
     /**
      * DataGSM 학생 id로 학생 정보를 조회한다. 관리자 또는 본인만 조회할 수 있다.
      */
-    @Operation(summary = "학생 정보 조회", description = "DataGSM 학생 id로 조회한다. 관리자 또는 본인만 조회할 수 있다.")
+    @Operation(summary = "학생 정보 조회", description = "DataGSM 학생 id로 조회한다. 관리자 또는 본인만 조회할 수 있고, 그 밖에는 403 FORBIDDEN. DataGSM에 학생이 없으면 404 STUDENT_NOT_FOUND. DataGSM 연결 실패·시간 초과·5xx·요청 과다는 503 DATAGSM_UNAVAILABLE, 그 밖의 DataGSM 오류는 502 DATAGSM_ERROR.")
     @GetMapping("/{studentId}")
     public UserSearchResponse findUser(@AuthenticationPrincipal Long memberId, @PathVariable Long studentId) {
         return userSearchService.findUser(memberId, studentId);
