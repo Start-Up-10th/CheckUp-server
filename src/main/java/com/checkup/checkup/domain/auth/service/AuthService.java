@@ -4,6 +4,7 @@ import com.checkup.checkup.domain.auth.dto.response.OAuthLoginResponse;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
+import com.checkup.checkup.global.config.AdminProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,16 +24,19 @@ public class AuthService {
     private final OAuthStateService oAuthStateService;
     private final String redirectUri;
     private final MemberService memberService;
+    private final AdminProperties adminProperties;
 
     public AuthService(
             DataGsmOAuthClient dataGsmOAuthClient,
             OAuthStateService oAuthStateService,
-            @Value("${datagsm.redirect-uri}") String redirectUri, MemberService memberService
+            @Value("${datagsm.redirect-uri}") String redirectUri, MemberService memberService,
+            AdminProperties adminProperties
     ) {
         this.dataGsmOAuthClient = dataGsmOAuthClient;
         this.oAuthStateService = oAuthStateService;
         this.redirectUri = redirectUri;
         this.memberService = memberService;
+        this.adminProperties = adminProperties;
     }
 
     /**
@@ -67,6 +71,9 @@ public class AuthService {
         TokenResponse token = dataGsmOAuthClient.exchangeCodeForToken(code, redirectUri, saved.codeVerifier());
         UserInfo userInfo = dataGsmOAuthClient.getUserInfo(token.getAccessToken());
         MemberRole role = resolveRole(userInfo);
+        if (adminProperties.isAllowed(userInfo.getId())) {
+            role = MemberRole.ADMIN;
+        }
         return new LoginResult(memberService.saveOrUpdate(userInfo, role), saved.redirectPath());
     }
 
