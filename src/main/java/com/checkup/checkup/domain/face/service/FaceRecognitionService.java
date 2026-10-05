@@ -137,6 +137,7 @@ public class FaceRecognitionService {
                 closeOwned(session);
                 throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
+            // 후보 중 저장되지 않았거나 호실이 빠진 학생이 있으면 세션을 닫는다. 후보 수만큼 쿼리하지 않고 한 번에 센다.
             Set<Long> candidates = session.candidateStudentIds();
             if (studentRepository.countByIdInAndDormitoryRoomIsNotNull(candidates) != candidates.size()) {
                 closeOwned(session);
