@@ -74,6 +74,7 @@ public class StudentSyncService {
 
     /**
      * 저장되지 않은 학생을 로그인 계정 없이 새로 저장한다. 졸업·자퇴생과 필요한 값이 빠진 학생은 저장하지 않는다.
+     * 첫 로그인이 같은 학생을 동시에 먼저 저장했으면 unique 충돌 없이 건너뛴다(#152). 로그인이 저장한 정보가 최신이다.
      *
      * @return 저장했으면 {@code true}, 건너뛰었으면 {@code false}
      */
@@ -84,16 +85,14 @@ public class StudentSyncService {
         if (!isComplete(changed)) {
             return false;
         }
-        Student student = Student.createWithoutMember(
+        return studentRepository.insertIfAbsent(
                 changed.datagsmStudentId(),
                 changed.name(), changed.grade(),
                 changed.classNum(), changed.number(),
                 changed.studentNumber(),
-                changed.dormitoryRoom()
-        );
-        student.markSynced(syncedAt);
-        studentRepository.save(student);
-        return true;
+                changed.dormitoryRoom(),
+                syncedAt
+        ) == 1;
     }
 
     /**
