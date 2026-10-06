@@ -11,9 +11,11 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -22,17 +24,23 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.sql.DataSource;
 
 /**
  * 학생이 졸업·자퇴하면 이벤트 커밋 뒤에 얼굴 벡터와 인식 세션 후보가 삭제되는지 검증한다.
@@ -40,9 +48,23 @@ import java.util.concurrent.ThreadLocalRandom;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Import({FaceEnrollmentStore.class, FaceSessionStore.class, FaceStudentLeftListener.class,
         FaceStudentLeftListenerTest.TestConfig.class})
 class FaceStudentLeftListenerTest {
+    private static final String TEST_SCHEMA = "face_left_it_" + UUID.randomUUID().toString().replace("-", "");
+
+    @DynamicPropertySource
+    static void useIsolatedPostgresSchema(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", () ->
+                "jdbc:postgresql://localhost:5433/checkup?currentSchema=" + TEST_SCHEMA);
+        registry.add("spring.datasource.username", () -> "checkup");
+        registry.add("spring.datasource.password", () -> "checkup");
+        registry.add("spring.flyway.schemas", () -> TEST_SCHEMA);
+        registry.add("spring.flyway.default-schema", () -> TEST_SCHEMA);
+        registry.add("spring.flyway.create-schemas", () -> true);
+    }
+
     @TestConfiguration
     static class TestConfig {
         @Bean
@@ -77,6 +99,9 @@ class FaceStudentLeftListenerTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Autowired
+    private DataSource dataSource;
+
+    @Autowired
     private AiFaceClient aiFaceClient;
 
     private Long adminMemberId;
@@ -97,6 +122,13 @@ class FaceStudentLeftListenerTest {
         assertThat(count("face_recognition_session_candidate", "session_id", sessionId)).isZero();
         assertThat(count("face_recognition_session", "session_id", sessionId)).isZero();
         verify(aiFaceClient).deleteSession(sessionId);
+    }
+
+    @AfterAll
+    void removeOnlyThisTestSchema() throws SQLException {
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("DROP SCHEMA IF EXISTS " + TEST_SCHEMA + " CASCADE");
+        }
     }
 
     @AfterEach

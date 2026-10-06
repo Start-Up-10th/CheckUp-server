@@ -27,4 +27,14 @@ public interface WebhookEventLogRepository extends JpaRepository<WebhookEventLog
             ON CONFLICT (id) DO NOTHING
             """, nativeQuery = true)
     int record(@Param("id") String id, @Param("receivedAt") Instant receivedAt);
+
+    /**
+     * 기준 시각보다 먼저 받은 이벤트 기록을 지운다. 기준 시각과 같은 기록은 남긴다.
+     *
+     * @param before 기준 시각
+     * @return 지운 기록 수
+     */
+    @Modifying
+    @Query("DELETE FROM WebhookEventLog w WHERE w.receivedAt < :before")
+    int deleteReceivedBefore(@Param("before") Instant before);
 }

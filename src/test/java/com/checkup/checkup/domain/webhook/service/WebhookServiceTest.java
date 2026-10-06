@@ -39,7 +39,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * DataGSM 문서의 {@code student.updated} 예시가 DTO로 읽히고,
  * 처리하지 않는 이벤트와 이미 처리한 이벤트 ID는 무시하며, 읽을 수 없거나 필수값이 없는 본문은 400으로 거부하는지 검증한다.
- * 저장된 학생의 정보·권한 동기화, 졸업·자퇴 처리와 이벤트 발행, 오래된 이벤트와 부분 데이터 건너뛰기도 검증한다.
+ * 저장된 학생의 정보·권한 동기화, 졸업·자퇴 처리와 이벤트 발행, 오래된 이벤트와 부분 데이터 건너뛰기,
+ * 보관 기간이 지난 이벤트 ID 기록 정리도 검증한다.
  */
 class WebhookServiceTest {
 
@@ -346,6 +347,17 @@ class WebhookServiceTest {
     }
 
     /** DataGSM 학생 ID로 저장된 학생 한 명을 만들고 저장소가 돌려주게 한다. 학년 2, 반 1, 번호 5, 학번 2105. */
+    @Test
+    @DisplayName("보관 기간 정리는 지금부터 30일 전보다 먼저 받은 기록을 지운다")
+    void deleteExpiredEventsUsesThirtyDaysBeforeNow() {
+        given(webhookEventLogRepository.deleteReceivedBefore(any())).willReturn(3);
+
+        int deleted = webhookService.deleteExpiredEvents();
+
+        assertThat(deleted).isEqualTo(3);
+        verify(webhookEventLogRepository).deleteReceivedBefore(Instant.parse("2026-05-24T05:22:00Z"));
+    }
+
     private Student storedStudent(Long datagsmStudentId, String name, MemberRole role, Integer dormitoryRoom) {
         Member member = Member.create(datagsmStudentId + 1000, name, role);
         Student student = Student.create(member, datagsmStudentId, name, 2, 1, 5, 2105, dormitoryRoom);

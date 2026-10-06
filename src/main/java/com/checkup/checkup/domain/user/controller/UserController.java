@@ -8,6 +8,8 @@ import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse
 import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
 import com.checkup.checkup.domain.user.serivce.UserSearchService;
 import com.checkup.checkup.domain.user.serivce.UserVolunteerService;
+import com.checkup.checkup.global.ratelimit.RateLimiter;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,7 @@ public class UserController {
 
     private final UserSearchService userSearchService;
     private final UserVolunteerService userVolunteerService;
+    private final RateLimiter rateLimiter;
 
     /**
      * DataGSM 학생 id로 학생 정보를 조회한다. 관리자 또는 본인만 조회할 수 있다.
@@ -30,6 +33,7 @@ public class UserController {
     @Operation(summary = "학생 정보 조회", description = "DataGSM 학생 id로 조회한다. 관리자 또는 본인만 조회할 수 있고, 그 밖에는 403 FORBIDDEN. DataGSM에 학생이 없으면 404 STUDENT_NOT_FOUND. DataGSM 연결 실패·시간 초과·5xx·요청 과다는 503 DATAGSM_UNAVAILABLE, 그 밖의 DataGSM 오류는 502 DATAGSM_ERROR.")
     @GetMapping("/{studentId}")
     public UserSearchResponse findUser(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable Long studentId) {
+        rateLimiter.check("user-search", memberId, 30, Duration.ofMinutes(1));
         return userSearchService.findUser(memberId, studentId);
     }
 
@@ -39,6 +43,7 @@ public class UserController {
     @Operation(summary = "학생 봉사 횟수 조회", description = "앞으로 해야 할 봉사 횟수다. 관리자 또는 본인만 조회할 수 있다.")
     @GetMapping("/{studentId}/volunteer")
     public UserVolunteerResponse findVolunteer(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable Long studentId) {
+        rateLimiter.check("user-volunteer", memberId, 30, Duration.ofMinutes(1));
         return userVolunteerService.findVolunteer(memberId, studentId);
     }
 

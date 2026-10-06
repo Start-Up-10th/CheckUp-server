@@ -12,6 +12,9 @@ import com.checkup.checkup.domain.qr.dto.request.QrScanRequest;
 import com.checkup.checkup.domain.qr.dto.response.QrScanResponse;
 import com.checkup.checkup.domain.qr.service.QrScanService;
 
+import com.checkup.checkup.global.ratelimit.RateLimiter;
+import java.time.Duration;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class QrScanController {
 
     private final QrScanService qrScanService;
+    private final RateLimiter rateLimiter;
 
     /**
      * QR 토큰으로 로그인한 학생의 출석을 처리한다. 판정 결과는 모두 200으로 반환한다.
@@ -39,6 +43,7 @@ public class QrScanController {
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody QrScanRequest request
     ) {
+        rateLimiter.check("qr-scan", memberId, 20, Duration.ofMinutes(1));
         return new QrScanResponse(qrScanService.scan(memberId, request.token()));
     }
 }

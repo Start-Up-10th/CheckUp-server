@@ -15,6 +15,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -28,6 +29,12 @@ import java.util.List;
 public class WebhookService {
 
     private static final String STUDENT_UPDATED = "student.updated";
+
+    /**
+     * 처리한 이벤트 ID를 보관하는 기간. DataGSM 재전송 기간이 문서에 없어 넉넉히 잡는다(#149).
+     * 기록을 지운 뒤 같은 이벤트가 다시 와도, 더 새 정보를 반영한 학생은 {@link StudentSyncService}가 건너뛴다.
+     */
+    static final Duration EVENT_RETENTION = Duration.ofDays(30);
 
     private final ObjectMapper objectMapper;
     private final WebhookEventLogRepository webhookEventLogRepository;
@@ -72,6 +79,16 @@ public class WebhookService {
         log.info("Received student.updated: id={}, students={}", event.id(), students.size());
 
         studentSyncService.syncAll(students, event.timestamp());
+    }
+
+    /**
+     * 보관 기간({@link #EVENT_RETENTION})보다 먼저 받은 이벤트 ID 기록을 지운다.
+     *
+     * @return 지운 기록 수
+     */
+    @Transactional
+    public int deleteExpiredEvents() {
+        return webhookEventLogRepository.deleteReceivedBefore(clock.instant().minus(EVENT_RETENTION));
     }
 
     /**

@@ -25,6 +25,9 @@ public record FaceProperties(
         @NotBlank String consentVersion
 ) {
     public FaceProperties {
+        if (aiBaseUrl != null) {
+            aiBaseUrl = aiBaseUrl.replaceFirst("/+$", "");
+        }
         requirePositive(connectTimeout, "connect-timeout");
         requirePositive(responseTimeout, "response-timeout");
         requirePositive(minFrameInterval, "min-frame-interval");

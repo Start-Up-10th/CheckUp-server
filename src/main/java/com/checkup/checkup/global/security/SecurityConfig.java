@@ -1,5 +1,6 @@
 package com.checkup.checkup.global.security;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -7,6 +8,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+
+import com.checkup.checkup.global.config.WebProperties;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,12 +24,15 @@ import tools.jackson.databind.ObjectMapper;
  * - {@code /api/v1/auth/me}를 제외한 {@code /api/v1/auth/**}는 로그인 없이 접근할 수 있다.
  * - {@code /api/v1/webhook}은 DataGSM이 로그인 없이 호출하며, 컨트롤러에서 서명으로 검증한다.
  * - API 문서({@code /v3/api-docs}, {@code /swagger-ui})는 로그인 없이 볼 수 있다. 끄려면 {@code SWAGGER_ENABLED=false}.
+ * - CSRF 토큰 대신 {@link OriginCheckFilter}로 상태 변경 요청의 출처를 확인한다. 로그아웃도 확인하도록 {@link LogoutFilter} 앞에 둔다.
  */
 @Configuration
+@EnableConfigurationProperties(WebProperties.class)
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper,
+                                                   WebProperties webProperties) throws Exception {
         SecurityErrorHandler errorHandler = new SecurityErrorHandler(objectMapper);
         http
                 .exceptionHandling(e -> e
@@ -33,6 +40,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(errorHandler)
                 )
                 .csrf(AbstractHttpConfigurer::disable)
+                .addFilterBefore(new OriginCheckFilter(webProperties.baseUrl(), errorHandler), LogoutFilter.class)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
