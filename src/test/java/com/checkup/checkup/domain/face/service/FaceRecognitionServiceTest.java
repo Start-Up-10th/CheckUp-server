@@ -49,6 +49,7 @@ class FaceRecognitionServiceTest {
     private final AiFaceClient aiFaceClient = mock(AiFaceClient.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final AttendanceService attendanceService = mock(AttendanceService.class);
+    private final FaceRecognitionLogService logService = mock(FaceRecognitionLogService.class);
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final MutableClock clock = new MutableClock(NOW);
     private final FaceProperties properties = new FaceProperties(
@@ -56,7 +57,7 @@ class FaceRecognitionServiceTest {
             1024, 512, Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
     private final FaceRecognitionService service = new FaceRecognitionService(
             templateRepository, sessionStore, aiFaceClient, studentRepository,
-            attendanceService, adminVerifier, properties,
+            attendanceService, logService, adminVerifier, properties,
             tools.jackson.databind.json.JsonMapper.builder().build(), clock);
 
     @Test
