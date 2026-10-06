@@ -7,6 +7,7 @@ import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
@@ -248,7 +249,8 @@ public class VolunteerService {
         if (volunteerDutyRepository.complete(duty.getId(), now) == 0) {
             throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
         }
-        volunteerAdjustmentRepository.insertIfAbsent(id, -1, -1, null, null, now);
+        volunteerAdjustmentRepository.insertIfAbsent(
+                id, -1, -1, null, VolunteerAdjustmentKind.DUTY_COMPLETION.name(), null, now);
         if (studentRepository.decreaseVolunteerCount(id) == 0) {
             throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
         }
@@ -288,7 +290,8 @@ public class VolunteerService {
             }
             verifySameRequest(key, id, requestedDelta);
         } else if (volunteerAdjustmentRepository.insertIfAbsent(
-                id, delta, requestedDelta, savedReason, key, clock.instant()) == 1) {
+                id, delta, requestedDelta, savedReason, VolunteerAdjustmentKind.ADMIN.name(), key,
+                clock.instant()) == 1) {
             studentRepository.changeVolunteerCount(id, delta);
         } else {
             verifySameRequest(key, id, requestedDelta);

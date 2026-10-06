@@ -64,7 +64,7 @@ public class VolunteerController {
      * @param limit     최대 개수(선택, 1~100). 없으면 50
      * @return 조정 이력
      */
-    @Operation(summary = "봉사 횟수 조정 이력", description = "관리자 전용. 조정 시각·실제 바뀐 횟수·요청 횟수·사유를 최신순으로 돌려준다. 당일 봉사 완료의 차감(-1)도 포함한다. limit은 1~100(기본 50), 벗어나면 400 INVALID_REQUEST.")
+    @Operation(summary = "봉사 횟수 조정 이력", description = "관리자 전용. 조정 시각·실제 바뀐 횟수·요청 횟수·사유·종류를 최신순으로 돌려준다. 당일 봉사 완료의 차감(-1)도 kind=DUTY_COMPLETION, reason=null로 포함한다. limit은 1~100(기본 50), 벗어나면 400 INVALID_REQUEST.")
     @GetMapping("/{studentId}/adjustments")
     public List<VolunteerAdjustmentResponse> getAdjustments(
             @AuthenticationPrincipal Long memberId,

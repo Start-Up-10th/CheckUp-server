@@ -20,6 +20,7 @@ import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
@@ -188,7 +189,7 @@ class VolunteerServiceTest {
     @DisplayName("증가는 기록을 남긴 뒤 횟수를 1 늘리고 바뀐 항목을 돌려준다")
     void increaseRecordsThenIncreases() {
         Student student = givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "key-1", NOW)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "ADMIN", "key-1", NOW)).willReturn(1);
         given(studentRepository.changeVolunteerCount(10L, 1)).willReturn(1);
         given(volunteerAdjustmentRepository.findLastActivityAt(10L)).willReturn(NOW);
 
@@ -204,7 +205,7 @@ class VolunteerServiceTest {
     @DisplayName("같은 키로 다시 오면 횟수를 바꾸지 않고 현재 상태만 돌려준다")
     void retryWithSameKeyDoesNotChangeCount() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "key-1", NOW)).willReturn(0);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "ADMIN", "key-1", NOW)).willReturn(0);
         given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(10L, 1)));
 
         service.increase(MEMBER_ID, 200L, "key-1");
@@ -216,7 +217,7 @@ class VolunteerServiceTest {
     @DisplayName("같은 키가 다른 학생이나 반대 방향 요청에 쓰였으면 409 IDEMPOTENCY_KEY_REUSED다")
     void reusedKeyForOtherRequestIsRejected() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any())).willReturn(0);
+        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any())).willReturn(0);
 
         given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(99L, 1)));
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "key-1"))
@@ -234,12 +235,12 @@ class VolunteerServiceTest {
     @DisplayName("키가 없거나 비어 있으면 null로 기록하고 매번 반영한다")
     void blankKeyIsNull() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, null, NOW)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "ADMIN", null, NOW)).willReturn(1);
         given(studentRepository.changeVolunteerCount(10L, 1)).willReturn(1);
 
         service.increase(MEMBER_ID, 200L, "  ");
 
-        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, 1, 1, null, null, NOW);
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, 1, 1, null, "ADMIN", null, NOW);
         verify(studentRepository).changeVolunteerCount(10L, 1);
     }
 
@@ -251,14 +252,14 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "k".repeat(101)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("차감은 -1로 기록하고 횟수를 1 줄인다")
     void decreaseRecordsThenDecreases() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, -1, null, null, NOW)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, -1, null, "ADMIN", null, NOW)).willReturn(1);
         given(studentRepository.changeVolunteerCount(10L, -1)).willReturn(1);
 
         service.decrease(MEMBER_ID, 200L, null);
@@ -274,7 +275,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
         verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
@@ -282,7 +283,7 @@ class VolunteerServiceTest {
     @DisplayName("여러 회 추가는 요청한 횟수와 다듬은 사유로 기록하고 그만큼 늘린다")
     void adjustCountIncreasesByDeltaWithReason() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 5, 5, "벌점", "key-1", NOW)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 5, 5, "벌점", "ADMIN", "key-1", NOW)).willReturn(1);
 
         service.adjustCount(MEMBER_ID, 200L, "key-1", 5, "  벌점 ");
 
@@ -293,11 +294,11 @@ class VolunteerServiceTest {
     @DisplayName("남은 횟수보다 많이 빼면 남은 횟수까지만 빼고 요청 횟수는 따로 기록한다")
     void adjustCountClampsDecreaseToRemaining() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -2, -5, null, null, NOW)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -2, -5, null, "ADMIN", null, NOW)).willReturn(1);
 
         service.adjustCount(MEMBER_ID, 200L, null, -5, " ");
 
-        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -2, -5, null, null, NOW);
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -2, -5, null, "ADMIN", null, NOW);
         verify(studentRepository).changeVolunteerCount(10L, -2);
     }
 
@@ -309,7 +310,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.adjustCount(MEMBER_ID, 200L, "key-1", -3, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
         verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
@@ -322,7 +323,7 @@ class VolunteerServiceTest {
 
         service.adjustCount(MEMBER_ID, 200L, "key-1", -5, null);
 
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
         verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
@@ -330,7 +331,7 @@ class VolunteerServiceTest {
     @DisplayName("같은 키를 요청 횟수가 다른 조정에 다시 쓰면 409 IDEMPOTENCY_KEY_REUSED다")
     void adjustCountReusedKeyWithOtherDeltaIsRejected() {
         givenAdjustable(5);
-        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any()))
+        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any()))
                 .willReturn(0);
         given(volunteerAdjustmentRepository.findByRequestKey("key-1"))
                 .willReturn(Optional.of(adjustment(10L, 3, 3)));
@@ -350,7 +351,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.adjustCount(MEMBER_ID, 200L, null, delta, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -361,22 +362,29 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.adjustCount(MEMBER_ID, 200L, null, 1, "가".repeat(101)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("조정 이력은 학생 DB id로 기본 50개를 최신순으로 읽어 시각·횟수·요청 횟수·사유로 돌려준다")
+    @DisplayName("조정 이력은 학생 DB id로 기본 50개를 최신순으로 읽어 시각·횟수·요청 횟수·사유·종류로 돌려주고, 당일 봉사 완료는 사유 없이 종류로 구분한다")
     void adjustmentsAreReturnedNewestFirst() {
         givenAdjustable(2);
         VolunteerAdjustment adjustment = adjustment(10L, -2, -5);
         ReflectionTestUtils.setField(adjustment, "reason", "감면");
+        ReflectionTestUtils.setField(adjustment, "kind", VolunteerAdjustmentKind.ADMIN);
         ReflectionTestUtils.setField(adjustment, "createdAt", NOW);
+        VolunteerAdjustment completion = adjustment(10L, -1, -1);
+        ReflectionTestUtils.setField(completion, "kind", VolunteerAdjustmentKind.DUTY_COMPLETION);
+        ReflectionTestUtils.setField(completion, "createdAt", NOW.minusSeconds(60));
         given(volunteerAdjustmentRepository.findByStudent_IdOrderByCreatedAtDescIdDesc(10L, Limit.of(50)))
-                .willReturn(List.of(adjustment));
+                .willReturn(List.of(adjustment, completion));
 
         List<VolunteerAdjustmentResponse> history = service.getAdjustments(MEMBER_ID, 200L, null);
 
-        assertThat(history).containsExactly(new VolunteerAdjustmentResponse(NOW, -2, -5, "감면"));
+        assertThat(history).containsExactly(
+                new VolunteerAdjustmentResponse(NOW, -2, -5, "감면", VolunteerAdjustmentKind.ADMIN),
+                new VolunteerAdjustmentResponse(NOW.minusSeconds(60), -1, -1, null,
+                        VolunteerAdjustmentKind.DUTY_COMPLETION));
     }
 
     @ParameterizedTest
@@ -420,7 +428,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -524,7 +532,7 @@ class VolunteerServiceTest {
 
         service.completeDuty(MEMBER_ID, 200L);
 
-        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -1, -1, null, null, NOW);
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -1, -1, null, "DUTY_COMPLETION", null, NOW);
         verify(studentRepository).decreaseVolunteerCount(10L);
     }
 
@@ -565,7 +573,7 @@ class VolunteerServiceTest {
         verify(studentRepository, never()).findAllByDatagsmStudentIdIsNotNull();
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any(), any());
         assertThatThrownBy(() -> service.assignDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);

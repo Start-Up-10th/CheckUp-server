@@ -8,6 +8,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.MemberRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ import org.springframework.data.domain.Limit;
 
 /**
  * 실제 PostgreSQL에서 봉사 조정 기록의 재시도 키 중복 무시, 마지막 조정 시각 조회,
- * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139), 학생별 최신순 이력 조회(#140)를 검증한다.
+ * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139), 학생별 최신순 이력 조회(#140), 조정 종류 기록(#176)을 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -51,17 +52,17 @@ class VolunteerAdjustmentRepositoryTest {
     @Test
     @DisplayName("같은 재시도 키는 한 번만 기록하고, 키가 없으면 매번 기록한다")
     void sameKeyIsRecordedOnce() {
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "key-1", T0)).isEqualTo(1);
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "key-1", T0.plusSeconds(1))).isZero();
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0)).isEqualTo(1);
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", "key-1", T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", "key-1", T0.plusSeconds(1))).isZero();
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", null, T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", null, T0)).isEqualTo(1);
     }
 
     @Test
     @DisplayName("학생별 마지막 조정 시각을 읽고, 조정하지 않은 학생은 결과에 없다")
     void lastActivityIsLatestPerStudent() {
-        adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0);
-        adjustmentRepository.insertIfAbsent(studentId, -1, -1, null, null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", null, T0);
+        adjustmentRepository.insertIfAbsent(studentId, -1, -1, null, "ADMIN", null, T0.plusSeconds(60));
 
         Map<Long, Instant> last = adjustmentRepository.findLastActivities().stream()
                 .collect(Collectors.toMap(VolunteerAdjustmentRepository.LastActivity::getStudentId,
@@ -75,13 +76,26 @@ class VolunteerAdjustmentRepositoryTest {
     @Test
     @DisplayName("실제 바뀐 횟수·요청 횟수·사유를 함께 기록한다")
     void reasonAndRequestedDeltaAreRecorded() {
-        adjustmentRepository.insertIfAbsent(studentId, -2, -5, "감면", "key-2", T0);
+        adjustmentRepository.insertIfAbsent(studentId, -2, -5, "감면", "ADMIN", "key-2", T0);
 
         assertThat(adjustmentRepository.findByRequestKey("key-2")).hasValueSatisfying(adjustment -> {
             assertThat(adjustment.getDelta()).isEqualTo((short) -2);
             assertThat(adjustment.getRequestedDelta()).isEqualTo((short) -5);
             assertThat(adjustment.getReason()).isEqualTo("감면");
         });
+    }
+
+    @Test
+    @DisplayName("조정 종류를 함께 기록해 관리자 조정과 당일 봉사 완료를 구분한다")
+    void kindIsRecorded() {
+        adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "ADMIN", "key-admin", T0);
+        adjustmentRepository.insertIfAbsent(studentId, -1, -1, null, "DUTY_COMPLETION", "key-duty", T0);
+
+        assertThat(adjustmentRepository.findByRequestKey("key-admin"))
+                .hasValueSatisfying(adjustment -> assertThat(adjustment.getKind()).isEqualTo(VolunteerAdjustmentKind.ADMIN));
+        assertThat(adjustmentRepository.findByRequestKey("key-duty"))
+                .hasValueSatisfying(adjustment -> assertThat(adjustment.getKind())
+                        .isEqualTo(VolunteerAdjustmentKind.DUTY_COMPLETION));
     }
 
     @Test
@@ -98,10 +112,10 @@ class VolunteerAdjustmentRepositoryTest {
     @Test
     @DisplayName("학생별 조정 기록을 최신순으로 개수만큼 읽고 다른 학생 기록은 빼며, 같은 시각이면 나중 기록이 앞이다")
     void adjustmentsAreReadNewestFirstPerStudent() {
-        adjustmentRepository.insertIfAbsent(studentId, 1, 1, "첫째", null, T0);
-        adjustmentRepository.insertIfAbsent(studentId, 2, 2, "둘째", null, T0.plusSeconds(60));
-        adjustmentRepository.insertIfAbsent(studentId, -1, -1, "셋째", null, T0.plusSeconds(60));
-        adjustmentRepository.insertIfAbsent(otherStudentId, 3, 3, "다른 학생", null, T0.plusSeconds(120));
+        adjustmentRepository.insertIfAbsent(studentId, 1, 1, "첫째", "ADMIN", null, T0);
+        adjustmentRepository.insertIfAbsent(studentId, 2, 2, "둘째", "ADMIN", null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(studentId, -1, -1, "셋째", "ADMIN", null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(otherStudentId, 3, 3, "다른 학생", "ADMIN", null, T0.plusSeconds(120));
 
         List<VolunteerAdjustment> all = adjustmentRepository
                 .findByStudent_IdOrderByCreatedAtDescIdDesc(studentId, Limit.of(10));

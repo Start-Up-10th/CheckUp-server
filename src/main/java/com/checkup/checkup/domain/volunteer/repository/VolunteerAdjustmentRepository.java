@@ -20,12 +20,13 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
      * @param delta          실제로 바뀐 횟수
      * @param requestedDelta 관리자가 요청한 횟수
      * @param reason         사유. 없으면 {@code null}
+     * @param kind           조정 종류. {@code ADMIN} 또는 {@code DUTY_COMPLETION}
      * @return 새로 저장했으면 1, 같은 키가 있어 무시했으면 0
      */
     @Modifying
     @Query(value = """
-            INSERT INTO volunteer_adjustment (student_id, delta, requested_delta, reason, request_key, created_at)
-            VALUES (:studentId, :delta, :requestedDelta, CAST(:reason AS VARCHAR), :requestKey, :createdAt)
+            INSERT INTO volunteer_adjustment (student_id, delta, requested_delta, reason, kind, request_key, created_at)
+            VALUES (:studentId, :delta, :requestedDelta, CAST(:reason AS VARCHAR), :kind, :requestKey, :createdAt)
             ON CONFLICT (request_key) DO NOTHING
             """, nativeQuery = true)
     int insertIfAbsent(
@@ -33,6 +34,7 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
             @Param("delta") int delta,
             @Param("requestedDelta") int requestedDelta,
             @Param("reason") String reason,
+            @Param("kind") String kind,
             @Param("requestKey") String requestKey,
             @Param("createdAt") Instant createdAt
     );
