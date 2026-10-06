@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.user.dto.Response;
 import io.swagger.v3.oas.annotations.media.Schema;
 import team.themoment.datagsm.sdk.openapi.model.Student;
 
+/** DataGSM에서 조회한 학생 정보. 이메일 등은 서버에 저장하지 않고 조회할 때만 받는다. */
 public record UserSearchResponse(
         @Schema(description = "DataGSM 학생 id", example = "1") Long id,
         @Schema(description = "이름", example = "홍길동") String name,
