@@ -2,23 +2,29 @@ package com.checkup.checkup.domain.face.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.http.HttpMethod.DELETE;
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
+import static org.springframework.http.HttpMethod.PUT;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import static org.springframework.http.HttpMethod.GET;
-import static org.springframework.http.HttpMethod.POST;
-import static org.springframework.http.HttpMethod.PUT;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -123,6 +129,127 @@ class AiFaceClientTest {
                 .andRespond(withSuccess("{\"status\":\"ready\"}", MediaType.APPLICATION_JSON));
 
         client.createSession(sessionId, request);
+
+        server.verify();
+    }
+
+    @Test
+    void 프레임_요청은_서비스_Bearer와_프레임_ID를_보내고_응답을_읽는다() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+        UUID sessionId = UUID.randomUUID();
+        byte[] frame = new byte[]{1, 2, 3, 4};
+
+        server.expect(requestTo("http://face-ai.test/internal/v1/face/sessions/" + sessionId + "/frames"))
+                .andExpect(method(POST))
+                .andExpect(header("Authorization", "Bearer face-secret"))
+                .andExpect(header("X-Frame-Id", "frame-42"))
+                .andExpect(header("Content-Type", "image/jpeg"))
+                .andExpect(request -> assertThat(request.getHeaders().getFirst("Cookie")).isNull())
+                .andExpect(content().bytes(frame))
+                .andRespond(withSuccess("""
+                        {"frameId":"frame-42","faces":[]}
+                        """, MediaType.APPLICATION_JSON));
+
+        AiFaceFrameResponse response = client.recognize(
+                sessionId, "frame-42", frame, MediaType.IMAGE_JPEG);
+
+        assertThat(response.frameId()).isEqualTo("frame-42");
+        assertThat(response.faces()).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void 세션_삭제는_서비스_Bearer로_호출하고_멱등_응답을_확인한다() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+        UUID sessionId = UUID.randomUUID();
+
+        server.expect(requestTo("http://face-ai.test/internal/v1/face/sessions/" + sessionId))
+                .andExpect(method(DELETE))
+                .andExpect(header("Authorization", "Bearer face-secret"))
+                .andRespond(withSuccess("{\"status\":\"deleted\"}", MediaType.APPLICATION_JSON));
+
+        client.deleteSession(sessionId);
+
+        server.verify();
+    }
+
+    @Test
+    void AI_인증_오류는_상태와_안전한_오류코드만_노출한다() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+
+        server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"detail":{"code":"unauthorized","message":"sensitive upstream body"}}
+                                """));
+
+        assertThatThrownBy(() -> client.extract(new byte[]{1}, MediaType.parseMediaType("video/webm")))
+                .isInstanceOfSatisfying(AiFaceException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(401);
+                    assertThat(error.getOperation()).isEqualTo("enrollment");
+                    assertThat(error.getErrorCode()).isEqualTo("unauthorized");
+                    assertThat(error.getMessage()).doesNotContain("sensitive upstream body");
+                });
+
+        server.verify();
+    }
+
+    @Test
+    void AI_연결_시간초과는_504로_변환한다() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+
+        server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))
+                .andRespond(withException(new SocketTimeoutException("sensitive timeout detail")));
+
+        assertThatThrownBy(() -> client.extract(new byte[]{1}, MediaType.parseMediaType("video/webm")))
+                .isInstanceOfSatisfying(AiFaceException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(504);
+                    assertThat(error.getErrorCode()).isEqualTo("timeout");
+                    assertThat(error.getMessage()).doesNotContain("sensitive timeout detail");
+                });
+
+        server.verify();
+    }
+
+    @Test
+    void AI_연결_실패는_503으로_변환한다() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://face-ai.test");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
+                Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
+                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+        AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
+
+        server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))
+                .andRespond(withException(new IOException("sensitive connection detail")));
+
+        assertThatThrownBy(() -> client.extract(new byte[]{1}, MediaType.parseMediaType("video/webm")))
+                .isInstanceOfSatisfying(AiFaceException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(503);
+                    assertThat(error.getErrorCode()).isEqualTo("unavailable");
+                    assertThat(error.getMessage()).doesNotContain("sensitive connection detail");
+                });
 
         server.verify();
     }

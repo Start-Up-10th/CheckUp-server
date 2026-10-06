@@ -5,7 +5,7 @@
 기숙사 자치위원이 학생을 한 명씩 확인하던 입소·자습실 출석을 얼굴 인식과 QR 인증으로 대신합니다.
 기숙사생 약 200명, 출입구 3곳을 대상으로 하며 학생과 관리자 모두 웹으로 사용합니다.
 
-> 현재는 프로젝트 골격 단계입니다. 아래 기능은 구현 목표이며 아직 구현되지 않았습니다.
+> 기능별 구현 상태는 `docs-harness/docs/plans/`를 확인하세요. 얼굴 AI의 현재 연결 상태와 남은 검증은 `face-recognition.md`에 기록합니다.
 
 ## 서버가 맡는 일
 
@@ -95,6 +95,32 @@ checkup:
 로그인 콜백은 성공하면 `{PUBLIC_ORIGIN}/login/complete`(또는 `GET /api/v1/auth/login?redirect=/경로`로 정한 경로), 실패하면 `{PUBLIC_ORIGIN}/login?error=<오류 코드>`로 302 리다이렉트합니다.
 DataGSM 호출은 연결 3초·응답 5초까지만 기다립니다. `DATAGSM_CONNECT_TIMEOUT`, `DATAGSM_RESPONSE_TIMEOUT`(예: `5s`)으로 바꿀 수 있고, 시간 안에 응답이 없으면 `DATAGSM_UNAVAILABLE`로 응답합니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
+
+### 얼굴 AI 서비스 연결
+
+Spring은 얼굴 등록·프레임 추론 요청을 AI 서비스에 위임하고 브라우저는 Spring API만 호출합니다. 로컬에서는 `application-local.yaml`, 운영에서는 Spring 프로세스 환경변수로 설정합니다.
+
+```yaml
+checkup:
+  face:
+    ai-base-url: ${FACE_AI_BASE_URL:http://localhost:8000}
+    service-token: ${FACE_SERVICE_TOKEN}
+```
+
+`FACE_AI_BASE_URL`에는 서비스 origin을 설정합니다. readiness 주소가 `http://service.gsmsv.site:32200/health/ready`라면 base URL은 `http://service.gsmsv.site:32200`입니다. Spring이 `/health/ready`와 `/internal/v1/face/*` 경로를 붙입니다.
+`FACE_SERVICE_TOKEN`은 AI와 Spring에 동일하게 설정하는 서버 간 secret이며 브라우저에 보내지 않습니다. 이 토큰이 포함된 요청은 HTTPS 또는 신뢰된 사설망으로만 전송하고 AI 포트의 접근을 Spring 서버로 제한합니다.
+AI 인식 세션은 프로세스 메모리에 저장되므로 AI 인스턴스 하나를 사용하거나 `session_id` 기준으로 같은 인스턴스에 라우팅해야 합니다.
+
+배포 AI의 인증 경로 스모크 테스트는 기본 테스트에서 실행되지 않습니다. HTTPS 또는 신뢰된 사설망에서만 실제 설정값으로 옵트인합니다.
+
+```powershell
+$env:FACE_AI_BASE_URL = 'https://<private-ai-host>'
+$env:FACE_SERVICE_TOKEN = '<same secret configured on AI>'
+$env:FACE_AI_LIVE_TESTS = 'true'
+.\gradlew.bat test --tests com.checkup.checkup.domain.face.ai.AiFaceClientLiveIntegrationTest
+```
+
+이 검사는 readiness와 임의 세션 ID의 멱등 삭제를 호출하고 얼굴 영상·벡터를 전송하지 않습니다. 사설망 HTTP가 꼭 필요할 때만 `FACE_AI_LIVE_ALLOW_HTTP=true`를 사용합니다.
 
 ## 명세·문서
 
