@@ -60,6 +60,8 @@ class QrScanServiceTest {
     void setUp() {
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_ID);
+        given(student.getDormitoryRoom()).willReturn(101);
+        given(student.hasRequiredConsent()).willReturn(true);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
     }
 
@@ -71,6 +73,32 @@ class QrScanServiceTest {
         assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
+        verifyNoInteractions(qrSessionRepository, attendanceService);
+    }
+
+    @Test
+    void 호실이_없으면_403이고_토큰을_확인하지_않는다() {
+        Student student = mock(Student.class);
+        given(student.getDormitoryRoom()).willReturn(null);
+        given(student.hasRequiredConsent()).willReturn(true);
+        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
+
+        assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
+        verifyNoInteractions(qrSessionRepository, attendanceService);
+    }
+
+    @Test
+    void 필수_동의가_없으면_403이고_토큰을_확인하지_않는다() {
+        Student student = mock(Student.class);
+        given(student.getDormitoryRoom()).willReturn(101);
+        given(student.hasRequiredConsent()).willReturn(false);
+        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
+
+        assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONSENT_REQUIRED));
         verifyNoInteractions(qrSessionRepository, attendanceService);
     }
 
