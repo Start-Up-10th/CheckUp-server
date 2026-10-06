@@ -2,10 +2,12 @@ package com.checkup.checkup.domain.volunteer.service;
 
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
@@ -14,6 +16,7 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,10 @@ public class VolunteerService {
 
     private static final Pattern DIGITS = Pattern.compile("\\d{1,9}");
     private static final int MAX_REQUEST_KEY_LENGTH = 100;
+    private static final int MAX_REASON_LENGTH = 100;
+    private static final int MAX_ADJUST_AMOUNT = 99;
+    private static final int DEFAULT_HISTORY_LIMIT = 50;
+    private static final int MAX_HISTORY_LIMIT = 100;
     private static final String DUTY_MESSAGE = "오늘 봉사 당번으로 지정됐어요. 봉사를 마치면 자치위원에게 확인받으세요.";
 
     /** 호실 → 이름 → 학번순. 호실이 없는 학생은 맨 뒤에 둔다. */
@@ -104,7 +111,7 @@ public class VolunteerService {
      */
     @Transactional
     public VolunteerResponse increase(Long memberId, Long studentId, String requestKey) {
-        return adjust(memberId, studentId, requestKey, 1);
+        return adjust(memberId, studentId, requestKey, 1, null);
     }
 
     /**
@@ -121,7 +128,53 @@ public class VolunteerService {
      */
     @Transactional
     public VolunteerResponse decrease(Long memberId, Long studentId, String requestKey) {
-        return adjust(memberId, studentId, requestKey, -1);
+        return adjust(memberId, studentId, requestKey, -1, null);
+    }
+
+    /**
+     * 봉사 횟수를 여러 회 늘리거나 줄이고 사유를 남긴다(#139). 차감은 남은 횟수까지만 한다.
+     *
+     * @param memberId   세션의 회원 id
+     * @param studentId  DataGSM 학생 id
+     * @param requestKey 재시도 방지 키(선택). 같은 키로 다시 오면 반영하지 않고 현재 상태만 돌려준다.
+     * @param delta      바꿀 횟수. 양수는 추가, 음수는 차감이며 -99~99, 0 제외
+     * @param reason     사유(선택, 100자 이하). 비어 있으면 남기지 않는다.
+     * @return 조정 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         차감인데 횟수가 0이면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409),
+     *                         횟수·사유·키가 범위를 벗어나면 {@link ErrorCode#INVALID_REQUEST}(400)
+     */
+    @Transactional
+    public VolunteerResponse adjustCount(Long memberId, Long studentId, String requestKey, int delta, String reason) {
+        if (delta == 0 || Math.abs(delta) > MAX_ADJUST_AMOUNT) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return adjust(memberId, studentId, requestKey, delta, reason);
+    }
+
+    /**
+     * 학생 한 명의 봉사 횟수 조정 이력을 최신순으로 돌려준다(#140). 당일 봉사 완료의 차감도 포함한다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @param limit     최대 개수(선택, 1~100). 없으면 50
+     * @return 조정 이력. 없으면 빈 목록
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         개수가 범위를 벗어나면 {@link ErrorCode#INVALID_REQUEST}(400)
+     */
+    @Transactional(readOnly = true)
+    public List<VolunteerAdjustmentResponse> getAdjustments(Long memberId, Long studentId, Integer limit) {
+        adminVerifier.verify(memberId);
+        int size = limit == null ? DEFAULT_HISTORY_LIMIT : limit;
+        if (size < 1 || size > MAX_HISTORY_LIMIT) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        Long id = findStudent(studentId).getId();
+        return volunteerAdjustmentRepository.findByStudent_IdOrderByCreatedAtDescIdDesc(id, Limit.of(size)).stream()
+                .map(VolunteerAdjustmentResponse::from)
+                .toList();
     }
 
     /**
@@ -196,7 +249,8 @@ public class VolunteerService {
         if (volunteerDutyRepository.complete(duty.getId(), now) == 0) {
             throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
         }
-        volunteerAdjustmentRepository.insertIfAbsent(id, -1, null, now);
+        volunteerAdjustmentRepository.insertIfAbsent(
+                id, -1, -1, null, VolunteerAdjustmentKind.DUTY_COMPLETION.name(), null, now);
         if (studentRepository.decreaseVolunteerCount(id) == 0) {
             throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
         }
@@ -214,36 +268,46 @@ public class VolunteerService {
     }
 
     /**
-     * 조정 기록을 먼저 남기고 횟수를 바꾼다. 같은 키의 기록이 이미 있으면 재시도로 보고 횟수를 바꾸지 않는다.
-     * 그 키가 다른 학생이나 반대 방향 요청에 쓰였으면 {@link ErrorCode#IDEMPOTENCY_KEY_REUSED}(409)다.
-     * 차감할 수 없으면 예외로 트랜잭션이 취소돼 기록도 남지 않는다.
+     * 학생 행을 잠가 남은 횟수를 보고 실제로 바꿀 횟수를 정한 뒤, 조정 기록을 먼저 남기고 횟수를 바꾼다.
+     * 차감은 남은 횟수까지만 하고, 남은 횟수가 0이면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409)다.
+     * 같은 키의 기록이 이미 있으면 재시도로 보고 횟수를 바꾸지 않는다. 잠금 덕분에 같은 키가 동시에 와도 한 번만 반영된다.
+     * 그 키가 다른 학생이나 다른 요청 횟수에 쓰였으면 {@link ErrorCode#IDEMPOTENCY_KEY_REUSED}(409)다.
      */
-    private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int delta) {
+    private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int requestedDelta,
+                                     String reason) {
         adminVerifier.verify(memberId);
         Long id = findStudent(studentId).getId();
         String key = normalizeKey(requestKey);
+        String savedReason = normalizeReason(reason);
 
-        if (volunteerAdjustmentRepository.insertIfAbsent(id, delta, key, clock.instant()) == 1) {
-            int changed = delta > 0
-                    ? studentRepository.increaseVolunteerCount(id)
-                    : studentRepository.decreaseVolunteerCount(id);
-            if (changed == 0) {
+        int count = studentRepository.lockVolunteerCount(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        int delta = requestedDelta > 0 ? requestedDelta : -Math.min(-requestedDelta, count);
+
+        if (delta == 0) {
+            if (key == null || volunteerAdjustmentRepository.findByRequestKey(key).isEmpty()) {
                 throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
             }
+            verifySameRequest(key, id, requestedDelta);
+        } else if (volunteerAdjustmentRepository.insertIfAbsent(
+                id, delta, requestedDelta, savedReason, VolunteerAdjustmentKind.ADMIN.name(), key,
+                clock.instant()) == 1) {
+            studentRepository.changeVolunteerCount(id, delta);
         } else {
-            verifySameRequest(key, id, delta);
+            verifySameRequest(key, id, requestedDelta);
         }
 
         return reload(id);
     }
 
     /**
-     * 키가 겹쳐 기록되지 않았을 때, 기존 기록이 같은 학생·같은 방향의 재시도인지 확인한다.
+     * 키가 겹쳐 기록되지 않았을 때, 기존 기록이 같은 학생·같은 요청 횟수의 재시도인지 확인한다.
      * 웹이 키를 다른 요청에 다시 쓰면 반영되지 않았는데 성공으로 보이지 않도록 409로 알린다.
      */
-    private void verifySameRequest(String key, Long studentId, int delta) {
+    private void verifySameRequest(String key, Long studentId, int requestedDelta) {
         boolean same = volunteerAdjustmentRepository.findByRequestKey(key)
-                .map(existing -> existing.getStudent().getId().equals(studentId) && existing.getDelta() == delta)
+                .map(existing -> existing.getStudent().getId().equals(studentId)
+                        && existing.getRequestedDelta() == requestedDelta)
                 .orElse(false);
         if (!same) {
             throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
@@ -270,6 +334,18 @@ public class VolunteerService {
                 .orElse(null);
         return VolunteerResponse.of(
                 student, volunteerAdjustmentRepository.findLastActivityAt(student.getId()), todayDuty);
+    }
+
+    /** 사유의 앞뒤 공백을 지운다. 비어 있으면 {@code null}, 100자를 넘으면 {@link ErrorCode#INVALID_REQUEST}(400)다. */
+    private static String normalizeReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return null;
+        }
+        String stripped = reason.strip();
+        if (stripped.length() > MAX_REASON_LENGTH) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return stripped;
     }
 
     private static String normalizeKey(String requestKey) {

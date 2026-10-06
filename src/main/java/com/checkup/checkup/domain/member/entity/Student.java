@@ -6,12 +6,23 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.Comparator;
 
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Table(name = "student")
 @Entity
 public class Student {
+
+    /**
+     * 호실 명단 정렬: 이름 → 학번 → id순(#150).
+     * 이름은 DB 정렬 규칙(예: {@code en_US.utf8})에 맡기지 않고 {@link String#compareTo}로 비교한다.
+     * 한글 음절은 유니코드에서 가나다순으로 놓여 있어 코드 순서가 곧 가나다순이다(예: 강 < 계 < 김 < 홍).
+     */
+    public static final Comparator<Student> NAME_ORDER = Comparator
+            .comparing(Student::getName)
+            .thenComparingInt(Student::getStudentNumber)
+            .thenComparing(Student::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -191,5 +202,13 @@ public class Student {
      */
     public boolean hasRequiredConsent() {
         return privacyAgreedAt != null && faceAgreedAt != null;
+    }
+
+    /**
+     * 출석을 인정할 수 있는 학생인지 확인한다. 필수 동의를 마치고 호실이 배정돼 있어야 한다.
+     * 졸업·자퇴로 호실이 비워진 학생이나 동의하지 않은 학생의 출석은 QR·얼굴 인증 모두 거부한다.
+     */
+    public boolean isAttendanceEligible() {
+        return hasRequiredConsent() && dormitoryRoom != null;
     }
 }

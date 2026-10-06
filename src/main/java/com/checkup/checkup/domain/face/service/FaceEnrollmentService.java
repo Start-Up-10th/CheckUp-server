@@ -18,7 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-/** Verifies the session owner and consent before sending raw video to AI. */
+/** 원본 영상을 AI로 보내기 전에 로그인 회원과 동의 여부를 확인한다. */
 @Service
 @RequiredArgsConstructor
 public class FaceEnrollmentService {
@@ -50,7 +50,7 @@ public class FaceEnrollmentService {
             }
 
             MediaType mediaType = mediaType(contentType);
-            // Network call occurs before the short insert transaction. A unique DB constraint closes races.
+            // AI 네트워크 호출은 짧은 저장 트랜잭션보다 먼저 한다. 동시 요청 경합은 DB unique 제약이 막는다.
             AiFaceEnrollmentResponse extracted = aiFaceClient.extract(rawVideo, mediaType);
             validate(extracted);
             String vectorsJson;

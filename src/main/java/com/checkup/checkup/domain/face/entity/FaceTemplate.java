@@ -18,7 +18,7 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.Instant;
 
-/** Persistent representative vectors and the model metadata needed to interpret them. */
+/** 저장하는 대표 얼굴 벡터와, 그 벡터를 해석하는 데 필요한 모델 정보. */
 @Getter
 @Entity
 @Table(name = "face_template")

@@ -1,13 +1,12 @@
 package com.checkup.checkup.domain.user.serivce;
 
 import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
-import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
@@ -16,6 +15,7 @@ import team.themoment.datagsm.sdk.openapi.model.Student;
 
 /**
  * DataGSM OpenAPI로 학생 정보를 조회한다. 관리자와 본인만 조회할 수 있다.
+ * 권한은 캐시보다 먼저 검사하고, 조회 결과만 {@link UserSearchCache}에 짧게 보관한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,7 +23,8 @@ public class UserSearchService {
 
     private final DataGsmOpenApiClient dataGsmOpenApiClient;
     private final MemberService memberService;
-    private final StudentRepository studentRepository;
+    private final UserAccessVerifier userAccessVerifier;
+    private final UserSearchCache userSearchCache;
 
     /**
      * @param memberId  세션의 로그인 회원 id
@@ -35,7 +36,12 @@ public class UserSearchService {
      */
     public UserSearchResponse findUser(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
-        verifyAccess(requester, studentId);
+        userAccessVerifier.verify(requester, studentId);
+
+        Optional<UserSearchResponse> cached = userSearchCache.get(studentId);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
 
         Student student;
         try {
@@ -46,19 +52,9 @@ public class UserSearchService {
         if (student == null) {
             throw new CustomException(ErrorCode.STUDENT_NOT_FOUND);
         }
-        return UserSearchResponse.from(student);
-    }
-
-    private void verifyAccess(Member requester, Long studentId) {
-        if (requester.getRole() == MemberRole.ADMIN) {
-            return;
-        }
-        boolean self = studentRepository.findByMember(requester)
-                .map(s -> studentId.equals(s.getDatagsmStudentId()))
-                .orElse(false);
-        if (!self) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
+        UserSearchResponse response = UserSearchResponse.from(student);
+        userSearchCache.put(studentId, response);
+        return response;
     }
 
 }

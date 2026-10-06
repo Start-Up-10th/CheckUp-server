@@ -4,15 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
+import com.checkup.checkup.domain.face.entity.FaceRecognitionResult;
 import com.checkup.checkup.domain.face.ai.AiFaceClient;
 import com.checkup.checkup.domain.face.ai.AiFaceException;
 import com.checkup.checkup.domain.face.ai.AiFaceFrameResponse;
@@ -49,6 +52,7 @@ class FaceRecognitionServiceTest {
     private final AiFaceClient aiFaceClient = mock(AiFaceClient.class);
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final AttendanceService attendanceService = mock(AttendanceService.class);
+    private final FaceRecognitionLogService logService = mock(FaceRecognitionLogService.class);
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final MutableClock clock = new MutableClock(NOW);
     private final FaceProperties properties = new FaceProperties(
@@ -56,7 +60,7 @@ class FaceRecognitionServiceTest {
             1024, 512, Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
     private final FaceRecognitionService service = new FaceRecognitionService(
             templateRepository, sessionStore, aiFaceClient, studentRepository,
-            attendanceService, adminVerifier, properties,
+            attendanceService, logService, adminVerifier, properties,
             tools.jackson.databind.json.JsonMapper.builder().build(), clock);
 
     @Test
@@ -74,6 +78,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
@@ -102,6 +107,7 @@ class FaceRecognitionServiceTest {
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(777L))).willReturn(1L);
 
@@ -164,6 +170,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.hasRequiredConsent()).willReturn(true);
         FaceTemplate template = mock(FaceTemplate.class);
         given(template.getStudent()).willReturn(student);
@@ -198,6 +205,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.hasRequiredConsent()).willReturn(true);
         FaceTemplate template = mock(FaceTemplate.class);
         given(template.getStudent()).willReturn(student);
@@ -249,6 +257,99 @@ class FaceRecognitionServiceTest {
         verify(studentRepository).countByIdInAndDormitoryRoomIsNotNull(candidates);
         verify(sessionStore).markInactive(SESSION_ID, ADMIN_ID);
         verify(aiFaceClient, never()).recognize(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("알아보고 출석 처리한 얼굴은 최근 인식에 학생과 함께 SUCCESS로 남긴다")
+    void recordedFaceIsLoggedAsSuccess() {
+        FaceSessionView session = givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.RECORDED);
+
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        verify(logService).record(session, "track-1", FaceRecognitionResult.SUCCESS, STUDENT_DB_ID, NOW);
+    }
+
+    @Test
+    @DisplayName("알아봤지만 늦게 도착해 출석 처리되지 않은 얼굴은 학생과 함께 FAILED로 남긴다")
+    void staleFaceIsLoggedAsFailed() {
+        FaceSessionView session = givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.STALE);
+
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        verify(logService).record(session, "track-1", FaceRecognitionResult.FAILED, STUDENT_DB_ID, NOW);
+    }
+
+    @Test
+    @DisplayName("이미 출석한 학생은 최근 인식에 남기지 않는다")
+    void duplicateFaceIsNotLogged() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
+
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        verifyNoInteractions(logService);
+    }
+
+    @Test
+    @DisplayName("못 알아본 얼굴은 AI가 QR을 안내할 때만 학생 없이 FAILED로 남긴다")
+    void unknownFaceIsLoggedOnlyWhenQrRecommended() {
+        FaceSessionView session = givenFrame(frame("UNKNOWN", null));
+
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+        verifyNoInteractions(logService);
+
+        given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
+                .willReturn(new AiFaceFrameResponse("frame-1", List.of(qrRecommendedFace())));
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        verify(logService).record(session, "track-1", FaceRecognitionResult.FAILED, null, NOW);
+    }
+
+    @Test
+    @DisplayName("최근 인식 기록에 실패해도 인식·출석 응답은 그대로 돌려준다")
+    void logFailureDoesNotBreakRecognition() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.RECORDED);
+        willThrow(new IllegalStateException("db down")).given(logService).record(any(), any(), any(), any(), any());
+
+        var response = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        assertThat(response.faces().getFirst().recognition().attendance()).isEqualTo("RECORDED");
+    }
+
+    /** 현재 세션 후보가 학생 한 명이고, 프레임을 보내면 AI가 주어진 결과를 돌려주게 한다. */
+    private FaceSessionView givenFrame(AiFaceFrameResponse frame) {
+        FaceSessionView session = session(Set.of(STUDENT_DB_ID));
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(session);
+        given(sessionStore.claimFrame(eq(SESSION_ID), eq(ADMIN_ID), any(), any(), any(), any())).willReturn(true);
+        given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
+        given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any())).willReturn(frame);
+        return session;
+    }
+
+    private void givenEligibleStudent() {
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(STUDENT_DB_ID);
+        given(student.isAttendanceEligible()).willReturn(true);
+        given(student.getName()).willReturn("Student Name");
+        given(student.getStudentNumber()).willReturn(15);
+        given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
+    }
+
+    private static AiFaceFrameResponse.FaceResult qrRecommendedFace() {
+        return new AiFaceFrameResponse.FaceResult("track-1", List.of(0.1, 0.2, 0.3, 0.4),
+                List.of(List.of(0.2, 0.3)), new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("UNKNOWN", null, 0.31, 0.02), 3, true);
     }
 
     private static FaceSessionView session(Set<Long> candidates) {

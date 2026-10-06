@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Spring-owned mapping between an attendance page and its separate AI session id. */
+/** 출석 페이지와 그 페이지의 AI 세션 id를 잇는, Spring이 관리하는 매핑이다. */
 @Getter
 @Entity
 @Table(name = "face_recognition_session")

@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.Arrays;
 import java.util.UUID;
 
-/** Administrator camera endpoints. Browser SESSION is never forwarded to FastAPI. */
+/** 관리자 카메라 API. 브라우저 SESSION 쿠키는 FastAPI로 절대 넘기지 않는다. */
 @Tag(name = "얼굴 인식(관리자 카메라)", description = "관리자 카메라 화면의 얼굴 인식 세션. 브라우저 SESSION은 얼굴 인식 서버로 넘기지 않는다.")
 @RestController
 @RequestMapping("/api/v1/face/sessions")

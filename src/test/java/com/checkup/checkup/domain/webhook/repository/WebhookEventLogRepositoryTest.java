@@ -42,4 +42,19 @@ class WebhookEventLogRepositoryTest {
         assertThat(webhookEventLogRepository.findById("evt_dup"))
                 .hasValueSatisfying(log -> assertThat(log.getReceivedAt()).isEqualTo(RECEIVED_AT));
     }
+
+    @Test
+    @DisplayName("기준 시각보다 먼저 받은 기록만 지우고 기준 시각과 같거나 나중 기록은 남긴다")
+    void deleteReceivedBeforeKeepsBoundary() {
+        webhookEventLogRepository.record("evt_old", RECEIVED_AT.minusMillis(1));
+        webhookEventLogRepository.record("evt_boundary", RECEIVED_AT);
+        webhookEventLogRepository.record("evt_new", RECEIVED_AT.plusSeconds(1));
+
+        int deleted = webhookEventLogRepository.deleteReceivedBefore(RECEIVED_AT);
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(webhookEventLogRepository.findById("evt_old")).isEmpty();
+        assertThat(webhookEventLogRepository.findById("evt_boundary")).isPresent();
+        assertThat(webhookEventLogRepository.findById("evt_new")).isPresent();
+    }
 }

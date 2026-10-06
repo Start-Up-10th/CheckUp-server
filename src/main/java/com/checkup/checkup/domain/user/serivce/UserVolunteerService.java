@@ -1,7 +1,6 @@
 package com.checkup.checkup.domain.user.serivce;
 
 import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
@@ -24,6 +23,7 @@ public class UserVolunteerService {
 
     private final MemberService memberService;
     private final StudentRepository studentRepository;
+    private final UserAccessVerifier userAccessVerifier;
     private final VolunteerDutyRepository volunteerDutyRepository;
 
     /**
@@ -34,7 +34,7 @@ public class UserVolunteerService {
     @Transactional(readOnly = true)
     public UserVolunteerResponse findVolunteer(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
-        verifyAccess(requester, studentId);
+        userAccessVerifier.verify(requester, studentId);
 
         Student student = studentRepository.findByDatagsmStudentId(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
@@ -51,7 +51,7 @@ public class UserVolunteerService {
     @Transactional(readOnly = true)
     public UserVolunteerHistoryResponse findVolunteerHistory(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
-        verifyAccess(requester, studentId);
+        userAccessVerifier.verify(requester, studentId);
 
         Student student = studentRepository.findByDatagsmStudentId(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
@@ -62,15 +62,4 @@ public class UserVolunteerService {
                 .toList());
     }
 
-    private void verifyAccess(Member requester, Long studentId) {
-        if (requester.getRole() == MemberRole.ADMIN) {
-            return;
-        }
-        boolean self = studentRepository.findByMember(requester)
-                .map(s -> studentId.equals(s.getDatagsmStudentId()))
-                .orElse(false);
-        if (!self) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
-    }
 }

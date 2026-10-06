@@ -59,6 +59,9 @@ public class AttendanceService {
      * @param verifiedAt 인증이 발생한 시각
      * @param method     인증 방식
      * @return 기록 결과
+     * @throws CustomException 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404), 필수 동의가 없거나 호실이 없으면
+     *                         {@link ErrorCode#FORBIDDEN}(403). QR·얼굴 경로가 먼저 걸러내지만 이 서비스를 직접 부르는
+     *                         다른 경로도 동의·호실 없는 학생을 기록하지 못하게 하는 마지막 방어선이다.
      */
     @Transactional
     public AttendanceRecordResult markAttended(
@@ -77,6 +80,8 @@ public class AttendanceService {
             return AttendanceRecordResult.STALE;
         }
 
+        verifyEligible(studentId);
+
         int changed = attendanceRepository.markAttended(
                 studentId, purpose.name(), operatingDay, recordedAt, method.name());
         if (changed == 1) {
@@ -91,12 +96,21 @@ public class AttendanceService {
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
     }
 
+    private void verifyEligible(Long studentId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        if (!student.isAttendanceEligible()) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+    }
+
     /**
      * 관리자가 고른 학생별 출석 상태를 오늘 운영일에 저장한다(REQ-ATT-006).
      *
      * 상태가 실제로 바뀌는 학생만 수정하고 수정 시각을 남긴다. 이미 같은 상태인 학생은 건드리지 않아,
      * 관리자가 바꾸지 않은 학생의 늦은 인증까지 막지 않는다(DEC-008).
      * 수동으로 새로 출석이 된 학생에게는 자동 인증과 같이 출석 완료 알림을 만든다. 같은 용도·운영일의 알림은 하나다.
+     * 출석에서 미출석으로 실제로 바뀐 학생은 같은 용도·운영일의 출석 완료 알림을 지운다(#148). 다시 출석으로 바꾸면 새로 만든다.
      * 여러 관리자가 동시에 저장해도 서로 기다리다 멈추지 않도록 학생 id 순서로 처리한다.
      *
      * @param attendedByStudentId 학생 id별 출석 여부. 출석이면 true
@@ -106,9 +120,12 @@ public class AttendanceService {
     public void saveManually(Map<Long, Boolean> attendedByStudentId, AttendancePurpose purpose) {
         Instant now = clock.instant();
         LocalDate operatingDay = operatingDayCalculator.of(now);
+        String sourceKey = purpose.name() + ":" + operatingDay;
         new TreeMap<>(attendedByStudentId).forEach((studentId, attended) -> {
             if (!attended) {
-                attendanceRepository.markManuallyAbsent(studentId, purpose.name(), operatingDay, now);
+                if (attendanceRepository.markManuallyAbsent(studentId, purpose.name(), operatingDay, now) == 1) {
+                    notificationService.delete(studentId, NotificationType.ATTENDANCE, sourceKey);
+                }
                 return;
             }
             int changed = attendanceRepository.markManuallyAttended(studentId, purpose.name(), operatingDay, now);
@@ -116,7 +133,7 @@ public class AttendanceService {
                 notificationService.create(
                         studentId,
                         NotificationType.ATTENDANCE,
-                        purpose.name() + ":" + operatingDay,
+                        sourceKey,
                         attendanceMessage(purpose));
             }
         });

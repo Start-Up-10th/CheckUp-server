@@ -44,7 +44,7 @@ public class RoomService {
      * @param memberId 세션의 현재 회원 id
      * @param dormitoryRoom 조회할 호실 번호
      * @param purpose 출석 여부를 볼 용도(기숙사 입소·자습실). 용도가 다르면 출석을 따로 본다(REQ-ATT-001)
-     * @return 이름·학번 순으로 정렬된 호실 학생 명단
+     * @return 이름(가나다)·학번 순으로 정렬된 호실 학생 명단. 관리자가 빈 호실을 조회하면 빈 목록이다(#151)
      */
     @Transactional(readOnly = true)
     public List<RoomStudentResponse> getStudents(Long memberId, Integer dormitoryRoom, AttendancePurpose purpose) {
@@ -59,10 +59,12 @@ public class RoomService {
             }
         }
 
-        List<Student> students = studentRepository
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(dormitoryRoom);
+        List<Student> students = studentRepository.findAllByDormitoryRoom(dormitoryRoom).stream()
+                .sorted(Student.NAME_ORDER)
+                .toList();
         if (students.isEmpty()) {
-            throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
+            // 학생 본인 호실은 본인이 있어 비지 않는다. 빈 호실은 권한 문제가 아니므로 관리자에게 빈 목록으로 응답한다.
+            return List.of();
         }
 
         Set<Long> attended = new HashSet<>(attendanceRepository.findAttendedStudentIds(
@@ -108,7 +110,7 @@ public class RoomService {
         adminVerifier.verify(memberId);
 
         Map<Long, Long> roomStudentIds = new HashMap<>();
-        for (Student student : studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(dormitoryRoom)) {
+        for (Student student : studentRepository.findAllByDormitoryRoom(dormitoryRoom)) {
             if (student.getDatagsmStudentId() != null) {
                 roomStudentIds.put(student.getDatagsmStudentId(), student.getId());
             }

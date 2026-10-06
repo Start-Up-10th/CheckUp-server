@@ -1,7 +1,10 @@
 package com.checkup.checkup.domain.qr.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -26,6 +29,7 @@ import com.checkup.checkup.domain.qr.entity.QrScanResult;
 import com.checkup.checkup.domain.qr.service.QrScanService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import com.checkup.checkup.global.ratelimit.RateLimiter;
 import com.checkup.checkup.global.security.SecurityConfig;
 
 /**
@@ -40,6 +44,9 @@ class QrScanControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private RateLimiter rateLimiter;
 
     @MockitoBean
     private QrScanService qrScanService;
@@ -82,6 +89,48 @@ class QrScanControllerTest {
                 .andExpect(status().isOk());
 
         verify(qrScanService).scan(STUDENT_ID, TOKEN);
+    }
+
+    @Test
+    @DisplayName("호출 한도를 넘으면 429이고 출석을 처리하지 않는다")
+    void overRateLimitReturnsTooManyRequests() throws Exception {
+        doThrow(new CustomException(ErrorCode.TOO_MANY_REQUESTS))
+                .when(rateLimiter).check(eq("qr-scan"), eq(STUDENT_ID), anyInt(), any());
+
+        mockMvc.perform(post("/api/v1/qr/attendance")
+                        .with(loginAs(STUDENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + TOKEN + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_REQUESTS"));
+
+        verify(qrScanService, never()).scan(any(), any());
+    }
+
+    @Test
+    @DisplayName("필수 동의가 없으면 403 FACE_CONSENT_REQUIRED다")
+    void withoutConsentReturnsForbidden() throws Exception {
+        given(qrScanService.scan(STUDENT_ID, TOKEN)).willThrow(new CustomException(ErrorCode.FACE_CONSENT_REQUIRED));
+
+        mockMvc.perform(post("/api/v1/qr/attendance")
+                        .with(loginAs(STUDENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + TOKEN + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FACE_CONSENT_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("호실이 없으면 403 ROOM_NOT_ASSIGNED다")
+    void withoutRoomReturnsForbidden() throws Exception {
+        given(qrScanService.scan(STUDENT_ID, TOKEN)).willThrow(new CustomException(ErrorCode.ROOM_NOT_ASSIGNED));
+
+        mockMvc.perform(post("/api/v1/qr/attendance")
+                        .with(loginAs(STUDENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + TOKEN + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROOM_NOT_ASSIGNED"));
     }
 
     @Test

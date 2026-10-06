@@ -40,7 +40,7 @@ public class RoomController {
      * @param purpose 출석 여부를 볼 용도. 없으면 기숙사 입소(DORMITORY)다
      * @return 해당 호실의 학생 명단
      */
-    @Operation(summary = "호실 학생 명단", description = "관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있다. attended는 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 여부다.")
+    @Operation(summary = "호실 학생 명단", description = "관리자는 모든 호실, 학생은 본인 호실만 조회할 수 있다. attended는 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 여부다. 학생이 없는 호실은 빈 배열이다.")
     @GetMapping("/student")
     public List<RoomStudentResponse> getStudents(
             @AuthenticationPrincipal Long memberId,

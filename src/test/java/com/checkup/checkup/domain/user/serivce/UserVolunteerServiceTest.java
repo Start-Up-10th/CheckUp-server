@@ -54,7 +54,8 @@ class UserVolunteerServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserVolunteerService(memberService, studentRepository, volunteerDutyRepository);
+        service = new UserVolunteerService(memberService, studentRepository,
+                new UserAccessVerifier(studentRepository), volunteerDutyRepository);
     }
 
     @Test

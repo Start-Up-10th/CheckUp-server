@@ -13,6 +13,7 @@ import com.checkup.checkup.domain.face.ai.AiFaceSessionRequest;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.domain.face.dto.FaceFrameResponse;
 import com.checkup.checkup.domain.face.dto.FaceSessionResponse;
+import com.checkup.checkup.domain.face.entity.FaceRecognitionResult;
 import com.checkup.checkup.domain.face.entity.FaceTemplate;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -38,7 +39,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 
-/** Starts AI sessions, rate limits camera frames, and authorizes face matches before attendance. */
+/** AI 세션을 시작하고, 카메라 프레임 속도를 제한하며, 출석 전에 얼굴 일치 결과를 검증한다. */
 @Slf4j
 @Service
 public class FaceRecognitionService {
@@ -50,6 +51,7 @@ public class FaceRecognitionService {
     private final AiFaceClient aiFaceClient;
     private final StudentRepository studentRepository;
     private final AttendanceService attendanceService;
+    private final FaceRecognitionLogService faceRecognitionLogService;
     private final AdminVerifier adminVerifier;
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
@@ -62,6 +64,7 @@ public class FaceRecognitionService {
             AiFaceClient aiFaceClient,
             StudentRepository studentRepository,
             AttendanceService attendanceService,
+            FaceRecognitionLogService faceRecognitionLogService,
             AdminVerifier adminVerifier,
             FaceProperties properties,
             ObjectMapper objectMapper,
@@ -72,6 +75,7 @@ public class FaceRecognitionService {
         this.aiFaceClient = aiFaceClient;
         this.studentRepository = studentRepository;
         this.attendanceService = attendanceService;
+        this.faceRecognitionLogService = faceRecognitionLogService;
         this.adminVerifier = adminVerifier;
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -91,7 +95,7 @@ public class FaceRecognitionService {
         AiFaceSessionRequest request = sessionRequest(templates);
         UUID sessionId = UUID.randomUUID();
         Instant now = clock.instant();
-        // Persist ownership before contacting AI so failed remote cleanup remains retryable.
+        // AI를 부르기 전에 세션 소유 정보를 먼저 저장한다. 그래야 AI 쪽 정리가 실패해도 다시 시도할 수 있다.
         faceSessionStore.create(sessionId, adminMemberId, purpose,
                 templates.stream().map(template -> template.getStudent().getId()).toList(),
                 now, now.minus(properties.minFrameInterval()));
@@ -158,7 +162,7 @@ public class FaceRecognitionService {
                 if (e.getStatus() != 404 || !"frame".equals(e.getOperation())) {
                     throw e;
                 }
-                // Contract says 404 means session absent, so this frame was not processed; recreate and retry once.
+                // 계약상 404는 AI 세션이 없다는 뜻이라 이 프레임은 처리되지 않았다. 세션을 다시 만들고 한 번만 재시도한다.
                 try {
                     Instant recoveryUntil = clock.instant().plus(properties.frameRecoveryLease());
                     if (!faceSessionStore.extendFrame(sessionId, adminMemberId, frameLockToken,
@@ -200,7 +204,7 @@ public class FaceRecognitionService {
                 try {
                     faceSessionStore.releaseFrame(sessionId, adminMemberId, frameLockToken, clock.instant());
                 } catch (RuntimeException e) {
-                    // The lease expires after the configured AI request timeout if release cannot reach the DB.
+                    // DB에 닿지 못해 잠금을 풀지 못해도, 설정한 AI 요청 시간이 지나면 잠금이 저절로 풀린다.
                     log.warn("Face frame lock release failed: reason={}", e.getClass().getSimpleName());
                 }
             }
@@ -211,7 +215,7 @@ public class FaceRecognitionService {
         }
     }
 
-    /** Idempotent browser close; remote deletion is retried if the DB mapping remains. */
+    /** 브라우저의 세션 종료. 여러 번 불러도 같다. DB 매핑이 남아 있으면 AI 쪽 삭제를 다시 시도한다. */
     public void close(Long adminMemberId, UUID sessionId) {
         adminVerifier.verify(adminMemberId);
         faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwned);
@@ -252,16 +256,29 @@ public class FaceRecognitionService {
                     : studentRepository.findByDatagsmStudentId(dataGsmStudentId);
             if (student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
-                    && student.get().getDormitoryRoom() != null) {
+                    && student.get().isAttendanceEligible()) {
                 studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttended(
                         student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
+                switch (attendance) {
+                    case "RECORDED" -> recordQuietly(session, face.trackId(), FaceRecognitionResult.SUCCESS,
+                            student.get().getId(), verifiedAt);
+                    case "STALE", "REJECTED" -> recordQuietly(session, face.trackId(), FaceRecognitionResult.FAILED,
+                            student.get().getId(), verifiedAt);
+                    default -> {
+                        // 이미 출석한 학생(DUPLICATE)은 최근 인식에 남기지 않는다.
+                    }
+                }
             } else {
-                // Never let AI nominate a student outside the Spring-owned, current session target list.
+                // Spring이 관리하는 현재 세션 후보 목록 밖의 학생을 AI가 지목해도 절대 출석으로 인정하지 않는다.
                 status = "UNKNOWN";
             }
+        }
+        if (attendance == null && face.qrRecommended()) {
+            // 못 알아본 얼굴은 AI가 QR을 안내할 때만 한 줄 남기고, 다른 학생의 이름을 만들지 않는다.
+            recordQuietly(session, face.trackId(), FaceRecognitionResult.FAILED, null, verifiedAt);
         }
 
         AiFaceFrameResponse.Quality quality = face.quality();
@@ -269,6 +286,18 @@ public class FaceRecognitionService {
                 new FaceFrameResponse.Quality(quality.brightness(), quality.sharpness(), quality.issues()),
                 new FaceFrameResponse.Recognition(status, studentName, studentNumber, attendance),
                 face.attempts(), face.qrRecommended());
+    }
+
+    /**
+     * 최근 인식 기록을 남긴다(#143). 기록은 화면 편의용이라 실패해도 인식·출석 응답은 그대로 돌려준다.
+     */
+    private void recordQuietly(FaceSessionView session, String trackId, FaceRecognitionResult result,
+                               Long studentId, Instant recognizedAt) {
+        try {
+            faceRecognitionLogService.record(session, trackId, result, studentId, recognizedAt);
+        } catch (RuntimeException e) {
+            log.warn("Face recognition log failed: reason={}", e.getClass().getSimpleName());
+        }
     }
 
     private static void validateFace(AiFaceFrameResponse.FaceResult face) {
@@ -343,7 +372,7 @@ public class FaceRecognitionService {
     }
 
     private static boolean eligibleStudent(Student student) {
-        return student.hasRequiredConsent() && student.getDormitoryRoom() != null
+        return student.isAttendanceEligible()
                 && student.getDatagsmStudentId() != null && student.getDatagsmStudentId() > 0;
     }
 

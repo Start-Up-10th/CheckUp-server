@@ -26,7 +26,7 @@ public class MemberService {
      * DataGSM 사용자 정보로 회원을 저장하거나 갱신한다. 학생이면 학생 정보도 함께 저장·갱신한다.
      *
      * 학생은 계정으로 먼저 찾고, 없으면 동기화로 미리 저장된 학생을 DataGSM 학생 id로 찾아 계정을 연결한다.
-     * 둘 다 없을 때만 새로 저장한다.
+     * 둘 다 없을 때만 새로 저장하고 계정을 연결한다.
      *
      * @param userInfo DataGSM 사용자 정보
      * @param role     판정된 역할
@@ -44,33 +44,40 @@ public class MemberService {
         member.update(name, role);
 
         if (dataGsmStudent != null) {
-            studentRepository.findByMember(member)
-                    .or(() -> studentRepository.findByDatagsmStudentId(dataGsmStudent.getId()))
-                    .ifPresentOrElse(
-                        student -> {
-                            student.linkMember(member);
-                            student.update(
-                                    dataGsmStudent.getId(),
-                                    name,
-                                    dataGsmStudent.getGrade(),
-                                    dataGsmStudent.getClassNum(),
-                                    dataGsmStudent.getNumber(),
-                                    dataGsmStudent.getStudentNumber(),
-                                    dataGsmStudent.getDormitoryRoom());
-                        },
-                        () -> studentRepository.save(Student.create(
-                                member,
-                                dataGsmStudent.getId(),
-                                name,
-                                dataGsmStudent.getGrade(),
-                                dataGsmStudent.getClassNum(),
-                                dataGsmStudent.getNumber(),
-                                dataGsmStudent.getStudentNumber(),
-                                dataGsmStudent.getDormitoryRoom()))
-                    );
+            Student student = studentRepository.findByMember(member)
+                    .orElseGet(() -> findOrInsert(dataGsmStudent, name));
+            student.linkMember(member);
+            student.update(
+                    dataGsmStudent.getId(),
+                    name,
+                    dataGsmStudent.getGrade(),
+                    dataGsmStudent.getClassNum(),
+                    dataGsmStudent.getNumber(),
+                    dataGsmStudent.getStudentNumber(),
+                    dataGsmStudent.getDormitoryRoom());
         }
 
         return member;
+    }
+
+    /**
+     * 동기화로 미리 저장된 학생을 DataGSM 학생 id로 찾고, 없으면 로그인 계정 없이 새로 저장한 뒤 다시 찾는다.
+     * 같은 학생을 동기화가 동시에 저장해도 {@link StudentRepository#insertIfAbsent}가 건너뛰므로 unique 충돌이 나지 않는다(#152).
+     */
+    private Student findOrInsert(team.themoment.datagsm.sdk.oauth.model.Student dataGsmStudent, String name) {
+        return studentRepository.findByDatagsmStudentId(dataGsmStudent.getId())
+                .orElseGet(() -> {
+                    studentRepository.insertIfAbsent(
+                            dataGsmStudent.getId(),
+                            name,
+                            dataGsmStudent.getGrade(),
+                            dataGsmStudent.getClassNum(),
+                            dataGsmStudent.getNumber(),
+                            dataGsmStudent.getStudentNumber(),
+                            dataGsmStudent.getDormitoryRoom(),
+                            null);
+                    return studentRepository.findByDatagsmStudentId(dataGsmStudent.getId()).orElseThrow();
+                });
     }
 
     /**

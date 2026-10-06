@@ -6,7 +6,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.LogoutSuccessEvent;
 import org.springframework.stereotype.Component;
 
-/** Ends camera sessions operated by the logged-out administrator. */
+/** 로그아웃한 관리자가 운영하던 카메라 세션을 끝낸다. */
 @Component
 @RequiredArgsConstructor
 @Slf4j

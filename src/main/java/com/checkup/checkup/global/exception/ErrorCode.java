@@ -13,8 +13,10 @@ public enum ErrorCode {
 
     // 공통
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+    INVALID_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 출처의 요청입니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로를 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메서드입니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다."),
@@ -23,6 +25,7 @@ public enum ErrorCode {
     INVALID_OAUTH_STATE(HttpStatus.BAD_REQUEST, "state가 유효하지 않거나 만료되었습니다."),
     INACTIVE_ACCOUNT(HttpStatus.FORBIDDEN, "올바르지 않은 계정 상태입니다."),
     MISSING_STUDENT_INFO(HttpStatus.FORBIDDEN, "학생 정보가 없습니다."),
+    ROOM_NOT_ASSIGNED(HttpStatus.FORBIDDEN, "기숙사 호실이 배정되지 않았습니다."),
     UNSUPPORTED_ACCOUNT(HttpStatus.FORBIDDEN, "이용 권한이 없는 계정입니다."),
     MEMBER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있습니다."),

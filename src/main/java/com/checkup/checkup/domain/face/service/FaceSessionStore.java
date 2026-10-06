@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Short DB-only transactions for Spring's recognition-session ownership and target list. */
+/** 인식 세션 소유 정보와 후보 목록을 다루는 짧은 DB 전용 트랜잭션. */
 @Service
 @RequiredArgsConstructor
 public class FaceSessionStore {

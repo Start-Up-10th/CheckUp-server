@@ -83,7 +83,7 @@ class RoomServiceTest {
         Member admin = Member.create(10L, "사감", MemberRole.ADMIN);
         Student rosterStudent = student(20L, "학생", 1101, ROOM);
         given(memberService.getById(ADMIN_ID)).willReturn(admin);
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(rosterStudent));
 
         given(operatingDayCalculator.today()).willReturn(TODAY);
@@ -102,7 +102,7 @@ class RoomServiceTest {
         Student roommate = student(21L, "룸메이트", 1102, ROOM);
         given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
         given(studentRepository.findByMember(currentMember)).willReturn(Optional.of(currentStudent));
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(roommate, currentStudent));
 
         given(operatingDayCalculator.today()).willReturn(TODAY);
@@ -125,7 +125,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(401);
+                .findAllByDormitoryRoom(401);
     }
 
     @Test
@@ -140,7 +140,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM);
+                .findAllByDormitoryRoom(ROOM);
     }
 
     @Test
@@ -157,15 +157,14 @@ class RoomServiceTest {
     }
 
     @Test
-    @DisplayName("조회한 호실에 학생이 없으면 403을 반환한다")
-    void emptyRoomReturnsForbidden() {
+    @DisplayName("관리자가 학생이 없는 호실을 조회하면 빈 목록을 반환하고 출석을 조회하지 않는다")
+    void emptyRoomReturnsEmptyListForAdmin() {
         given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of());
 
-        assertThatThrownBy(() -> roomService.getStudents(ADMIN_ID, ROOM, DORMITORY))
-                .isInstanceOfSatisfying(CustomException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
+        assertThat(roomService.getStudents(ADMIN_ID, ROOM, DORMITORY)).isEmpty();
+        verifyNoInteractions(attendanceRepository);
     }
 
     @Test
@@ -179,7 +178,7 @@ class RoomServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND));
 
         verify(studentRepository, never())
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM);
+                .findAllByDormitoryRoom(ROOM);
     }
 
     @Test
@@ -189,7 +188,7 @@ class RoomServiceTest {
         Student attendedStudent = withId(student(20L, "출석", 1101, ROOM), 100L);
         Student absentStudent = withId(student(21L, "미출석", 1102, ROOM), 101L);
         given(memberService.getById(ADMIN_ID)).willReturn(admin);
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(absentStudent, attendedStudent));
         given(operatingDayCalculator.today()).willReturn(TODAY);
         given(attendanceRepository.findAttendedStudentIds(List.of(101L, 100L), AttendancePurpose.STUDY_ROOM, TODAY))
@@ -242,7 +241,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("수동 출석 저장은 요청의 DataGSM 학생 id를 그 호실 학생으로 바꿔 용도와 함께 저장한다")
     void savesManualAttendanceForRoomStudents() {
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(
                         withId(student(20L, "학생", 1101, ROOM), 100L),
                         withId(student(21L, "룸메이트", 1102, ROOM), 101L)));
@@ -255,7 +254,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("그 호실 학생이 아닌 학생이 섞여 있으면 STUDENT_NOT_IN_ROOM이고 아무것도 저장하지 않는다")
     void manualAttendanceForOtherRoomStudentSavesNothing() {
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(withId(student(20L, "학생", 1101, ROOM), 100L)));
 
         assertThatThrownBy(() -> roomService.saveAttendance(
@@ -269,7 +268,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("같은 학생이 요청에 두 번 있으면 INVALID_REQUEST이고 아무것도 저장하지 않는다")
     void manualAttendanceWithDuplicateStudentSavesNothing() {
-        given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
+        given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(withId(student(20L, "학생", 1101, ROOM), 100L)));
 
         assertThatThrownBy(() -> roomService.saveAttendance(
@@ -322,6 +321,26 @@ class RoomServiceTest {
     private static Student withId(Student student, long id) {
         ReflectionTestUtils.setField(student, "id", id);
         return student;
+    }
+
+    @Test
+    @DisplayName("호실 명단은 DB가 돌려준 순서와 상관없이 이름 가나다순, 같은 이름은 학번순이다")
+    void studentsAreSortedInKoreanOrder() {
+        given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
+        given(studentRepository.findAllByDormitoryRoom(ROOM)).willReturn(List.of(
+                student(31L, "홍길동", 1102, ROOM),
+                student(32L, "계정", 1103, ROOM),
+                student(33L, "김", 1104, ROOM),
+                student(34L, "홍길동", 1101, ROOM),
+                student(35L, "강학생", 1105, ROOM)));
+        given(operatingDayCalculator.today()).willReturn(TODAY);
+
+        List<RoomStudentResponse> response = roomService.getStudents(ADMIN_ID, ROOM, DORMITORY);
+
+        assertThat(response).extracting(RoomStudentResponse::studentName)
+                .containsExactly("강학생", "계정", "김", "홍길동", "홍길동");
+        assertThat(response).extracting(RoomStudentResponse::studentNumber)
+                .containsExactly(1105, 1103, 1104, 1101, 1102);
     }
 
     private static Student student(long datagsmId, String name, int studentNumber, Integer dormitoryRoom) {

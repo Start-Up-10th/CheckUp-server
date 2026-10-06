@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.checkup.checkup.domain.member.entity.Member;
@@ -28,7 +29,10 @@ import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
 import team.themoment.datagsm.sdk.openapi.exception.ServerErrorException;
 
+import com.checkup.checkup.support.MutableClock;
 import java.net.SocketTimeoutException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -52,11 +56,15 @@ class UserServiceTest {
     @Mock
     private StudentRepository studentRepository;
 
+    private final MutableClock clock = new MutableClock(Instant.parse("2026-10-06T00:00:00Z"));
+
     private UserSearchService userSearchService;
 
     @BeforeEach
     void setUp() {
-        userSearchService = new UserSearchService(dataGsmOpenApiClient, memberService, studentRepository);
+        userSearchService = new UserSearchService(
+                dataGsmOpenApiClient, memberService, new UserAccessVerifier(studentRepository),
+                new UserSearchCache(clock));
     }
 
     @Test
@@ -159,6 +167,38 @@ class UserServiceTest {
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("TTL 안의 반복 조회는 DataGSM을 한 번만 호출하고 만료되면 다시 호출한다")
+    void repeatedLookupWithinTtlCallsDataGsmOnce() {
+        givenMember(MemberRole.ADMIN);
+        givenDataGsmStudent(sdkStudent());
+
+        userSearchService.findUser(MEMBER_ID, STUDENT_ID);
+        clock.advance(Duration.ofSeconds(59));
+        userSearchService.findUser(MEMBER_ID, STUDENT_ID);
+        verify(studentApi, times(1)).getStudent(STUDENT_ID);
+
+        clock.advance(Duration.ofSeconds(2));
+        userSearchService.findUser(MEMBER_ID, STUDENT_ID);
+        verify(studentApi, times(2)).getStudent(STUDENT_ID);
+    }
+
+    @Test
+    @DisplayName("캐시에 있어도 권한이 없으면 FORBIDDEN이다")
+    void cachedResultIsNotServedWithoutAccess() {
+        Member admin = Member.create(10L, "관리자", MemberRole.ADMIN);
+        Member student = Member.create(11L, "학생", MemberRole.STUDENT);
+        given(memberService.getById(1L)).willReturn(admin);
+        given(memberService.getById(2L)).willReturn(student);
+        givenOwnStudent(student, 999L);
+        givenDataGsmStudent(sdkStudent());
+        userSearchService.findUser(1L, STUDENT_ID);
+
+        assertThatThrownBy(() -> userSearchService.findUser(2L, STUDENT_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
     private Member givenMember(MemberRole role) {
