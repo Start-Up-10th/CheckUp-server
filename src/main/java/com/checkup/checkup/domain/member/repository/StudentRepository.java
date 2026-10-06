@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.member.repository;
 
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.Student;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,33 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     @EntityGraph(attributePaths = "member")
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
+
+    /**
+     * DataGSM 학생 id로 저장된 학생이 없을 때만 로그인 계정 없이 새로 저장한다.
+     * 확인과 저장이 한 문장이라, 첫 로그인과 동기화가 같은 학생을 동시에 저장해도 unique 충돌로 실패하지 않는다.
+     * 다른 트랜잭션이 같은 학생을 저장하는 중이면 그 트랜잭션이 끝날 때까지 기다린 뒤 건너뛴다.
+     * 저장한 학생은 {@link #findByDatagsmStudentId}로 다시 조회해 쓴다.
+     *
+     * @param syncedAt 동기화 기준 시각. 로그인으로 저장하면 {@code null}이다.
+     * @return 새로 저장하면 1, 이미 있으면 0
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO student (datagsm_student_id, name, grade, class_number, number, student_number,
+                                 dormitory_room, datagsm_synced_at)
+            VALUES (:datagsmStudentId, :name, :grade, :classNumber, :number, :studentNumber,
+                    CAST(:dormitoryRoom AS INTEGER), CAST(:syncedAt AS TIMESTAMPTZ))
+            ON CONFLICT (datagsm_student_id) DO NOTHING
+            """, nativeQuery = true)
+    int insertIfAbsent(
+            @Param("datagsmStudentId") Long datagsmStudentId,
+            @Param("name") String name,
+            @Param("grade") Integer grade,
+            @Param("classNumber") Integer classNumber,
+            @Param("number") Integer number,
+            @Param("studentNumber") Integer studentNumber,
+            @Param("dormitoryRoom") Integer dormitoryRoom,
+            @Param("syncedAt") Instant syncedAt);
 
     /**
      * 주어진 학생 id 중 호실이 배정된 학생 수를 쿼리 한 번으로 센다. 얼굴 인식 프레임마다 후보 확인에 쓴다.
