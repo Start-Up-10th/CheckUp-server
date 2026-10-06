@@ -59,6 +59,10 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(Integer dormitoryRoom);
 
+    @EntityGraph(attributePaths = "member")
+    List<Student> findAllByDormitoryRoomAndDatagsmStudentIdIsNotNullOrderByNameAscStudentNumberAscIdAsc(
+            Integer dormitoryRoom);
+
     /**
      * DataGSM 학생 ID로 학생과 회원을 한 번에 조회한다. 일괄 졸업처럼 여러 학생이 한 이벤트로 올 때 쓴다.
      *
