@@ -157,15 +157,14 @@ class RoomServiceTest {
     }
 
     @Test
-    @DisplayName("조회한 호실에 학생이 없으면 403을 반환한다")
-    void emptyRoomReturnsForbidden() {
+    @DisplayName("관리자가 학생이 없는 호실을 조회하면 빈 목록을 반환하고 출석을 조회하지 않는다")
+    void emptyRoomReturnsEmptyListForAdmin() {
         given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
         given(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(ROOM))
                 .willReturn(List.of());
 
-        assertThatThrownBy(() -> roomService.getStudents(ADMIN_ID, ROOM, DORMITORY))
-                .isInstanceOfSatisfying(CustomException.class,
-                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
+        assertThat(roomService.getStudents(ADMIN_ID, ROOM, DORMITORY)).isEmpty();
+        verifyNoInteractions(attendanceRepository);
     }
 
     @Test
