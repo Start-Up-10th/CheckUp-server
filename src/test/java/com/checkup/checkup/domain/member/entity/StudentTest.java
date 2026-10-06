@@ -86,6 +86,22 @@ class StudentTest {
     }
 
     @Test
+    @DisplayName("출석은 필수 동의를 마치고 호실이 있는 학생만 인정한다")
+    void attendanceEligibleNeedsConsentAndRoom() {
+        Instant now = Instant.parse("2026-09-30T00:00:00Z");
+        Student notAgreed = student(301);
+        Student agreed = student(301);
+        agreed.agree(false, now, "v1");
+        Student agreedWithoutRoom = student(301);
+        agreedWithoutRoom.agree(false, now, "v1");
+        agreedWithoutRoom.leaveDormitory();
+
+        assertThat(notAgreed.isAttendanceEligible()).isFalse();
+        assertThat(agreed.isAttendanceEligible()).isTrue();
+        assertThat(agreedWithoutRoom.isAttendanceEligible()).isFalse();
+    }
+
+    @Test
     @DisplayName("다시 동의하면 처음 동의 시각은 유지하고 공지 알림 수신만 바꾼다")
     void agreeAgainKeepsFirstTimeAndUpdatesNoticeAlarm() {
         Student student = student(301);
