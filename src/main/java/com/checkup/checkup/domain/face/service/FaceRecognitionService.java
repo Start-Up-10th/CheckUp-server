@@ -13,6 +13,7 @@ import com.checkup.checkup.domain.face.ai.AiFaceSessionRequest;
 import com.checkup.checkup.domain.face.config.FaceProperties;
 import com.checkup.checkup.domain.face.dto.FaceFrameResponse;
 import com.checkup.checkup.domain.face.dto.FaceSessionResponse;
+import com.checkup.checkup.domain.face.entity.FaceRecognitionResult;
 import com.checkup.checkup.domain.face.entity.FaceTemplate;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -50,6 +51,7 @@ public class FaceRecognitionService {
     private final AiFaceClient aiFaceClient;
     private final StudentRepository studentRepository;
     private final AttendanceService attendanceService;
+    private final FaceRecognitionLogService faceRecognitionLogService;
     private final AdminVerifier adminVerifier;
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
@@ -62,6 +64,7 @@ public class FaceRecognitionService {
             AiFaceClient aiFaceClient,
             StudentRepository studentRepository,
             AttendanceService attendanceService,
+            FaceRecognitionLogService faceRecognitionLogService,
             AdminVerifier adminVerifier,
             FaceProperties properties,
             ObjectMapper objectMapper,
@@ -72,6 +75,7 @@ public class FaceRecognitionService {
         this.aiFaceClient = aiFaceClient;
         this.studentRepository = studentRepository;
         this.attendanceService = attendanceService;
+        this.faceRecognitionLogService = faceRecognitionLogService;
         this.adminVerifier = adminVerifier;
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -258,10 +262,23 @@ public class FaceRecognitionService {
                 AttendanceRecordResult recorded = attendanceService.markAttended(
                         student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
+                switch (attendance) {
+                    case "RECORDED" -> recordQuietly(session, face.trackId(), FaceRecognitionResult.SUCCESS,
+                            student.get().getId(), verifiedAt);
+                    case "STALE", "REJECTED" -> recordQuietly(session, face.trackId(), FaceRecognitionResult.FAILED,
+                            student.get().getId(), verifiedAt);
+                    default -> {
+                        // 이미 출석한 학생(DUPLICATE)은 최근 인식에 남기지 않는다.
+                    }
+                }
             } else {
                 // Spring이 관리하는 현재 세션 후보 목록 밖의 학생을 AI가 지목해도 절대 출석으로 인정하지 않는다.
                 status = "UNKNOWN";
             }
+        }
+        if (attendance == null && face.qrRecommended()) {
+            // 못 알아본 얼굴은 AI가 QR을 안내할 때만 한 줄 남기고, 다른 학생의 이름을 만들지 않는다.
+            recordQuietly(session, face.trackId(), FaceRecognitionResult.FAILED, null, verifiedAt);
         }
 
         AiFaceFrameResponse.Quality quality = face.quality();
@@ -269,6 +286,18 @@ public class FaceRecognitionService {
                 new FaceFrameResponse.Quality(quality.brightness(), quality.sharpness(), quality.issues()),
                 new FaceFrameResponse.Recognition(status, studentName, studentNumber, attendance),
                 face.attempts(), face.qrRecommended());
+    }
+
+    /**
+     * 최근 인식 기록을 남긴다(#143). 기록은 화면 편의용이라 실패해도 인식·출석 응답은 그대로 돌려준다.
+     */
+    private void recordQuietly(FaceSessionView session, String trackId, FaceRecognitionResult result,
+                               Long studentId, Instant recognizedAt) {
+        try {
+            faceRecognitionLogService.record(session, trackId, result, studentId, recognizedAt);
+        } catch (RuntimeException e) {
+            log.warn("Face recognition log failed: reason={}", e.getClass().getSimpleName());
+        }
     }
 
     private static void validateFace(AiFaceFrameResponse.FaceResult face) {

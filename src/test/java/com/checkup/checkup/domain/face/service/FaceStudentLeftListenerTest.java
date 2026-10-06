@@ -80,7 +80,8 @@ class FaceStudentLeftListenerTest {
                 StudentRepository studentRepository
         ) {
             return new FaceRecognitionService(templateRepository, sessionStore, aiFaceClient,
-                    studentRepository, mock(AttendanceService.class), mock(AdminVerifier.class),
+                    studentRepository, mock(AttendanceService.class), mock(FaceRecognitionLogService.class),
+                    mock(AdminVerifier.class),
                     new FaceProperties("http://face-ai.test", "test-token", Duration.ofSeconds(2),
                             Duration.ofSeconds(5), 1024, 512, Duration.ofMillis(200), 2,
                             Duration.ofMinutes(5), 60_000, "v1"),
