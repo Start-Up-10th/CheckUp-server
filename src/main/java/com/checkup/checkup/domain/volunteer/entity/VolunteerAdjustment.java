@@ -34,9 +34,17 @@ public class VolunteerAdjustment {
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
-    /** +1(봉사 추가) 또는 -1(봉사 완료·감면). */
+    /** 실제로 바뀐 횟수. 양수는 봉사 추가, 음수는 봉사 완료·감면이다. 차감은 남은 횟수까지만 하므로 요청보다 작을 수 있다. */
     @Column(nullable = false)
     private short delta;
+
+    /** 관리자가 요청한 횟수(-99~99, 0 제외). 같은 재시도 키가 같은 요청인지 확인할 때 쓴다. */
+    @Column(nullable = false)
+    private short requestedDelta;
+
+    /** 관리자가 남긴 사유. 남기지 않았으면 {@code null}이다. 로그에 남기지 않는다. */
+    @Column(length = 100)
+    private String reason;
 
     /** 웹이 보낸 재시도 방지 키. 보내지 않았으면 {@code null}이다. */
     @Column(length = 100)
