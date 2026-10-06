@@ -3,11 +3,13 @@ package com.checkup.checkup.domain.member.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 학생 엔티티의 층 계산, 호실 비우기, DataGSM 이벤트 순서 판정, 동의 기록 규칙을 검증한다.
+ * 학생 엔티티의 층 계산, 호실 비우기, DataGSM 이벤트 순서 판정, 동의 기록 규칙, 이름 가나다순 정렬(#150)을 검증한다.
  */
 class StudentTest {
 
@@ -119,5 +121,21 @@ class StudentTest {
     private static Student student(Integer dormitoryRoom) {
         return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, "학생", 1, 1, 1, 1101,
                 dormitoryRoom);
+    }
+
+    @Test
+    @DisplayName("이름 정렬은 가나다순이고 같은 이름은 학번순이다")
+    void nameOrderIsKoreanAlphabetical() {
+        List<Student> sorted = Stream.of(
+                        Student.createWithoutMember(1L, "홍길동", 1, 1, 1, 1102, 301),
+                        Student.createWithoutMember(2L, "계정", 1, 1, 1, 1103, 301),
+                        Student.createWithoutMember(3L, "김", 1, 1, 1, 1104, 301),
+                        Student.createWithoutMember(4L, "홍길동", 1, 1, 1, 1101, 301),
+                        Student.createWithoutMember(5L, "강학생", 1, 1, 1, 1105, 301))
+                .sorted(Student.NAME_ORDER)
+                .toList();
+
+        assertThat(sorted).extracting(Student::getName).containsExactly("강학생", "계정", "김", "홍길동", "홍길동");
+        assertThat(sorted).extracting(Student::getStudentNumber).containsExactly(1105, 1103, 1104, 1101, 1102);
     }
 }
