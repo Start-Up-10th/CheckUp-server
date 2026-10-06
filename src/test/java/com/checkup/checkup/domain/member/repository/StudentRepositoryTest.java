@@ -15,7 +15,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
 /**
- * 실제 PostgreSQL에서 학생 조회 쿼리의 정렬·필터와 회원 정보 함께 조회, 없을 때만 저장을 검증한다(#152).
+ * 실제 PostgreSQL에서 학생 조회 쿼리의 필터와 회원 정보 함께 조회, 없을 때만 저장을 검증한다(#152).
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -31,19 +31,15 @@ class StudentRepositoryTest {
     private EntityManagerFactory entityManagerFactory;
 
     @Test
-    @DisplayName("같은 호실 학생을 이름과 학번순으로 조회하고 회원 정보를 함께 가져온다")
-    void findsRoomStudentsInNameAndNumberOrderWithMember() {
+    @DisplayName("같은 호실 학생만 회원 정보와 함께 조회한다")
+    void findsRoomStudentsWithMember() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, 301);
-        saveStudent("홍길동", 1101, 301);
         saveStudent("다른 방", 1201, 401);
 
-        List<Student> students = studentRepository
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301);
+        List<Student> students = studentRepository.findAllByDormitoryRoom(301);
 
-        assertThat(students).extracting(Student::getName)
-                .containsExactly("김학생", "홍길동", "홍길동");
-        assertThat(students).extracting(Student::getStudentNumber).containsExactly(1103, 1101, 1102);
+        assertThat(students).extracting(Student::getName).containsExactlyInAnyOrder("김학생", "홍길동");
         assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
                 .isLoaded(student, "member")).isTrue());
     }
@@ -53,8 +49,7 @@ class StudentRepositoryTest {
     void studentWithoutRoomIsNotInRoomSearch() {
         saveStudent("호실 없음", 1101, null);
 
-        assertThat(studentRepository
-                .findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301)).isEmpty();
+        assertThat(studentRepository.findAllByDormitoryRoom(301)).isEmpty();
     }
 
     @Test
@@ -89,8 +84,8 @@ class StudentRepositoryTest {
         saveStudent("홍길동", 1102, 301);
         studentRepository.saveAndFlush(Student.createWithoutMember(77_001L, "강학생", 1, 1, 1, 1103, 301));
 
-        assertThat(studentRepository.findAllByDormitoryRoomOrderByNameAscStudentNumberAscIdAsc(301))
-                .extracting(Student::getName).containsExactly("강학생", "홍길동");
+        assertThat(studentRepository.findAllByDormitoryRoom(301))
+                .extracting(Student::getName).containsExactlyInAnyOrder("강학생", "홍길동");
         assertThat(studentRepository.findAllByDatagsmStudentIdIsNotNull())
                 .extracting(Student::getName).contains("강학생");
         assertThat(studentRepository.findByDatagsmStudentId(77_001L))
