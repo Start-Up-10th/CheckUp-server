@@ -30,6 +30,20 @@ public class FaceEnrollmentService {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 휴대폰 촬영 영상으로 학생의 얼굴을 처음 등록한다(REQ-FACE-001).
+     * 동의·등록 대상·중복 등록을 먼저 확인한 뒤 AI에서 대표 벡터를 뽑아 저장한다. 원본 영상은 처리 뒤 메모리에서 지우고 저장하지 않는다.
+     *
+     * @param contentType {@code video/webm} 또는 {@code video/mp4}
+     * @param rawVideo    원본 영상. 처리 뒤 0으로 덮어쓴다
+     * @return 등록 결과
+     * @throws CustomException 필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
+     *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
+     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED},
+     *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA},
+     *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE},
+     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}
+     */
     public FaceEnrollmentResponse enroll(Long memberId, String contentType, byte[] rawVideo) {
         try {
             FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.Comparator;
 
+/** 기숙사 학생. DataGSM 학생 정보와 호실, 필수 동의, 봉사 횟수를 가진다. 로그인 전에 동기화로 미리 저장될 수 있다. */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Table(name = "student")
@@ -17,7 +18,7 @@ public class Student {
     /**
      * 호실 명단 정렬: 이름 → 학번 → id순(#150).
      * 이름은 DB 정렬 규칙(예: {@code en_US.utf8})에 맡기지 않고 {@link String#compareTo}로 비교한다.
-     * 한글 음절은 유니코드에서 가나다순으로 놓여 있어 코드 순서가 곧 가나다순이다(예: 강 < 계 < 김 < 홍).
+     * 한글 음절은 유니코드에서 가나다순으로 놓여 있어 코드 순서가 곧 가나다순이다(예: {@code 강 < 계 < 김 < 홍}).
      */
     public static final Comparator<Student> NAME_ORDER = Comparator
             .comparing(Student::getName)

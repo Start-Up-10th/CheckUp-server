@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.face.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/** 얼굴 최초 등록 결과(REQ-FACE-001). */
 public record FaceEnrollmentResponse(@Schema(description = "등록 결과. 항상 REGISTERED") String status) {
     public static FaceEnrollmentResponse registered() {
         return new FaceEnrollmentResponse("REGISTERED");

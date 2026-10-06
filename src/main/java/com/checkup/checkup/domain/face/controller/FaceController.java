@@ -30,7 +30,8 @@ public class FaceController {
     private final FaceStudentService faceStudentService;
     private final FaceEnrollmentService faceEnrollmentService;
 
-    @Operation(summary = "내 얼굴 등록 상태 조회")
+    /** 로그인한 학생의 필수 동의·등록 대상 여부·얼굴 등록 상태를 돌려준다. */
+    @Operation(summary = "내 얼굴 등록 상태 조회", description = "학생 전용. status는 REGISTERED 또는 NOT_REGISTERED이고, consented·eligible·enrolled를 함께 준다. 학생이 아니면 403 MISSING_STUDENT_INFO.")
     @GetMapping("/me")
     public FaceStatusResponse me(@AuthenticationPrincipal Long memberId) {
         return faceStudentService.getStatus(memberId);
@@ -44,7 +45,12 @@ public class FaceController {
         return faceStudentService.consent(memberId);
     }
 
-    /** 원본 영상 바이트만 받고, 모든 응답 경로에서 업로드 버퍼를 초기화한다. */
+    /**
+     * 휴대폰 촬영 영상으로 얼굴을 처음 등록한다. 원본 영상 바이트만 받고, 모든 응답 경로에서 업로드 버퍼를 0으로 덮어쓴다.
+     *
+     * @param contentType {@code video/webm} 또는 {@code video/mp4}
+     * @param video       원본 영상 바이트
+     */
     @Operation(
             summary = "얼굴 최초 등록",
             description = "video/webm 또는 video/mp4 영상 원본 바이트를 요청 본문으로 보낸다."
