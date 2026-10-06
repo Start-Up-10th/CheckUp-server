@@ -1,6 +1,6 @@
 package com.checkup.checkup.domain.face.ai;
 
-/** An upstream failure without its response body or request data. */
+/** AI 서버 호출 실패. 응답 본문과 요청 데이터는 담지 않는다. */
 public class AiFaceException extends RuntimeException {
     private final int status;
     private final String operation;
