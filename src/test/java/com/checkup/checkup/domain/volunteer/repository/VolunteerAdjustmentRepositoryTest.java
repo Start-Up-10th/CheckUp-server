@@ -48,17 +48,17 @@ class VolunteerAdjustmentRepositoryTest {
     @Test
     @DisplayName("같은 재시도 키는 한 번만 기록하고, 키가 없으면 매번 기록한다")
     void sameKeyIsRecordedOnce() {
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, "key-1", T0)).isEqualTo(1);
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, "key-1", T0.plusSeconds(1))).isZero();
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, null, T0)).isEqualTo(1);
-        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, null, T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "key-1", T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, "key-1", T0.plusSeconds(1))).isZero();
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0)).isEqualTo(1);
     }
 
     @Test
     @DisplayName("학생별 마지막 조정 시각을 읽고, 조정하지 않은 학생은 결과에 없다")
     void lastActivityIsLatestPerStudent() {
-        adjustmentRepository.insertIfAbsent(studentId, 1, null, T0);
-        adjustmentRepository.insertIfAbsent(studentId, -1, null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(studentId, 1, 1, null, null, T0);
+        adjustmentRepository.insertIfAbsent(studentId, -1, -1, null, null, T0.plusSeconds(60));
 
         Map<Long, Instant> last = adjustmentRepository.findLastActivities().stream()
                 .collect(Collectors.toMap(VolunteerAdjustmentRepository.LastActivity::getStudentId,
