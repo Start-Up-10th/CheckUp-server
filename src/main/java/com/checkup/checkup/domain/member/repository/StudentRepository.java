@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/** 학생 정보. 로그인 계정이 없는 학생(동기화로 미리 저장)도 포함한다. */
 public interface StudentRepository extends JpaRepository<Student, Long> {
     Optional<Student> findByMember(Member member);
 
