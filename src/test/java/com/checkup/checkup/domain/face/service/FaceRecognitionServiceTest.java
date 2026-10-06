@@ -74,6 +74,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
@@ -102,6 +103,7 @@ class FaceRecognitionServiceTest {
         Student student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(777L))).willReturn(1L);
 
@@ -164,6 +166,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.hasRequiredConsent()).willReturn(true);
         FaceTemplate template = mock(FaceTemplate.class);
         given(template.getStudent()).willReturn(student);
@@ -198,6 +201,7 @@ class FaceRecognitionServiceTest {
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.getDatagsmStudentId()).willReturn(DATAGSM_STUDENT_ID);
         given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
         given(student.hasRequiredConsent()).willReturn(true);
         FaceTemplate template = mock(FaceTemplate.class);
         given(template.getStudent()).willReturn(student);

@@ -192,4 +192,12 @@ public class Student {
     public boolean hasRequiredConsent() {
         return privacyAgreedAt != null && faceAgreedAt != null;
     }
+
+    /**
+     * 출석을 인정할 수 있는 학생인지 확인한다. 필수 동의를 마치고 호실이 배정돼 있어야 한다.
+     * 졸업·자퇴로 호실이 비워진 학생이나 동의하지 않은 학생의 출석은 QR·얼굴 인증 모두 거부한다.
+     */
+    public boolean isAttendanceEligible() {
+        return hasRequiredConsent() && dormitoryRoom != null;
+    }
 }

@@ -252,7 +252,7 @@ public class FaceRecognitionService {
                     : studentRepository.findByDatagsmStudentId(dataGsmStudentId);
             if (student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
-                    && student.get().getDormitoryRoom() != null) {
+                    && student.get().isAttendanceEligible()) {
                 studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttended(
@@ -343,7 +343,7 @@ public class FaceRecognitionService {
     }
 
     private static boolean eligibleStudent(Student student) {
-        return student.hasRequiredConsent() && student.getDormitoryRoom() != null
+        return student.isAttendanceEligible()
                 && student.getDatagsmStudentId() != null && student.getDatagsmStudentId() > 0;
     }
 
