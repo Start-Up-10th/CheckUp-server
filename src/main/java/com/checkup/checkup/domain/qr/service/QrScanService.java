@@ -48,8 +48,10 @@ public class QrScanService {
      */
     public QrScanResult scan(Long memberId, String token) {
         Student student = findStudent(memberId);
-        if (!student.hasRequiredConsent()) {
-            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        if (!student.isAttendanceEligible()) {
+            throw new CustomException(student.hasRequiredConsent()
+                    ? ErrorCode.MISSING_STUDENT_INFO
+                    : ErrorCode.FACE_CONSENT_REQUIRED);
         }
         Instant now = clock.instant();
 
@@ -89,7 +91,6 @@ public class QrScanService {
 
     private Student findStudent(Long memberId) {
         return studentRepository.findByMemberId(memberId)
-                .filter(student -> student.getDormitoryRoom() != null)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
     }
 }
