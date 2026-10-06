@@ -21,7 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import team.themoment.datagsm.sdk.oauth.model.UserInfo;
 
 /**
- * 로그인할 때 DataGSM 학생 정보로 학생의 호실·이름이 저장·갱신되고, 동기화로 미리 저장된 학생에는 계정을 연결하는지 검증한다.
+ * 로그인할 때 DataGSM 학생 정보로 학생의 호실·이름이 저장·갱신되고, 동기화로 미리 저장되거나 동시에 저장된 학생에는
+ * 계정을 연결하는지 검증한다(#152).
  */
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
@@ -43,19 +44,38 @@ class MemberServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 학생의 DataGSM 호실을 dormitoryRoom으로 저장한다")
-    void savesDormitoryRoomOnLogin() {
-        UserInfo userInfo = studentUser(301);
-        given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.empty());
-        given(memberRepository.save(any(Member.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
-        given(studentRepository.findByMember(any(Member.class))).willReturn(Optional.empty());
+    @DisplayName("저장된 학생이 없으면 없을 때만 저장한 뒤 다시 조회한 학생에 계정과 호실을 반영한다")
+    void insertsMissingStudentAndLinksMember() {
+        Student inserted = Student.createWithoutMember(DATAGSM_STUDENT_ID, "학생", 1, 1, 1, 1101, 301);
+        givenNewMember();
+        given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID))
+                .willReturn(Optional.empty(), Optional.of(inserted));
+        given(studentRepository.insertIfAbsent(DATAGSM_STUDENT_ID, "학생", 1, 1, 1, 1101, 301, null))
+                .willReturn(1);
 
-        memberService.saveOrUpdate(userInfo, MemberRole.STUDENT);
+        Member member = memberService.saveOrUpdate(studentUser(301), MemberRole.STUDENT);
 
-        verify(studentRepository).save(org.mockito.ArgumentMatchers.argThat(student ->
-                student.getDormitoryRoom() == 301 && student.getDormitoryFloor() == 3
-                        && student.getStudentNumber() == 1101 && student.getClassNumber() == 1));
+        assertThat(inserted.getMember()).isSameAs(member);
+        assertThat(inserted.getDormitoryRoom()).isEqualTo(301);
+        assertThat(inserted.getDormitoryFloor()).isEqualTo(3);
+        verify(studentRepository, never()).save(any(Student.class));
+    }
+
+    @Test
+    @DisplayName("동기화가 같은 학생을 먼저 저장해 없을 때만 저장이 건너뛰어도 그 학생에 계정을 연결한다")
+    void linksStudentSavedConcurrentlyBySync() {
+        Student savedBySync = Student.createWithoutMember(DATAGSM_STUDENT_ID, "옛이름", 1, 1, 1, 1101, 301);
+        givenNewMember();
+        given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID))
+                .willReturn(Optional.empty(), Optional.of(savedBySync));
+        given(studentRepository.insertIfAbsent(DATAGSM_STUDENT_ID, "학생", 1, 1, 1, 1101, 425, null))
+                .willReturn(0);
+
+        Member member = memberService.saveOrUpdate(studentUser(425), MemberRole.STUDENT);
+
+        assertThat(savedBySync.getMember()).isSameAs(member);
+        assertThat(savedBySync.getName()).isEqualTo("학생");
+        assertThat(savedBySync.getDormitoryRoom()).isEqualTo(425);
     }
 
     @Test
@@ -88,7 +108,14 @@ class MemberServiceTest {
         assertThat(preStored.getMember()).isSameAs(member);
         assertThat(preStored.getName()).isEqualTo("학생");
         assertThat(preStored.getDormitoryRoom()).isEqualTo(425);
-        verify(studentRepository, never()).save(any(Student.class));
+        verify(studentRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    private void givenNewMember() {
+        given(memberRepository.findByDatagsmId(DATAGSM_USER_ID)).willReturn(Optional.empty());
+        given(memberRepository.save(any(Member.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(studentRepository.findByMember(any(Member.class))).willReturn(Optional.empty());
     }
 
     private static UserInfo studentUser(int dormitoryRoom) {
