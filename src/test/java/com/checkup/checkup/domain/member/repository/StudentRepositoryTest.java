@@ -6,6 +6,7 @@ import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import jakarta.persistence.EntityManagerFactory;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
 /**
- * 실제 PostgreSQL에서 학생 조회 쿼리의 정렬·필터와 회원 정보 함께 조회를 검증한다.
+ * 실제 PostgreSQL에서 학생 조회 쿼리의 정렬·필터와 회원 정보 함께 조회, 없을 때만 저장을 검증한다(#152).
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -109,6 +110,26 @@ class StudentRepositoryTest {
                 .isEqualTo(1L);
         assertThat(studentRepository.countByIdInAndDormitoryRoomIsNotNull(List.of(withRoom))).isEqualTo(1L);
         assertThat(studentRepository.countByIdInAndDormitoryRoomIsNotNull(List.of())).isZero();
+    }
+
+    @Test
+    @DisplayName("없을 때만 저장은 처음에만 1을 반환하고, 이미 있으면 기존 학생을 바꾸지 않고 0을 반환한다")
+    void insertIfAbsentSavesOnlyOnce() {
+        Instant syncedAt = Instant.parse("2026-10-06T00:00:00Z");
+
+        int first = studentRepository.insertIfAbsent(77_201L, "처음", 2, 1, 5, 2105, null, syncedAt);
+        int second = studentRepository.insertIfAbsent(77_201L, "나중", 3, 2, 6, 3206, 301, null);
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        assertThat(studentRepository.findByDatagsmStudentId(77_201L)).hasValueSatisfying(student -> {
+            assertThat(student.getName()).isEqualTo("처음");
+            assertThat(student.getStudentNumber()).isEqualTo(2105);
+            assertThat(student.getDormitoryRoom()).isNull();
+            assertThat(student.getMember()).isNull();
+            assertThat(student.getDatagsmSyncedAt()).isEqualTo(syncedAt);
+            assertThat(student.getVolunteerCount()).isZero();
+        });
     }
 
     private void saveStudent(String name, int studentNumber, Integer dormitoryRoom) {
