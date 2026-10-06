@@ -43,10 +43,14 @@ public class QrScanService {
      * @param memberId 로그인 세션의 회원 id
      * @param token    QR 링크의 토큰
      * @return 판정 결과
-     * @throws CustomException 학생이 아닌 회원이면 {@link ErrorCode#MISSING_STUDENT_INFO}(403)
+     * @throws CustomException 학생이 아니거나 호실이 없으면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403)
      */
     public QrScanResult scan(Long memberId, String token) {
         Student student = findStudent(memberId);
+        if (!student.hasRequiredConsent()) {
+            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        }
         Instant now = clock.instant();
 
         Optional<QrToken> qrToken = QrTokenGenerator.isWellFormed(token)
@@ -85,6 +89,7 @@ public class QrScanService {
 
     private Student findStudent(Long memberId) {
         return studentRepository.findByMemberId(memberId)
+                .filter(student -> student.getDormitoryRoom() != null)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
     }
 }

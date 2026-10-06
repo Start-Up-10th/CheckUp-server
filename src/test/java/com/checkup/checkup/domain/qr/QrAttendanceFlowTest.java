@@ -53,7 +53,7 @@ class QrAttendanceFlowTest {
         teacherId = insertMember("교사", "ADMIN");
         studentMemberId = insertMember("학생", "STUDENT");
         studentId = jdbcTemplate.queryForObject(
-                "INSERT INTO student (member_id, name, number, grade, class_number, student_number) VALUES (?, '테스트학생', 1, 1, 1, 1101) RETURNING id",
+                "INSERT INTO student (member_id, name, number, grade, class_number, student_number, dormitory_room, privacy_agreed_at, face_agreed_at) VALUES (?, '테스트학생', 1, 1, 1, 1101, 101, now(), now()) RETURNING id",
                 Long.class, studentMemberId);
     }
 
