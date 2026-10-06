@@ -7,7 +7,9 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.MemberRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,10 +18,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.data.domain.Limit;
 
 /**
  * 실제 PostgreSQL에서 봉사 조정 기록의 재시도 키 중복 무시, 마지막 조정 시각 조회,
- * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139)을 검증한다.
+ * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139), 학생별 최신순 이력 조회(#140)를 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -90,6 +93,23 @@ class VolunteerAdjustmentRepositoryTest {
 
         assertThat(studentRepository.lockVolunteerCount(studentId)).contains(4);
         assertThat(studentRepository.lockVolunteerCount(-1L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("학생별 조정 기록을 최신순으로 개수만큼 읽고 다른 학생 기록은 빼며, 같은 시각이면 나중 기록이 앞이다")
+    void adjustmentsAreReadNewestFirstPerStudent() {
+        adjustmentRepository.insertIfAbsent(studentId, 1, 1, "첫째", null, T0);
+        adjustmentRepository.insertIfAbsent(studentId, 2, 2, "둘째", null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(studentId, -1, -1, "셋째", null, T0.plusSeconds(60));
+        adjustmentRepository.insertIfAbsent(otherStudentId, 3, 3, "다른 학생", null, T0.plusSeconds(120));
+
+        List<VolunteerAdjustment> all = adjustmentRepository
+                .findByStudent_IdOrderByCreatedAtDescIdDesc(studentId, Limit.of(10));
+        List<VolunteerAdjustment> limited = adjustmentRepository
+                .findByStudent_IdOrderByCreatedAtDescIdDesc(studentId, Limit.of(2));
+
+        assertThat(all).extracting(VolunteerAdjustment::getReason).containsExactly("셋째", "둘째", "첫째");
+        assertThat(limited).extracting(VolunteerAdjustment::getReason).containsExactly("셋째", "둘째");
     }
 
     @Test
