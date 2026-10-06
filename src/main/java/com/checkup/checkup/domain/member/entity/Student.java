@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.Comparator;
 
+/** 기숙사 학생. DataGSM 학생 정보와 호실, 필수 동의, 봉사 횟수를 가진다. 로그인 전에 동기화로 미리 저장될 수 있다. */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Table(name = "student")
