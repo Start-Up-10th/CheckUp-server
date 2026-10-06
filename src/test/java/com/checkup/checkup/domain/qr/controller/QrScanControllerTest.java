@@ -108,6 +108,32 @@ class QrScanControllerTest {
     }
 
     @Test
+    @DisplayName("필수 동의가 없으면 403 FACE_CONSENT_REQUIRED다")
+    void withoutConsentReturnsForbidden() throws Exception {
+        given(qrScanService.scan(STUDENT_ID, TOKEN)).willThrow(new CustomException(ErrorCode.FACE_CONSENT_REQUIRED));
+
+        mockMvc.perform(post("/api/v1/qr/attendance")
+                        .with(loginAs(STUDENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + TOKEN + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FACE_CONSENT_REQUIRED"));
+    }
+
+    @Test
+    @DisplayName("호실이 없으면 403 ROOM_NOT_ASSIGNED다")
+    void withoutRoomReturnsForbidden() throws Exception {
+        given(qrScanService.scan(STUDENT_ID, TOKEN)).willThrow(new CustomException(ErrorCode.ROOM_NOT_ASSIGNED));
+
+        mockMvc.perform(post("/api/v1/qr/attendance")
+                        .with(loginAs(STUDENT_ID))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + TOKEN + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROOM_NOT_ASSIGNED"));
+    }
+
+    @Test
     @DisplayName("로그인하지 않으면 401이다")
     void withoutLoginReturnsUnauthorized() throws Exception {
         mockMvc.perform(post("/api/v1/qr/attendance")

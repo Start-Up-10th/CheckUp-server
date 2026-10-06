@@ -18,11 +18,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
+import com.checkup.checkup.domain.member.entity.Member;
+import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.qr.entity.QrScanResult;
@@ -76,29 +79,48 @@ class QrScanServiceTest {
     }
 
     @Test
-    void 호실이_없으면_403이고_토큰을_확인하지_않는다() {
-        Student student = mock(Student.class);
-        given(student.isAttendanceEligible()).willReturn(false);
-        given(student.hasRequiredConsent()).willReturn(true);
-        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
+    @DisplayName("호실이 없으면 403 ROOM_NOT_ASSIGNED이고 토큰을 확인하지 않는다")
+    void withoutRoomIsRejectedWithRoomNotAssigned() {
+        Student student = realStudent(null);
+        student.agree(false, clock.instant(), "v1");
 
-        assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
-                .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MISSING_STUDENT_INFO));
-        verifyNoInteractions(qrSessionRepository, attendanceService);
+        assertScanRejected(student, ErrorCode.ROOM_NOT_ASSIGNED);
     }
 
     @Test
-    void 필수_동의가_없으면_403이고_토큰을_확인하지_않는다() {
-        Student student = mock(Student.class);
-        given(student.isAttendanceEligible()).willReturn(false);
-        given(student.hasRequiredConsent()).willReturn(false);
+    @DisplayName("필수 동의가 없으면 403 FACE_CONSENT_REQUIRED이고 토큰을 확인하지 않는다")
+    void withoutConsentIsRejectedWithConsentRequired() {
+        assertScanRejected(realStudent(301), ErrorCode.FACE_CONSENT_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("얼굴 정보 동의만 빠져도 403 FACE_CONSENT_REQUIRED다")
+    void missingFaceConsentOnlyIsRejected() {
+        Student student = realStudent(301);
+        student.agree(false, clock.instant(), "v1");
+        ReflectionTestUtils.setField(student, "faceAgreedAt", null);
+
+        assertScanRejected(student, ErrorCode.FACE_CONSENT_REQUIRED);
+    }
+
+    @Test
+    @DisplayName("동의도 호실도 없으면 동의 오류를 먼저 돌려준다")
+    void withoutConsentAndRoomReportsConsentFirst() {
+        assertScanRejected(realStudent(null), ErrorCode.FACE_CONSENT_REQUIRED);
+    }
+
+    private void assertScanRejected(Student student, ErrorCode expected) {
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
 
         assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
                 .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_CONSENT_REQUIRED));
+                        e -> assertThat(e.getErrorCode()).isEqualTo(expected));
         verifyNoInteractions(qrSessionRepository, attendanceService);
+    }
+
+    private static Student realStudent(Integer dormitoryRoom) {
+        return Student.create(Member.create(1L, "학생", MemberRole.STUDENT), 1L, "학생", 1, 1, 1, 1101,
+                dormitoryRoom);
     }
 
     @Test

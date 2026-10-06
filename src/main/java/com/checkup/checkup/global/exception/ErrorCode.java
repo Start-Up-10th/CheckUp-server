@@ -25,6 +25,7 @@ public enum ErrorCode {
     INVALID_OAUTH_STATE(HttpStatus.BAD_REQUEST, "state가 유효하지 않거나 만료되었습니다."),
     INACTIVE_ACCOUNT(HttpStatus.FORBIDDEN, "올바르지 않은 계정 상태입니다."),
     MISSING_STUDENT_INFO(HttpStatus.FORBIDDEN, "학생 정보가 없습니다."),
+    ROOM_NOT_ASSIGNED(HttpStatus.FORBIDDEN, "기숙사 호실이 배정되지 않았습니다."),
     UNSUPPORTED_ACCOUNT(HttpStatus.FORBIDDEN, "이용 권한이 없는 계정입니다."),
     MEMBER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
     ADMIN_ONLY(HttpStatus.FORBIDDEN, "관리자만 사용할 수 있습니다."),
