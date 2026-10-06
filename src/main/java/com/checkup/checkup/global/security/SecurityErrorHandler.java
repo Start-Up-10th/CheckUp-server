@@ -40,7 +40,10 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
         write(response, ErrorCode.FORBIDDEN);
     }
 
-    private void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+    /**
+     * 같은 패키지의 보안 필터도 같은 형식으로 오류를 쓰도록 package-private으로 연다.
+     */
+    void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
         response.setStatus(errorCode.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
