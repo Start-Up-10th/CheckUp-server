@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
-/** Face API, upload limits, and short-lived recognition-session settings. */
+/** 얼굴 AI 서버 연결, 업로드 크기 제한, 짧게 유지되는 인식 세션 설정값. */
 @Validated
 @ConfigurationProperties("checkup.face")
 public record FaceProperties(

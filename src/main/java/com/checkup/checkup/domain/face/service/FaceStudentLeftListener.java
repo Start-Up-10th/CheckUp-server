@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/** Removes persistent enrollment and remote in-memory candidates after DataGSM confirms a student left. */
+/** DataGSM이 학생의 졸업·자퇴를 알려 오면 저장된 얼굴 등록 정보와 AI 메모리의 후보를 지운다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

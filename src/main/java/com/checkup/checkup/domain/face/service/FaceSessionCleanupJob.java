@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Retries remote deletion for abandoned camera sessions after disconnects and request timeouts. */
+/** 연결이 끊기거나 요청 시간이 초과돼 버려진 카메라 세션의 AI 쪽 삭제를 다시 시도한다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

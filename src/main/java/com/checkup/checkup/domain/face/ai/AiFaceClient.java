@@ -17,7 +17,7 @@ import java.net.http.HttpTimeoutException;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-/** The only Spring component that communicates with the private FastAPI service. */
+/** 내부 FastAPI 얼굴 AI 서버와 통신하는 유일한 Spring 컴포넌트다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -134,7 +134,7 @@ public class AiFaceClient {
                 return "validation_error";
             }
         } catch (tools.jackson.core.JacksonException ignored) {
-            // Do not log or return an unparseable upstream body.
+            // 해석할 수 없는 AI 응답 본문은 로그에 남기거나 그대로 돌려주지 않는다.
         }
         return "unspecified";
     }

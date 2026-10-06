@@ -38,7 +38,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 
-/** Starts AI sessions, rate limits camera frames, and authorizes face matches before attendance. */
+/** AI 세션을 시작하고, 카메라 프레임 속도를 제한하며, 출석 전에 얼굴 일치 결과를 검증한다. */
 @Slf4j
 @Service
 public class FaceRecognitionService {
@@ -91,7 +91,7 @@ public class FaceRecognitionService {
         AiFaceSessionRequest request = sessionRequest(templates);
         UUID sessionId = UUID.randomUUID();
         Instant now = clock.instant();
-        // Persist ownership before contacting AI so failed remote cleanup remains retryable.
+        // AI를 부르기 전에 세션 소유 정보를 먼저 저장한다. 그래야 AI 쪽 정리가 실패해도 다시 시도할 수 있다.
         faceSessionStore.create(sessionId, adminMemberId, purpose,
                 templates.stream().map(template -> template.getStudent().getId()).toList(),
                 now, now.minus(properties.minFrameInterval()));
@@ -158,7 +158,7 @@ public class FaceRecognitionService {
                 if (e.getStatus() != 404 || !"frame".equals(e.getOperation())) {
                     throw e;
                 }
-                // Contract says 404 means session absent, so this frame was not processed; recreate and retry once.
+                // 계약상 404는 AI 세션이 없다는 뜻이라 이 프레임은 처리되지 않았다. 세션을 다시 만들고 한 번만 재시도한다.
                 try {
                     Instant recoveryUntil = clock.instant().plus(properties.frameRecoveryLease());
                     if (!faceSessionStore.extendFrame(sessionId, adminMemberId, frameLockToken,
@@ -200,7 +200,7 @@ public class FaceRecognitionService {
                 try {
                     faceSessionStore.releaseFrame(sessionId, adminMemberId, frameLockToken, clock.instant());
                 } catch (RuntimeException e) {
-                    // The lease expires after the configured AI request timeout if release cannot reach the DB.
+                    // DB에 닿지 못해 잠금을 풀지 못해도, 설정한 AI 요청 시간이 지나면 잠금이 저절로 풀린다.
                     log.warn("Face frame lock release failed: reason={}", e.getClass().getSimpleName());
                 }
             }
@@ -211,7 +211,7 @@ public class FaceRecognitionService {
         }
     }
 
-    /** Idempotent browser close; remote deletion is retried if the DB mapping remains. */
+    /** 브라우저의 세션 종료. 여러 번 불러도 같다. DB 매핑이 남아 있으면 AI 쪽 삭제를 다시 시도한다. */
     public void close(Long adminMemberId, UUID sessionId) {
         adminVerifier.verify(adminMemberId);
         faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwned);
@@ -259,7 +259,7 @@ public class FaceRecognitionService {
                         student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
             } else {
-                // Never let AI nominate a student outside the Spring-owned, current session target list.
+                // Spring이 관리하는 현재 세션 후보 목록 밖의 학생을 AI가 지목해도 절대 출석으로 인정하지 않는다.
                 status = "UNKNOWN";
             }
         }

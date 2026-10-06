@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
-/** Bounds raw camera bodies before Spring MVC materializes the byte array. */
+/** Spring MVC가 바이트 배열을 만들기 전에 카메라 원본 요청 본문의 크기를 제한한다. */
 @RequiredArgsConstructor
 public class FacePayloadLimitFilter extends OncePerRequestFilter {
     private final FaceProperties properties;
@@ -32,7 +32,7 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
     @jakarta.annotation.PostConstruct
     void initialize() {
         framePermits = new Semaphore(properties.maxConcurrentFrames());
-        // Keep only one potentially large enrollment body buffered at a time.
+        // 클 수 있는 얼굴 등록 영상 본문은 한 번에 하나만 메모리에 올린다.
         enrollmentPermits = new Semaphore(1);
     }
 
@@ -82,7 +82,7 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
         return path != null && path.startsWith("/api/v1/face/sessions/") && path.endsWith("/frames");
     }
 
-    /** Returns null when input exceeds configured cap. At most cap+1 bytes are read into memory. */
+    /** 입력이 설정한 최대 크기를 넘으면 null을 반환한다. 메모리에는 최대 크기+1바이트까지만 읽는다. */
     private static byte[] readBounded(HttpServletRequest request, long maxSize) throws IOException {
         int limit = (int) Math.min(maxSize, Integer.MAX_VALUE - 1L);
         SensitiveBuffer output = new SensitiveBuffer(Math.min(limit, 8192));
