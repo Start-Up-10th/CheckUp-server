@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.volunteer.repository;
 
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -35,6 +36,14 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
             @Param("requestKey") String requestKey,
             @Param("createdAt") Instant createdAt
     );
+
+    /**
+     * 학생 한 명의 조정 기록을 최신순으로 읽는다. 같은 시각이면 나중에 저장한 기록이 앞이다. 봉사 조정 이력(#140)에 쓴다.
+     *
+     * @param studentId 학생 DB id
+     * @param limit     최대 개수
+     */
+    List<VolunteerAdjustment> findByStudent_IdOrderByCreatedAtDescIdDesc(Long studentId, Limit limit);
 
     /** 재시도 키로 이미 남은 조정 기록을 찾는다. 같은 키가 다른 학생·방향에 쓰였는지 확인할 때 쓴다. */
     Optional<VolunteerAdjustment> findByRequestKey(String requestKey);
