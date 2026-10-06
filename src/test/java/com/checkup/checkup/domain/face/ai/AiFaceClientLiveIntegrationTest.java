@@ -15,7 +15,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/** Opt-in, no-biometric-data smoke test for the configured deployed AI service. */
+/** 환경 변수로 지정한 AI 서비스의 연결을 생체 데이터 없이 확인하는 선택 실행형 테스트. */
 @EnabledIfEnvironmentVariable(named = "FACE_AI_LIVE_TESTS", matches = "true")
 class AiFaceClientLiveIntegrationTest {
 
@@ -52,7 +52,7 @@ class AiFaceClientLiveIntegrationTest {
         AiFaceClient client = new AiFaceClient(restClient, properties, JsonMapper.builder().build());
 
         client.ensureReady();
-        // The AI delete contract is idempotent, so this random, nonexistent ID cannot remove a live session.
+        // AI 세션 삭제는 멱등적이므로 존재하지 않는 임의 ID로 실제 세션을 삭제하지 않는다.
         client.deleteSession(UUID.randomUUID());
     }
 
