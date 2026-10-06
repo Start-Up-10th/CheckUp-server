@@ -1,8 +1,6 @@
 package com.checkup.checkup.domain.user.serivce;
 
 import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
-import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
 import com.checkup.checkup.global.exception.CustomException;
@@ -25,7 +23,7 @@ public class UserSearchService {
 
     private final DataGsmOpenApiClient dataGsmOpenApiClient;
     private final MemberService memberService;
-    private final StudentRepository studentRepository;
+    private final UserAccessVerifier userAccessVerifier;
     private final UserSearchCache userSearchCache;
 
     /**
@@ -38,7 +36,7 @@ public class UserSearchService {
      */
     public UserSearchResponse findUser(Long memberId, Long studentId) {
         Member requester = memberService.getById(memberId);
-        verifyAccess(requester, studentId);
+        userAccessVerifier.verify(requester, studentId);
 
         Optional<UserSearchResponse> cached = userSearchCache.get(studentId);
         if (cached.isPresent()) {
@@ -57,18 +55,6 @@ public class UserSearchService {
         UserSearchResponse response = UserSearchResponse.from(student);
         userSearchCache.put(studentId, response);
         return response;
-    }
-
-    private void verifyAccess(Member requester, Long studentId) {
-        if (requester.getRole() == MemberRole.ADMIN) {
-            return;
-        }
-        boolean self = studentRepository.findByMember(requester)
-                .map(s -> studentId.equals(s.getDatagsmStudentId()))
-                .orElse(false);
-        if (!self) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
-        }
     }
 
 }

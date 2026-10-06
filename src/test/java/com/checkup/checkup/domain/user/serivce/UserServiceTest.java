@@ -63,7 +63,8 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userSearchService = new UserSearchService(
-                dataGsmOpenApiClient, memberService, studentRepository, new UserSearchCache(clock));
+                dataGsmOpenApiClient, memberService, new UserAccessVerifier(studentRepository),
+                new UserSearchCache(clock));
     }
 
     @Test
