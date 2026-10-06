@@ -19,12 +19,11 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * 받은 목록에 있는 학생만 조회·반영하고 목록에 없는 학생은 삭제·졸업 처리하지 않는지,
- * 저장되지 않은 재학생은 계정 없이 새로 저장하는지, 실제로 반영한 학생 수만 돌려주는지,
+ * 저장되지 않은 재학생은 계정 없이 새로 저장하고 첫 로그인이 먼저 저장했으면 건너뛰는지(#152), 실제로 반영한 학생 수만 돌려주는지,
  * 관리자 허용 목록 회원은 동기화 뒤에도 ADMIN을 유지하는지 검증한다. 학생 한 명의 반영 규칙은 {@code WebhookServiceTest}에서 검증한다.
  */
 class StudentSyncServiceTest {
@@ -79,19 +78,25 @@ class StudentSyncServiceTest {
     void unsavedEnrolledStudentIsCreatedWithoutMember() {
         given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of());
 
+        given(studentRepository.insertIfAbsent(99L, "새학생", 1, 2, 3, 1203, 405, SYNCED_AT)).willReturn(1);
+
         int count = service.syncAll(List.of(
                 new StudentSyncData(99L, "새학생", 1, 2, 3, 1203, 405, "GENERAL_STUDENT")), SYNCED_AT);
 
-        ArgumentCaptor<Student> saved = ArgumentCaptor.forClass(Student.class);
-        verify(studentRepository).save(saved.capture());
-        Student created = saved.getValue();
         assertThat(count).isEqualTo(1);
-        assertThat(created.getMember()).isNull();
-        assertThat(created.getDatagsmStudentId()).isEqualTo(99L);
-        assertThat(created.getName()).isEqualTo("새학생");
-        assertThat(created.getStudentNumber()).isEqualTo(1203);
-        assertThat(created.getDormitoryRoom()).isEqualTo(405);
-        assertThat(created.getDatagsmSyncedAt()).isEqualTo(SYNCED_AT);
+        verify(studentRepository).insertIfAbsent(99L, "새학생", 1, 2, 3, 1203, 405, SYNCED_AT);
+    }
+
+    @Test
+    @DisplayName("첫 로그인이 같은 학생을 먼저 저장해 없을 때만 저장이 건너뛰면 반영한 수에 세지 않는다")
+    void studentSavedConcurrentlyByLoginIsNotCounted() {
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of());
+        given(studentRepository.insertIfAbsent(99L, "새학생", 1, 2, 3, 1203, 405, SYNCED_AT)).willReturn(0);
+
+        int count = service.syncAll(List.of(
+                new StudentSyncData(99L, "새학생", 1, 2, 3, 1203, 405, "GENERAL_STUDENT")), SYNCED_AT);
+
+        assertThat(count).isZero();
     }
 
     @Test
@@ -106,7 +111,7 @@ class StudentSyncServiceTest {
                 new StudentSyncData(93L, "학생", 2, 1, 5, 2105, 302, "UNKNOWN")), SYNCED_AT);
 
         assertThat(count).isZero();
-        verify(studentRepository, never()).save(any());
+        verify(studentRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
