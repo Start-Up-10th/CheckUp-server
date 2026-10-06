@@ -15,6 +15,7 @@ import com.checkup.checkup.domain.user.serivce.UserVolunteerService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.GlobalExceptionHandler;
+import com.checkup.checkup.global.ratelimit.RateLimiter;
 import com.checkup.checkup.global.security.SecurityConfig;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,6 +42,9 @@ class UserControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private RateLimiter rateLimiter;
 
     @MockitoBean
     private UserSearchService userSearchService;
