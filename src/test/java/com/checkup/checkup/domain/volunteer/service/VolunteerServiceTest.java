@@ -17,6 +17,7 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
@@ -38,12 +39,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.data.domain.Limit;
 import org.springframework.beans.BeanUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * 봉사 관리 명단이 관리자에게만 전체 학생을 봉사 횟수와 함께 보여주고,
- * 횟수 조정이 남은 횟수까지만 빼며 사유·요청 횟수를 기록하고 재시도를 한 번만 반영하는지 검증한다(#139).
+ * 횟수 조정이 남은 횟수까지만 빼며 사유·요청 횟수를 기록하고 재시도를 한 번만 반영하는지(#139),
+ * 조정 이력을 관리자에게 최신순으로 돌려주는지(#140) 검증한다.
  */
 class VolunteerServiceTest {
 
@@ -359,6 +362,54 @@ class VolunteerServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
         verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("조정 이력은 학생 DB id로 기본 50개를 최신순으로 읽어 시각·횟수·요청 횟수·사유로 돌려준다")
+    void adjustmentsAreReturnedNewestFirst() {
+        givenAdjustable(2);
+        VolunteerAdjustment adjustment = adjustment(10L, -2, -5);
+        ReflectionTestUtils.setField(adjustment, "reason", "감면");
+        ReflectionTestUtils.setField(adjustment, "createdAt", NOW);
+        given(volunteerAdjustmentRepository.findByStudent_IdOrderByCreatedAtDescIdDesc(10L, Limit.of(50)))
+                .willReturn(List.of(adjustment));
+
+        List<VolunteerAdjustmentResponse> history = service.getAdjustments(MEMBER_ID, 200L, null);
+
+        assertThat(history).containsExactly(new VolunteerAdjustmentResponse(NOW, -2, -5, "감면"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 101})
+    @DisplayName("조정 이력 개수가 1~100을 벗어나면 400 INVALID_REQUEST이고 조회하지 않는다")
+    void adjustmentsRejectInvalidLimit(int limit) {
+        givenAdjustable(2);
+
+        assertThatThrownBy(() -> service.getAdjustments(MEMBER_ID, 200L, limit))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        verify(volunteerAdjustmentRepository, never()).findByStudent_IdOrderByCreatedAtDescIdDesc(any(), any());
+    }
+
+    @Test
+    @DisplayName("관리자가 아니면 조정 이력을 조회하지 않고 403 ADMIN_ONLY다")
+    void adjustmentsRequireAdmin() {
+        willThrow(new CustomException(ErrorCode.ADMIN_ONLY)).given(adminVerifier).verify(MEMBER_ID);
+
+        assertThatThrownBy(() -> service.getAdjustments(MEMBER_ID, 200L, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
+        verify(volunteerAdjustmentRepository, never()).findByStudent_IdOrderByCreatedAtDescIdDesc(any(), any());
+    }
+
+    @Test
+    @DisplayName("저장된 학생이 없으면 조정 이력도 404 STUDENT_NOT_FOUND다")
+    void adjustmentsOfUnknownStudentAreRejected() {
+        given(studentRepository.findByDatagsmStudentId(200L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getAdjustments(MEMBER_ID, 200L, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
     }
 
     @Test

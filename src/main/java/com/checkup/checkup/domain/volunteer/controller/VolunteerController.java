@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.volunteer.dto.request.VolunteerAdjustRequest;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
 import jakarta.validation.Valid;
@@ -53,6 +54,24 @@ public class VolunteerController {
             @Parameter(description = "true면 오늘 당일 봉사자로 지정된 학생만(완료 포함, 선택)", example = "true") @RequestParam(required = false) Boolean onDuty
     ) {
         return volunteerService.getVolunteers(memberId, floor, q, minCount, onDuty);
+    }
+
+    /**
+     * 학생 한 명의 봉사 횟수 조정 이력을 최신순으로 돌려준다(#140).
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @param limit     최대 개수(선택, 1~100). 없으면 50
+     * @return 조정 이력
+     */
+    @Operation(summary = "봉사 횟수 조정 이력", description = "관리자 전용. 조정 시각·실제 바뀐 횟수·요청 횟수·사유를 최신순으로 돌려준다. 당일 봉사 완료의 차감(-1)도 포함한다. limit은 1~100(기본 50), 벗어나면 400 INVALID_REQUEST.")
+    @GetMapping("/{studentId}/adjustments")
+    public List<VolunteerAdjustmentResponse> getAdjustments(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "최대 개수(선택, 1~100). 없으면 50", example = "50") @RequestParam(required = false) Integer limit
+    ) {
+        return volunteerService.getAdjustments(memberId, studentId, limit);
     }
 
     /**

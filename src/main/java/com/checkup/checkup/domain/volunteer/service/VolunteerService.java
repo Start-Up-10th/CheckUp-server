@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.volunteer.service;
 
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
@@ -14,6 +15,7 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +44,8 @@ public class VolunteerService {
     private static final int MAX_REQUEST_KEY_LENGTH = 100;
     private static final int MAX_REASON_LENGTH = 100;
     private static final int MAX_ADJUST_AMOUNT = 99;
+    private static final int DEFAULT_HISTORY_LIMIT = 50;
+    private static final int MAX_HISTORY_LIMIT = 100;
     private static final String DUTY_MESSAGE = "오늘 봉사 당번으로 지정됐어요. 봉사를 마치면 자치위원에게 확인받으세요.";
 
     /** 호실 → 이름 → 학번순. 호실이 없는 학생은 맨 뒤에 둔다. */
@@ -146,6 +150,30 @@ public class VolunteerService {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
         return adjust(memberId, studentId, requestKey, delta, reason);
+    }
+
+    /**
+     * 학생 한 명의 봉사 횟수 조정 이력을 최신순으로 돌려준다(#140). 당일 봉사 완료의 차감도 포함한다.
+     *
+     * @param memberId  세션의 회원 id
+     * @param studentId DataGSM 학생 id
+     * @param limit     최대 개수(선택, 1~100). 없으면 50
+     * @return 조정 이력. 없으면 빈 목록
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         개수가 범위를 벗어나면 {@link ErrorCode#INVALID_REQUEST}(400)
+     */
+    @Transactional(readOnly = true)
+    public List<VolunteerAdjustmentResponse> getAdjustments(Long memberId, Long studentId, Integer limit) {
+        adminVerifier.verify(memberId);
+        int size = limit == null ? DEFAULT_HISTORY_LIMIT : limit;
+        if (size < 1 || size > MAX_HISTORY_LIMIT) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        Long id = findStudent(studentId).getId();
+        return volunteerAdjustmentRepository.findByStudent_IdOrderByCreatedAtDescIdDesc(id, Limit.of(size)).stream()
+                .map(VolunteerAdjustmentResponse::from)
+                .toList();
     }
 
     /**

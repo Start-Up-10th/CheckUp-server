@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
@@ -135,6 +136,20 @@ class VolunteerControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(volunteerService, never()).adjustCount(any(), any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("조정 이력은 경로의 학생 id와 limit을 서비스로 넘기고 배열로 응답한다")
+    void adjustmentsAreReturnedAsArray() throws Exception {
+        given(volunteerService.getAdjustments(MEMBER_ID, 200L, 20)).willReturn(List.of(
+                new VolunteerAdjustmentResponse(Instant.parse("2026-10-01T03:00:00Z"), -2, -5, "감면")));
+
+        mockMvc.perform(get(BASE + "/200/adjustments").param("limit", "20").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].createdAt").value("2026-10-01T03:00:00Z"))
+                .andExpect(jsonPath("$[0].delta").value(-2))
+                .andExpect(jsonPath("$[0].requestedDelta").value(-5))
+                .andExpect(jsonPath("$[0].reason").value("감면"));
     }
 
     @Test
