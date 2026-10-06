@@ -76,6 +76,24 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     List<Student> findAllByDatagsmStudentIdIsNotNull();
 
     /**
+     * 학생 행을 잠그고 봉사 횟수를 읽는다. 여러 회 조정에서 남은 횟수를 보고 실제로 뺄 횟수를 정할 때 쓴다.
+     * 트랜잭션이 끝날 때까지 같은 학생의 다른 조정은 기다린다.
+     *
+     * @return 봉사 횟수. 학생이 없으면 비어 있다.
+     */
+    @Query(value = "SELECT volunteer_count FROM student WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<Integer> lockVolunteerCount(@Param("id") Long id);
+
+    /**
+     * 봉사 횟수를 {@code delta}만큼 바꾼다. 0 미만이 되지 않는지는 {@link #lockVolunteerCount}로 잠근 뒤 호출하는 쪽에서 확인한다.
+     *
+     * @return 바뀐 행 수(학생이 있으면 1)
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.volunteerCount = s.volunteerCount + :delta WHERE s.id = :id")
+    int changeVolunteerCount(@Param("id") Long id, @Param("delta") int delta);
+
+    /**
      * 봉사 횟수를 1 늘린다. DB에서 바로 더해 동시에 눌러도 빠지지 않는다.
      *
      * @return 바뀐 행 수(학생이 있으면 1)
