@@ -88,7 +88,7 @@ class AttendanceServiceTest {
                 "INSERT INTO member (datagsm_id, name, role) VALUES (?, '테스트학생', 'STUDENT') RETURNING id",
                 Long.class, datagsmId);
         studentId = jdbcTemplate.queryForObject(
-                "INSERT INTO student (member_id, name, number, grade, class_number, student_number) VALUES (?, '테스트학생', 1, 1, 1, 1101) RETURNING id",
+                "INSERT INTO student (member_id, name, number, grade, class_number, student_number, dormitory_room, privacy_agreed_at, face_agreed_at) VALUES (?, '테스트학생', 1, 1, 1, 1101, 101, now(), now()) RETURNING id",
                 Long.class, memberId);
     }
 
@@ -108,6 +108,37 @@ class AttendanceServiceTest {
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
         assertThat(method(AttendancePurpose.DORMITORY, DAY)).isEqualTo("QR");
+    }
+
+    @Test
+    @DisplayName("필수 동의가 없는 학생은 인증해도 기록하지 않고 403이다")
+    void withoutConsentIsNotRecorded() {
+        jdbcTemplate.update("UPDATE student SET face_agreed_at = NULL WHERE id = ?", studentId);
+
+        assertThatThrownBy(() -> mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThat(attendanceCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("호실이 없는 학생은 인증해도 기록하지 않고 403이다")
+    void withoutRoomIsNotRecorded() {
+        jdbcTemplate.update("UPDATE student SET dormitory_room = NULL WHERE id = ?", studentId);
+
+        assertThatThrownBy(() -> mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.FACE))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThat(attendanceCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("없는 학생 id는 404 STUDENT_NOT_FOUND다")
+    void unknownStudentIsNotFound() {
+        assertThatThrownBy(() -> attendanceService.markAttended(
+                -1L, AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
     }
 
     @Test
@@ -525,6 +556,11 @@ class AttendanceServiceTest {
                 "SELECT " + column + " FROM attendance WHERE student_id = ? AND purpose = 'DORMITORY' AND operating_day = ?",
                 Timestamp.class, studentId, DAY);
         return value == null ? null : value.toInstant();
+    }
+
+    private int attendanceCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM attendance WHERE student_id = ?", Integer.class, studentId);
     }
 
     private AttendanceRecordResult mark(AttendancePurpose purpose, Instant verifiedAt, AttendanceMethod method) {
