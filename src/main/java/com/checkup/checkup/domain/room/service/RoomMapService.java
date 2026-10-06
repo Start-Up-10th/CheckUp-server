@@ -32,9 +32,10 @@ public class RoomMapService {
     @Transactional(readOnly = true)
     public List<RoomAttendanceStudentResponse> getRoomAttendance(Long memberId, Integer dormitoryRoom) {
         adminVerifier.verify(memberId);
-        List<Student> students = studentRepository
-                .findAllByDormitoryRoomAndDatagsmStudentIdIsNotNullOrderByNameAscStudentNumberAscIdAsc(
-                        dormitoryRoom);
+        List<Student> students = studentRepository.findAllByDormitoryRoomAndDatagsmStudentIdIsNotNull(dormitoryRoom)
+                .stream()
+                .sorted(Student.NAME_ORDER)
+                .toList();
         Set<Long> attendedIds = findAttendedIds(students);
         return students.stream()
                 .map(student -> RoomAttendanceStudentResponse.from(
