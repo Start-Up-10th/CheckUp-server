@@ -69,7 +69,7 @@ checkup:
     base-url: ${PUBLIC_ORIGIN}
   face:
     # AI sessions are in-memory; use one AI process or routing sticky to the session_id.
-    ai-base-url: ${FACE_AI_BASE_URL:http://localhost:8000}
+    ai-base-url: ${FACE_AI_BASE_URL:http://host.docker.internal:8000/}
     service-token: ${FACE_SERVICE_TOKEN}
     connect-timeout: ${FACE_AI_CONNECT_TIMEOUT:2s}
     response-timeout: ${FACE_AI_RESPONSE_TIMEOUT:30s}

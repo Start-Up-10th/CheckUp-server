@@ -103,11 +103,12 @@ Spring은 얼굴 등록·프레임 추론 요청을 AI 서비스에 위임하고
 ```yaml
 checkup:
   face:
-    ai-base-url: ${FACE_AI_BASE_URL:http://localhost:8000}
+    ai-base-url: ${FACE_AI_BASE_URL:http://host.docker.internal:8000/}
     service-token: ${FACE_SERVICE_TOKEN}
 ```
 
 `FACE_AI_BASE_URL`에는 서비스 origin을 설정합니다. readiness 주소가 `http://service.gsmsv.site:32200/health/ready`라면 base URL은 `http://service.gsmsv.site:32200`입니다. Spring이 `/health/ready`와 `/internal/v1/face/*` 경로를 붙입니다.
+Spring 컨테이너에서 호스트의 8000번 포트로 노출된 AI에 연결할 때 기본값 `http://host.docker.internal:8000/`을 사용합니다. Linux Docker에서는 Spring 컨테이너에 `host.docker.internal:host-gateway` 매핑이 필요할 수 있습니다. Spring을 호스트에서 직접 실행한다면 `FACE_AI_BASE_URL=http://localhost:8000`으로 지정할 수 있습니다. 끝의 `/`는 Spring에서 제거합니다.
 `FACE_SERVICE_TOKEN`은 AI와 Spring에 동일하게 설정하는 서버 간 secret이며 브라우저에 보내지 않습니다. 이 토큰이 포함된 요청은 HTTPS 또는 신뢰된 사설망으로만 전송하고 AI 포트의 접근을 Spring 서버로 제한합니다.
 AI 인식 세션은 프로세스 메모리에 저장되므로 AI 인스턴스 하나를 사용하거나 `session_id` 기준으로 같은 인스턴스에 라우팅해야 합니다.
 
