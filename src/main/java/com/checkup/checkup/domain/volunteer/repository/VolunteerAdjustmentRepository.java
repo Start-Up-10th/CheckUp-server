@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+/** 봉사 횟수 조정 기록(REQ-COM-002). 관리자 조정과 당일 봉사 완료를 종류로 구분한다. */
 public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAdjustment, Long> {
 
     /**
