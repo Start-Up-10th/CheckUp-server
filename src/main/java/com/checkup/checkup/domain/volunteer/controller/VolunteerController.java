@@ -3,8 +3,10 @@ package com.checkup.checkup.domain.volunteer.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.checkup.checkup.domain.volunteer.dto.request.VolunteerAdjustRequest;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -86,6 +89,26 @@ public class VolunteerController {
             @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey
     ) {
         return volunteerService.decrease(memberId, studentId, idempotencyKey);
+    }
+
+    /**
+     * 봉사 횟수를 여러 회 늘리거나 줄이고 사유를 남긴다(#139). 차감은 남은 횟수까지만 한다.
+     *
+     * @param memberId       세션의 회원 id
+     * @param studentId      DataGSM 학생 id
+     * @param idempotencyKey 재시도 방지 키(선택, 100자 이하)
+     * @param request        바꿀 횟수와 사유
+     * @return 조정 뒤 학생의 명단 항목
+     */
+    @Operation(summary = "봉사 횟수 조정(여러 회·사유)", description = "delta는 -99~99(0 제외), reason은 선택(최대 100자). 차감은 남은 횟수까지만 하고 남은 횟수가 0이면 409 VOLUNTEER_COUNT_ZERO. Idempotency-Key는 증가와 같으며, 같은 키를 다른 학생·다른 delta에 쓰면 409 IDEMPOTENCY_KEY_REUSED.")
+    @PatchMapping("/{studentId}/count")
+    public VolunteerResponse adjust(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
+            @Valid @RequestBody VolunteerAdjustRequest request
+    ) {
+        return volunteerService.adjustCount(memberId, studentId, idempotencyKey, request.delta(), request.reason());
     }
 
     /**
