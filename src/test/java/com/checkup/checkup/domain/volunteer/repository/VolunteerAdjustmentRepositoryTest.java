@@ -19,7 +19,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 
 /**
  * 실제 PostgreSQL에서 봉사 조정 기록의 재시도 키 중복 무시, 마지막 조정 시각 조회,
- * 봉사 횟수 증가와 0 하한 차감을 검증한다.
+ * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139)을 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -67,6 +67,29 @@ class VolunteerAdjustmentRepositoryTest {
         assertThat(last).containsEntry(studentId, T0.plusSeconds(60)).doesNotContainKey(otherStudentId);
         assertThat(adjustmentRepository.findLastActivityAt(studentId)).isEqualTo(T0.plusSeconds(60));
         assertThat(adjustmentRepository.findLastActivityAt(otherStudentId)).isNull();
+    }
+
+    @Test
+    @DisplayName("실제 바뀐 횟수·요청 횟수·사유를 함께 기록한다")
+    void reasonAndRequestedDeltaAreRecorded() {
+        adjustmentRepository.insertIfAbsent(studentId, -2, -5, "감면", "key-2", T0);
+
+        assertThat(adjustmentRepository.findByRequestKey("key-2")).hasValueSatisfying(adjustment -> {
+            assertThat(adjustment.getDelta()).isEqualTo((short) -2);
+            assertThat(adjustment.getRequestedDelta()).isEqualTo((short) -5);
+            assertThat(adjustment.getReason()).isEqualTo("감면");
+        });
+    }
+
+    @Test
+    @DisplayName("잠금 조회로 봉사 횟수를 읽고 여러 회 변경을 반영한다")
+    void lockAndChangeVolunteerCount() {
+        assertThat(studentRepository.lockVolunteerCount(studentId)).contains(0);
+        assertThat(studentRepository.changeVolunteerCount(studentId, 7)).isEqualTo(1);
+        assertThat(studentRepository.changeVolunteerCount(studentId, -3)).isEqualTo(1);
+
+        assertThat(studentRepository.lockVolunteerCount(studentId)).contains(4);
+        assertThat(studentRepository.lockVolunteerCount(-1L)).isEmpty();
     }
 
     @Test
