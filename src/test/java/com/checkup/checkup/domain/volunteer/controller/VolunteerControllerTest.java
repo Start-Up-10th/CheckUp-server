@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.volunteer.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -24,9 +25,12 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -90,6 +94,47 @@ class VolunteerControllerTest {
 
         verify(volunteerService).increase(MEMBER_ID, 200L, "key-1");
         verify(volunteerService).decrease(MEMBER_ID, 200L, null);
+    }
+
+    @Test
+    @DisplayName("여러 회 조정은 본문의 횟수·사유와 Idempotency-Key를 서비스로 넘기고 바뀐 항목을 응답한다")
+    void adjustCountPassesDeltaAndReason() throws Exception {
+        VolunteerResponse updated = new VolunteerResponse(200L, "학생", 2105, 301, 0, Instant.parse("2026-10-01T03:00:00Z"), null);
+        given(volunteerService.adjustCount(MEMBER_ID, 200L, "key-1", -3, "감면")).willReturn(updated);
+
+        mockMvc.perform(patch(BASE + "/200/count").header("Idempotency-Key", "key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delta\":-3,\"reason\":\"감면\"}")
+                        .with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.volunteerCount").value(0));
+
+        verify(volunteerService).adjustCount(MEMBER_ID, 200L, "key-1", -3, "감면");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"delta\":100}", "{\"delta\":-100}"})
+    @DisplayName("여러 회 조정의 횟수가 없거나 -99~99를 벗어나면 400이고 서비스를 호출하지 않는다")
+    void adjustCountRejectsInvalidDelta(String body) throws Exception {
+        mockMvc.perform(patch(BASE + "/200/count")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+
+        verify(volunteerService, never()).adjustCount(any(), any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("여러 회 조정의 사유가 100자를 넘으면 400이고 서비스를 호출하지 않는다")
+    void adjustCountRejectsTooLongReason() throws Exception {
+        mockMvc.perform(patch(BASE + "/200/count")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delta\":1,\"reason\":\"" + "가".repeat(101) + "\"}")
+                        .with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+
+        verify(volunteerService, never()).adjustCount(any(), any(), any(), anyInt(), any());
     }
 
     @Test
