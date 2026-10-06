@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 
+/** 얼굴 AI 서버 호출용 RestClient와 얼굴 설정을 등록한다. */
 @Configuration
 @EnableConfigurationProperties(FaceProperties.class)
 public class FaceConfig {
