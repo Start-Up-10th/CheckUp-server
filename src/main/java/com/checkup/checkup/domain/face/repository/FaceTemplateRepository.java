@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+/** 학생별 얼굴 등록 템플릿(대표 벡터). 학생마다 하나다. */
 public interface FaceTemplateRepository extends JpaRepository<FaceTemplate, Long> {
     boolean existsByStudent_Id(Long studentId);
 

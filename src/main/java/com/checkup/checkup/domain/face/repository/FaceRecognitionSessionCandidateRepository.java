@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
 
+/** 얼굴 인식 세션의 후보 학생 목록. */
 public interface FaceRecognitionSessionCandidateRepository
         extends JpaRepository<FaceRecognitionSessionCandidate, Long> {
 
