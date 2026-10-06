@@ -44,12 +44,12 @@ public class QrScanService {
      * @param token    QR 링크의 토큰
      * @return 판정 결과
      * @throws CustomException 학생이 아니거나 호실이 없으면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
-     *                         필수 동의가 없으면 {@link ErrorCode#CONSENT_REQUIRED}(403)
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403)
      */
     public QrScanResult scan(Long memberId, String token) {
         Student student = findStudent(memberId);
         if (!student.hasRequiredConsent()) {
-            throw new CustomException(ErrorCode.CONSENT_REQUIRED);
+            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
         }
         Instant now = clock.instant();
 

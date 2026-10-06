@@ -98,7 +98,7 @@ class QrScanServiceTest {
 
         assertThatThrownBy(() -> qrScanService.scan(MEMBER_ID, TOKEN))
                 .isInstanceOfSatisfying(CustomException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CONSENT_REQUIRED));
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_CONSENT_REQUIRED));
         verifyNoInteractions(qrSessionRepository, attendanceService);
     }
 
