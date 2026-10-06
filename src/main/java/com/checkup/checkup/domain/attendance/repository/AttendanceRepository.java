@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import com.checkup.checkup.domain.attendance.entity.Attendance;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 
+/** 학생·용도·운영일 출석 기록(REQ-ATT-001). 같은 학생·용도·운영일은 한 행이며, 자동 인증·수동 수정은 DB 한 문장으로 원자적으로 바꾼다. */
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     /**

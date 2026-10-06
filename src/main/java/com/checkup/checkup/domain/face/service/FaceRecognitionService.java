@@ -83,6 +83,16 @@ public class FaceRecognitionService {
         this.framePermits = new Semaphore(properties.maxConcurrentFrames());
     }
 
+    /**
+     * 관리자 카메라 페이지의 얼굴 인식 세션을 만든다. 출석 대상(필수 동의·호실)이고 얼굴을 등록한 학생이 후보다.
+     *
+     * @param adminMemberId 세션의 관리자 회원 id
+     * @param purpose       출석 용도
+     * @return 새 세션 id와 용도
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS},
+     *                         후보가 200명을 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}
+     */
     public FaceSessionResponse create(Long adminMemberId, AttendancePurpose purpose) {
         adminVerifier.verify(adminMemberId);
         List<FaceTemplate> templates = eligibleTemplates();
@@ -113,6 +123,22 @@ public class FaceRecognitionService {
         return new FaceSessionResponse(sessionId, purpose, "ACTIVE");
     }
 
+    /**
+     * 카메라 프레임 한 장에서 얼굴을 인식하고, 현재 세션 후보로 확인된 학생을 출석 처리한다.
+     * AI가 후보 밖의 학생을 지목하면 출석으로 인정하지 않고 {@code UNKNOWN}으로 낮춘다. 결과는 최근 인식 기록에도 남긴다(#143).
+     * 프레임 이미지는 처리 뒤 메모리에서 지우고 저장하지 않는다.
+     *
+     * @param frameIdHeader 프레임 id(선택, 최대 128자). 없으면 새로 만든다
+     * @param contentType   {@code image/jpeg} 또는 {@code image/webp}
+     * @param image         프레임 이미지. 처리 뒤 0으로 덮어쓴다
+     * @return 얼굴별 위치·품질·인식·출석 결과
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         세션이 없거나 닫혔으면 {@link ErrorCode#FACE_SESSION_NOT_FOUND}(404),
+     *                         프레임 간격이 너무 짧으면 {@link ErrorCode#FACE_FRAME_RATE_LIMITED},
+     *                         동시 처리 한도를 넘으면 {@link ErrorCode#FACE_SERVICE_BUSY},
+     *                         이미지가 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA},
+     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}
+     */
     public FaceFrameResponse recognize(
             Long adminMemberId,
             UUID sessionId,
@@ -221,14 +247,17 @@ public class FaceRecognitionService {
         faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwned);
     }
 
+    /** 관리자 한 명의 모든 세션을 닫는다. 로그아웃 때 부른다. 일부 세션 정리에 실패해도 나머지는 계속 닫는다. */
     public void closeAll(Long adminMemberId) {
         faceSessionStore.findForAdmin(adminMemberId).forEach(this::closeOwnedQuietly);
     }
 
+    /** 학생이 후보에 들어 있는 세션을 모두 닫는다. 졸업·자퇴로 출석 대상에서 빠졌을 때 부른다. */
     public void removeStudent(Long studentId) {
         faceSessionStore.findWithStudent(studentId).forEach(this::closeOwnedQuietly);
     }
 
+    /** 유휴 시간이 지났고 처리 중인 프레임이 없는 세션을 닫는다. 정리 작업이 주기적으로 부른다. */
     public void cleanupIdleSessions() {
         Instant now = clock.instant();
         Instant cutoff = now.minus(properties.sessionIdleTimeout());

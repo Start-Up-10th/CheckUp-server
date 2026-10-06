@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
+/** 카메라 프레임 한 장의 얼굴 인식 결과. 얼굴 이미지와 벡터는 담지 않는다. */
 public record FaceFrameResponse(
         @Schema(description = "프레임 id. 요청의 X-Frame-Id, 없으면 서버가 만든 값", example = "frame-1")
         String frameId,

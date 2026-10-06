@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.List;
 
+/** 웹 내부 알림(REQ-COM-005). 같은 학생·유형·원본 키의 알림은 하나다. */
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
     /** 학생의 최근 알림 50개를 최신순으로 읽는다. */

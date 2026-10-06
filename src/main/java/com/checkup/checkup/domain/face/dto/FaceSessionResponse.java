@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
+/** 새로 만든 관리자 얼굴 인식 세션. */
 public record FaceSessionResponse(
         @Schema(description = "얼굴 인식 세션 id. 프레임 전송·종료 경로에 쓴다") UUID sessionId,
         @Schema(description = "출석 용도. DORMITORY 또는 STUDY_ROOM") AttendancePurpose purpose,

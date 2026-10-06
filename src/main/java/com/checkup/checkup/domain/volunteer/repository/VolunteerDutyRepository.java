@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/** 당일 봉사자 지정(REQ-COM-006). 학생·운영일마다 한 행이다. */
 public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Long> {
 
     /**

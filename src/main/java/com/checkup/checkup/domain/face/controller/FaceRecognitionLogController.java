@@ -23,6 +23,12 @@ import java.util.List;
 public class FaceRecognitionLogController {
     private final FaceRecognitionLogService faceRecognitionLogService;
 
+    /**
+     * 로그인한 관리자가 연 세션의 오늘(운영일)·용도 최근 인식 기록을 최신순으로 돌려준다.
+     *
+     * @param purpose 출석 용도
+     * @param limit   최대 개수(선택, 1~100). 없으면 50
+     */
     @Operation(summary = "최근 인식 목록", description = "관리자 전용. 로그인한 관리자가 연 세션의 오늘(운영일) 기록을 최신순으로 돌려준다. 이미 출석한 학생은 남기지 않고, 못 알아본 얼굴은 QR 안내 때만 이름 없이 FAILED로 남는다. limit은 1~100(기본 50), 벗어나면 400 INVALID_REQUEST. 지난 운영일 기록은 08:00 KST에 지운다.")
     @GetMapping
     public List<FaceRecognitionLogResponse> getRecent(

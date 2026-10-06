@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/** 관리자 얼굴 인식 세션. 프레임 잠금과 비활성 전환은 조건부 UPDATE 한 문장으로 한다. */
 public interface FaceRecognitionSessionRepository extends JpaRepository<FaceRecognitionSession, UUID> {
     Optional<FaceRecognitionSession> findByIdAndAdminMemberId(UUID id, Long adminMemberId);
 

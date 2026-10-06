@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
 
+/** 얼굴 인식 세션의 읽기 전용 상태와 후보 학생 DB id 목록. */
 public record FaceSessionView(
         UUID id,
         Long adminMemberId,

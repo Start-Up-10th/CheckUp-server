@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "face_recognition_session_candidate", uniqueConstraints =
         @UniqueConstraint(name = "uk_face_session_candidate", columnNames = {"session_id", "student_id"}))
+/** 얼굴 인식 세션이 대조하는 후보 학생 한 명. 세션을 만들 때 출석 대상이고 얼굴을 등록한 학생이다. */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FaceRecognitionSessionCandidate {
     @Id
