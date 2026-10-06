@@ -182,13 +182,13 @@ class VolunteerServiceTest {
     @DisplayName("증가는 기록을 남긴 뒤 횟수를 1 늘리고 바뀐 항목을 돌려준다")
     void increaseRecordsThenIncreases() {
         Student student = givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, "key-1", NOW)).willReturn(1);
-        given(studentRepository.increaseVolunteerCount(10L)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "key-1", NOW)).willReturn(1);
+        given(studentRepository.changeVolunteerCount(10L, 1)).willReturn(1);
         given(volunteerAdjustmentRepository.findLastActivityAt(10L)).willReturn(NOW);
 
         VolunteerResponse response = service.increase(MEMBER_ID, 200L, " key-1 ");
 
-        verify(studentRepository).increaseVolunteerCount(10L);
+        verify(studentRepository).changeVolunteerCount(10L, 1);
         assertThat(response.studentId()).isEqualTo(200L);
         assertThat(response.lastActivityAt()).isEqualTo(NOW);
         assertThat(response.volunteerCount()).isEqualTo(student.getVolunteerCount());
@@ -198,19 +198,19 @@ class VolunteerServiceTest {
     @DisplayName("같은 키로 다시 오면 횟수를 바꾸지 않고 현재 상태만 돌려준다")
     void retryWithSameKeyDoesNotChangeCount() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, "key-1", NOW)).willReturn(0);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, "key-1", NOW)).willReturn(0);
         given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(10L, 1)));
 
         service.increase(MEMBER_ID, 200L, "key-1");
 
-        verify(studentRepository, never()).increaseVolunteerCount(anyLong());
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
     @Test
     @DisplayName("같은 키가 다른 학생이나 반대 방향 요청에 쓰였으면 409 IDEMPOTENCY_KEY_REUSED다")
     void reusedKeyForOtherRequestIsRejected() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), any(), any())).willReturn(0);
+        given(volunteerAdjustmentRepository.insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any())).willReturn(0);
 
         given(volunteerAdjustmentRepository.findByRequestKey("key-1")).willReturn(Optional.of(adjustment(99L, 1)));
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "key-1"))
@@ -221,21 +221,20 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, "key-1"))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
-        verify(studentRepository, never()).increaseVolunteerCount(anyLong());
-        verify(studentRepository, never()).decreaseVolunteerCount(anyLong());
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
     @Test
     @DisplayName("키가 없거나 비어 있으면 null로 기록하고 매번 반영한다")
     void blankKeyIsNull() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, null, NOW)).willReturn(1);
-        given(studentRepository.increaseVolunteerCount(10L)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, 1, 1, null, null, NOW)).willReturn(1);
+        given(studentRepository.changeVolunteerCount(10L, 1)).willReturn(1);
 
         service.increase(MEMBER_ID, 200L, "  ");
 
-        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, 1, null, NOW);
-        verify(studentRepository).increaseVolunteerCount(10L);
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, 1, 1, null, null, NOW);
+        verify(studentRepository).changeVolunteerCount(10L, 1);
     }
 
     @Test
@@ -246,31 +245,31 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, "k".repeat(101)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
     }
 
     @Test
     @DisplayName("차감은 -1로 기록하고 횟수를 1 줄인다")
     void decreaseRecordsThenDecreases() {
         givenAdjustable(2);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, null, NOW)).willReturn(1);
-        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(1);
+        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, -1, null, null, NOW)).willReturn(1);
+        given(studentRepository.changeVolunteerCount(10L, -1)).willReturn(1);
 
         service.decrease(MEMBER_ID, 200L, null);
 
-        verify(studentRepository).decreaseVolunteerCount(10L);
+        verify(studentRepository).changeVolunteerCount(10L, -1);
     }
 
     @Test
     @DisplayName("횟수가 0이면 409 VOLUNTEER_COUNT_ZERO다")
     void decreaseAtZeroIsRejected() {
         givenAdjustable(0);
-        given(volunteerAdjustmentRepository.insertIfAbsent(10L, -1, null, NOW)).willReturn(1);
-        given(studentRepository.decreaseVolunteerCount(10L)).willReturn(0);
 
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
     }
 
     @Test
@@ -281,7 +280,7 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
     }
 
     @Test
@@ -385,7 +384,7 @@ class VolunteerServiceTest {
 
         service.completeDuty(MEMBER_ID, 200L);
 
-        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -1, null, NOW);
+        verify(volunteerAdjustmentRepository).insertIfAbsent(10L, -1, -1, null, null, NOW);
         verify(studentRepository).decreaseVolunteerCount(10L);
     }
 
@@ -426,7 +425,7 @@ class VolunteerServiceTest {
         verify(studentRepository, never()).findAllByDatagsmStudentIdIsNotNull();
         assertThatThrownBy(() -> service.increase(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.decrease(MEMBER_ID, 200L, null)).isInstanceOf(CustomException.class);
-        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), any(), any());
+        verify(volunteerAdjustmentRepository, never()).insertIfAbsent(anyLong(), anyInt(), anyInt(), any(), any(), any());
         assertThatThrownBy(() -> service.assignDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
@@ -448,6 +447,7 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(student, "id", 10L);
         ReflectionTestUtils.setField(student, "volunteerCount", count);
         given(studentRepository.findByDatagsmStudentId(200L)).willReturn(Optional.of(student));
+        given(studentRepository.lockVolunteerCount(10L)).willReturn(Optional.of(count));
         given(studentRepository.findById(10L)).willReturn(Optional.of(student));
         return student;
     }
@@ -484,6 +484,7 @@ class VolunteerServiceTest {
         VolunteerAdjustment adjustment = BeanUtils.instantiateClass(VolunteerAdjustment.class);
         ReflectionTestUtils.setField(adjustment, "student", student);
         ReflectionTestUtils.setField(adjustment, "delta", (short) delta);
+        ReflectionTestUtils.setField(adjustment, "requestedDelta", (short) delta);
         return adjustment;
     }
 }
