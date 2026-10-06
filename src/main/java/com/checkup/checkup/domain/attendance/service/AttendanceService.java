@@ -59,6 +59,9 @@ public class AttendanceService {
      * @param verifiedAt 인증이 발생한 시각
      * @param method     인증 방식
      * @return 기록 결과
+     * @throws CustomException 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404), 필수 동의가 없거나 호실이 없으면
+     *                         {@link ErrorCode#FORBIDDEN}(403). QR·얼굴 경로가 먼저 걸러내지만 이 서비스를 직접 부르는
+     *                         다른 경로도 동의·호실 없는 학생을 기록하지 못하게 하는 마지막 방어선이다.
      */
     @Transactional
     public AttendanceRecordResult markAttended(
@@ -77,6 +80,8 @@ public class AttendanceService {
             return AttendanceRecordResult.STALE;
         }
 
+        verifyEligible(studentId);
+
         int changed = attendanceRepository.markAttended(
                 studentId, purpose.name(), operatingDay, recordedAt, method.name());
         if (changed == 1) {
@@ -89,6 +94,14 @@ public class AttendanceService {
         }
         boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
+    }
+
+    private void verifyEligible(Long studentId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        if (!student.isAttendanceEligible()) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
     }
 
     /**
