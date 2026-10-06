@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owns short consent and template database transactions; AI network calls happen outside. */
+/** 동의 확인과 템플릿 저장의 짧은 DB 트랜잭션을 맡는다. AI 네트워크 호출은 트랜잭션 밖에서 한다. */
 @Service
 @RequiredArgsConstructor
 public class FaceEnrollmentStore {
