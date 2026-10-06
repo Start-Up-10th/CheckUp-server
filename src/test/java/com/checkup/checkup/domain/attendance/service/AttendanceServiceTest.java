@@ -43,6 +43,7 @@ import com.checkup.checkup.domain.notification.service.NotificationService;
 /**
  * 실제 PostgreSQL에서 자동 인증 출석이 학생·용도·운영일마다 한 번만 기록되고, 수동 수정·늦은 인증·시계 오차 규칙(REQ-ATT-002·007)과 출석 완료 알림 생성을 지키는지,
  * 관리자 수동 저장이 바뀌는 상태만 수정하고 최초 인증 시각을 남기며 수동 수정 전후 인증 순서(REQ-ATT-006, DEC-008)를 지키는지,
+ * 수동 미출석이 그 용도의 출석 완료 알림을 지우는지(#148),
  * 학생 본인의 오늘 출석 조회가 용도·운영일 경계·수동 수정을 반영하는지,
  * 08:00 경계에 지난 운영일 출석을 지우고 지운 기록을 늦은 인증으로 되살리지 않는지 검증한다.
  */
@@ -407,7 +408,7 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("출석한 학생을 수동 미출석으로 바꾸면 최초 인증 시각과 방식은 남고 수정 시각을 기록한다")
+    @DisplayName("출석한 학생을 수동 미출석으로 바꾸면 최초 인증 시각과 방식은 남고 수정 시각을 기록하며 출석 완료 알림을 지운다")
     void manualAbsentKeepsFirstVerification() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         clock.setInstant(AT.plusSeconds(600));
@@ -418,10 +419,11 @@ class AttendanceServiceTest {
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
         assertThat(method(AttendancePurpose.DORMITORY, DAY)).isEqualTo("QR");
         assertThat(timestamp("manual_updated_at")).isEqualTo(AT.plusSeconds(600));
+        assertThat(notificationCount()).isZero();
     }
 
     @Test
-    @DisplayName("수동 미출석을 다시 수동 출석으로 바꿔도 최초 인증 시각과 방식은 그대로이고 알림은 하나다")
+    @DisplayName("수동 미출석을 다시 수동 출석으로 바꿔도 최초 인증 시각과 방식은 그대로이고 지웠던 알림을 다시 하나 만든다")
     void manualAttendAfterManualAbsentKeepsFirstVerification() {
         mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
         saveManually(AttendancePurpose.DORMITORY, false);
@@ -466,6 +468,33 @@ class AttendanceServiceTest {
         assertThat(fresh).isEqualTo(AttendanceRecordResult.RECORDED);
         assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
         assertThat(firstVerifiedAt(AttendancePurpose.DORMITORY, DAY)).isEqualTo(AT);
+    }
+
+    @Test
+    @DisplayName("수동 미출석은 요청한 용도의 출석 완료 알림만 지우고 다른 용도 알림은 남긴다")
+    void manualAbsentDeletesOnlyThatPurposeNotification() {
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
+
+        saveManually(AttendancePurpose.DORMITORY, false);
+
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT source_key FROM notification WHERE student_id = ?", String.class, studentId))
+                .containsExactly("STUDY_ROOM:" + DAY);
+    }
+
+    @Test
+    @DisplayName("이미 미출석인 학생을 다시 미출석으로 저장해도 다른 알림을 건드리지 않는다")
+    void manualAbsentOnAbsentStudentKeepsNotifications() {
+        mark(AttendancePurpose.STUDY_ROOM, AT, AttendanceMethod.QR);
+
+        saveManually(AttendancePurpose.STUDY_ROOM, false);
+        saveManually(AttendancePurpose.STUDY_ROOM, false);
+
+        assertThat(notificationCount()).isZero();
+        mark(AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+        saveManually(AttendancePurpose.STUDY_ROOM, false);
+        assertThat(notificationCount()).isEqualTo(1);
     }
 
     @Test
