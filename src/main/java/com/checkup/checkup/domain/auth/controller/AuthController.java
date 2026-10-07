@@ -66,6 +66,7 @@ public class AuthController {
      *
      * 브라우저가 서버 주소에 머물지 않도록 실패도 웹 로그인 화면({@code /login?error=<ErrorCode>})으로 보낸다.
      * code·state가 없으면(DataGSM에서 로그인을 취소한 경우 등) {@code INVALID_REQUEST}다.
+     * 예상하지 못한 오류(Redis·DB 장애 등)도 JSON 500으로 끝내지 않고 {@code INTERNAL_SERVER_ERROR}로 보낸다.
      *
      * @param code  DataGSM 인가 코드
      * @param state 로그인 시작 때 발급한 state
@@ -92,6 +93,9 @@ public class AuthController {
         } catch (DataGsmException e) {
             log.warn("DataGSM login failed: {}", e.getClass().getSimpleName());
             return redirectToLoginFailure(DataGsmErrorCodes.of(e));
+        } catch (RuntimeException e) {
+            log.error("Login callback failed", e);
+            return redirectToLoginFailure(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
