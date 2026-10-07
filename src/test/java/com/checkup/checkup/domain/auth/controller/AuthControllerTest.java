@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.auth.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -135,6 +136,29 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/callback").param("code", "code").param("state", "state"))
                 .andExpect(status().isFound())
                 .andExpect(header().string("Location", "https://web.test/login?error=DATAGSM_INVALID_CODE"));
+    }
+
+    @Test
+    @DisplayName("로그인 처리 중 예상하지 못한 오류도 웹 로그인 화면으로 INTERNAL_SERVER_ERROR와 302")
+    void unexpectedErrorRedirectsToLogin() throws Exception {
+        given(authService.completeLogin("code", "state")).willThrow(new IllegalStateException("redis down"));
+
+        mockMvc.perform(get("/api/v1/auth/callback").param("code", "code").param("state", "state"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://web.test/login?error=INTERNAL_SERVER_ERROR"));
+
+        verify(loginSessionService, never()).login(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("세션을 만들다 예상하지 못한 오류가 나도 웹 로그인 화면으로 302")
+    void sessionFailureRedirectsToLogin() throws Exception {
+        given(authService.completeLogin("code", "state")).willReturn(new LoginResult(member, "/login/complete"));
+        willThrow(new IllegalStateException("session failed")).given(loginSessionService).login(any(), any(), any());
+
+        mockMvc.perform(get("/api/v1/auth/callback").param("code", "code").param("state", "state"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "https://web.test/login?error=INTERNAL_SERVER_ERROR"));
     }
 
     @Test
