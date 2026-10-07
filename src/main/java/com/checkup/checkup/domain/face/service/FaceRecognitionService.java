@@ -215,15 +215,13 @@ public class FaceRecognitionService {
                 throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
             }
             result.faces().forEach(FaceRecognitionService::validateFace);
-            FaceSessionView currentSession;
-            try {
-                currentSession = faceSessionStore.findOwned(sessionId, adminMemberId);
-            } catch (CustomException closed) {
+            // AI를 기다리는 동안 세션이 닫혔는지만 본다. 후보 목록은 처음 읽은 값을 쓴다(세션이 열려 있는 동안 바뀌지 않는다).
+            if (!faceSessionStore.isOwnedActive(sessionId, adminMemberId)) {
                 deleteAiSessionQuietly(sessionId);
-                throw closed;
+                throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
             return new FaceFrameResponse(frameId, result.faces().stream()
-                    .map(face -> toPublicFace(currentSession, face, now)).toList());
+                    .map(face -> toPublicFace(session, face, now)).toList());
         } catch (AiFaceException e) {
             if (e.getStatus() >= 500 || e.getStatus() == 404) {
                 faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwnedQuietly);
@@ -300,8 +298,8 @@ public class FaceRecognitionService {
                     && student.get().isAttendanceEligible()) {
                 studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
-                AttendanceRecordResult recorded = attendanceService.markAttended(
-                        student.get().getId(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
+                AttendanceRecordResult recorded = attendanceService.markAttendedFor(
+                        student.get(), session.purpose(), verifiedAt, AttendanceMethod.FACE);
                 attendance = attendanceResult(recorded);
                 switch (attendance) {
                     case "RECORDED" -> recordQuietly(session, face.trackId(), FaceRecognitionResult.SUCCESS,
