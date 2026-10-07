@@ -29,6 +29,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
@@ -41,7 +43,7 @@ import team.themoment.datagsm.sdk.openapi.model.StudentRole;
  * 공통 동기화 정보로 바꿔 {@link StudentSyncService}에 넘기는지 검증한다.
  * DataGSM 요청이 한 페이지라도 실패하면 아무것도 반영하지 않고 502로 끝나는지도 검증한다.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class StudentManualSyncServiceTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -147,6 +149,21 @@ class StudentManualSyncServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_ERROR));
         verify(studentSyncService, never()).syncAll(any(), any());
+    }
+
+    @Test
+    @DisplayName("DataGSM 요청 실패는 실패한 페이지와 예외 종류만 로그에 남기고 SDK 메시지는 남기지 않는다")
+    void dataGsmFailureIsLoggedWithoutUpstreamMessage(CapturedOutput output) {
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudents(any()))
+                .willReturn(page(2, enrolled(1L)))
+                .willThrow(new DataGsmException("upstream-body", new SocketTimeoutException("timeout")));
+
+        assertThatThrownBy(() -> service.sync(MEMBER_ID)).isInstanceOf(CustomException.class);
+        assertThat(output.getOut())
+                .contains("DataGSM student list fetch failed: page=1, "
+                        + "type=DataGsmException, status=0, cause=SocketTimeoutException")
+                .doesNotContain("upstream-body");
     }
 
     @Test
