@@ -284,7 +284,7 @@
             "uid": "prometheus"
           },
           "expr": "hikaricp_connections_idle",
-          "legendFormat": "대기 연결"
+          "legendFormat": "쉬는 연결"
         },
         {
           "refId": "C",
