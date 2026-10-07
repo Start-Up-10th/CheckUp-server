@@ -76,6 +76,8 @@ management:
       # API 응답 시간의 p95 같은 분위수를 Prometheus에서 계산할 수 있게 구간별 횟수를 남긴다
       percentiles-histogram:
         http.server.requests: true
+        # 얼굴 AI 서버 호출 시간. Spring Boot가 RestClient 호출을 자동으로 잰다
+        http.client.requests: true
 
 # Hibernate 통계를 켜면 트랜잭션마다 찍히는 요약 로그를 끈다. 값은 지표로 본다.
 logging:
