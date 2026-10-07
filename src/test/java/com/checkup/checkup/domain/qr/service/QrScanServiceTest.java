@@ -59,9 +59,11 @@ class QrScanServiceTest {
             clock
     );
 
+    private Student student;
+
     @BeforeEach
     void setUp() {
-        Student student = mock(Student.class);
+        student = mock(Student.class);
         given(student.getId()).willReturn(STUDENT_ID);
         given(student.isAttendanceEligible()).willReturn(true);
         given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
@@ -129,13 +131,13 @@ class QrScanServiceTest {
         assertThat(qrScanService.scan(MEMBER_ID, "not-a-token")).isEqualTo(QrScanResult.INVALID);
         assertThat(qrScanService.scan(MEMBER_ID, "a".repeat(44))).isEqualTo(QrScanResult.INVALID);
 
-        verify(qrSessionRepository, never()).findToken(anyString());
+        verify(qrSessionRepository, never()).findTokenWithSession(anyString());
     }
 
     @Test
     @DisplayName("발급하지 않은 토큰은 INVALID다")
     void unknownTokenIsInvalid() {
-        given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.empty());
+        given(qrSessionRepository.findTokenWithSession(TOKEN)).willReturn(lookup(Optional.empty(), Optional.empty()));
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.INVALID);
         verifyNoInteractions(attendanceService);
@@ -144,7 +146,8 @@ class QrScanServiceTest {
     @Test
     @DisplayName("만료 시각이 지난 토큰은 EXPIRED다")
     void expiredTokenIsExpired() {
-        given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant())));
+        given(qrSessionRepository.findTokenWithSession(TOKEN))
+                .willReturn(lookup(Optional.of(token(clock.instant())), Optional.empty()));
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.EXPIRED);
         verifyNoInteractions(attendanceService);
@@ -153,8 +156,8 @@ class QrScanServiceTest {
     @Test
     @DisplayName("세션이 종료됐으면 CLOSED다")
     void closedSessionIsClosed() {
-        given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(600))));
-        given(qrSessionRepository.findById(SESSION_ID)).willReturn(Optional.empty());
+        given(qrSessionRepository.findTokenWithSession(TOKEN))
+                .willReturn(lookup(Optional.of(token(clock.instant().plusSeconds(600))), Optional.empty()));
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.CLOSED);
         verifyNoInteractions(attendanceService);
@@ -163,9 +166,9 @@ class QrScanServiceTest {
     @Test
     @DisplayName("세션의 lease가 끝났으면 CLOSED다")
     void expiredLeaseIsClosed() {
-        given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(600))));
-        given(qrSessionRepository.findById(SESSION_ID))
-                .willReturn(Optional.of(session(AttendancePurpose.DORMITORY, clock.instant())));
+        given(qrSessionRepository.findTokenWithSession(TOKEN)).willReturn(lookup(
+                Optional.of(token(clock.instant().plusSeconds(600))),
+                Optional.of(session(AttendancePurpose.DORMITORY, clock.instant()))));
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.CLOSED);
         verifyNoInteractions(attendanceService);
@@ -175,20 +178,20 @@ class QrScanServiceTest {
     @DisplayName("처음 출석하면 세션 용도와 현재 운영일로 기록하고 APPROVED다")
     void firstAttendanceIsApproved() {
         activeToken(AttendancePurpose.STUDY_ROOM);
-        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.RECORDED);
+        given(attendanceService.markAttendedFor(any(), any(), any(), any())).willReturn(AttendanceRecordResult.RECORDED);
 
         QrScanResult result = qrScanService.scan(MEMBER_ID, TOKEN);
 
         assertThat(result).isEqualTo(QrScanResult.APPROVED);
-        verify(attendanceService).markAttended(
-                STUDENT_ID, AttendancePurpose.STUDY_ROOM, clock.instant(), AttendanceMethod.QR);
+        verify(attendanceService).markAttendedFor(
+                student, AttendancePurpose.STUDY_ROOM, clock.instant(), AttendanceMethod.QR);
     }
 
     @Test
     @DisplayName("이미 출석했으면 DUPLICATE다")
     void alreadyAttendedIsDuplicate() {
         activeToken(AttendancePurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
+        given(attendanceService.markAttendedFor(any(), any(), any(), any())).willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.DUPLICATE);
     }
@@ -197,7 +200,7 @@ class QrScanServiceTest {
     @DisplayName("수동 수정에 밀린 인증은 DUPLICATE다")
     void supersededByManualIsDuplicate() {
         activeToken(AttendancePurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any()))
+        given(attendanceService.markAttendedFor(any(), any(), any(), any()))
                 .willReturn(AttendanceRecordResult.SUPERSEDED_BY_MANUAL);
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.DUPLICATE);
@@ -207,7 +210,7 @@ class QrScanServiceTest {
     @DisplayName("지난 운영일로 판정되면 EXPIRED다")
     void staleIsExpired() {
         activeToken(AttendancePurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.STALE);
+        given(attendanceService.markAttendedFor(any(), any(), any(), any())).willReturn(AttendanceRecordResult.STALE);
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.EXPIRED);
     }
@@ -216,15 +219,19 @@ class QrScanServiceTest {
     @DisplayName("미래 시각으로 판정되면 INVALID다")
     void futureIsInvalid() {
         activeToken(AttendancePurpose.DORMITORY);
-        given(attendanceService.markAttended(any(), any(), any(), any())).willReturn(AttendanceRecordResult.FUTURE);
+        given(attendanceService.markAttendedFor(any(), any(), any(), any())).willReturn(AttendanceRecordResult.FUTURE);
 
         assertThat(qrScanService.scan(MEMBER_ID, TOKEN)).isEqualTo(QrScanResult.INVALID);
     }
 
     private void activeToken(AttendancePurpose purpose) {
-        given(qrSessionRepository.findToken(TOKEN)).willReturn(Optional.of(token(clock.instant().plusSeconds(60))));
-        given(qrSessionRepository.findById(SESSION_ID))
-                .willReturn(Optional.of(session(purpose, clock.instant().plusSeconds(60))));
+        given(qrSessionRepository.findTokenWithSession(TOKEN)).willReturn(lookup(
+                Optional.of(token(clock.instant().plusSeconds(60))),
+                Optional.of(session(purpose, clock.instant().plusSeconds(60)))));
+    }
+
+    private static QrSessionRepository.TokenLookup lookup(Optional<QrToken> token, Optional<QrSession> session) {
+        return new QrSessionRepository.TokenLookup(token, session);
     }
 
     private static QrToken token(Instant expiresAt) {

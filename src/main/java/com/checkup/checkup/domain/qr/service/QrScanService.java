@@ -56,9 +56,11 @@ public class QrScanService {
         }
         Instant now = clock.instant();
 
-        Optional<QrToken> qrToken = QrTokenGenerator.isWellFormed(token)
-                ? qrSessionRepository.findToken(token)
-                : Optional.empty();
+        // 토큰과 세션을 Redis 한 번에 읽는다. 판정 순서(INVALID → EXPIRED → CLOSED)는 읽은 값으로 그대로 따른다.
+        QrSessionRepository.TokenLookup lookup = QrTokenGenerator.isWellFormed(token)
+                ? qrSessionRepository.findTokenWithSession(token)
+                : new QrSessionRepository.TokenLookup(Optional.empty(), Optional.empty());
+        Optional<QrToken> qrToken = lookup.token();
         if (qrToken.isEmpty()) {
             return QrScanResult.INVALID;
         }
@@ -66,14 +68,13 @@ public class QrScanService {
             return QrScanResult.EXPIRED;
         }
 
-        Optional<QrSession> session = qrSessionRepository.findById(qrToken.get().sessionId())
-                .filter(found -> found.isLeaseActive(now));
+        Optional<QrSession> session = lookup.session().filter(found -> found.isLeaseActive(now));
         if (session.isEmpty()) {
             return QrScanResult.CLOSED;
         }
 
-        AttendanceRecordResult recorded = attendanceService.markAttended(
-                student.getId(),
+        AttendanceRecordResult recorded = attendanceService.markAttendedFor(
+                student,
                 session.get().purpose(),
                 now,
                 AttendanceMethod.QR
