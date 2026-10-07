@@ -1,0 +1,76 @@
+name: checkup
+
+services:
+  server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/checkup
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATAGSM_CLIENT_ID: ${DATAGSM_CLIENT_ID}
+      DATAGSM_CLIENT_SECRET: ${DATAGSM_CLIENT_SECRET}
+      DATAGSM_API_KEY: ${DATAGSM_API_KEY}
+      DATAGSM_REDIRECT_URI: ${DATAGSM_REDIRECT_URI}
+      DATAGSM_WEBHOOK_SECRET: ${DATAGSM_WEBHOOK_SECRET}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
+      # .env에 빈 값으로 두면 application.yaml의 기본값(7d)이 적용되지 않으므로 여기서 기본값을 준다(#156).
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-7d}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      FACE_SERVICE_TOKEN: ${FACE_SERVICE_TOKEN}
+      FACE_AI_BASE_URL: ${FACE_AI_BASE_URL}
+      CHECKUP_ADMIN_DATAGSM_IDS: ${CHECKUP_ADMIN_DATAGSM_IDS:-}
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: checkup
+      POSTGRES_USER: checkup
+      POSTGRES_PASSWORD: checkup
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkup -d checkup"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    # 로그인 세션이 Redis에 있다. 컨테이너를 다시 만들거나 비정상 종료돼도 남도록 볼륨과 AOF를 쓴다(#156).
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  default:
+    driver_opts:
+      com.docker.network.driver.mtu: "1400"

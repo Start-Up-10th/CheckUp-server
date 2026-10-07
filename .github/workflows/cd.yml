@@ -1,0 +1,81 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to school server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd ~/CheckUp-server
+
+            if [ ! -f .env ]; then
+              echo "ERROR: .env file missing. Aborting deploy."
+              exit 1
+            fi
+
+            PREV_COMMIT=$(git rev-parse HEAD)
+
+            git fetch origin main
+            git reset --hard origin/main
+            git submodule sync --recursive
+            git submodule update --init --recursive
+
+            if ! grep -q '"mtu"' /etc/docker/daemon.json 2>/dev/null; then
+              echo "WARNING: Docker MTU not configured, build may fail on slow network"
+            fi
+
+            if ! sudo docker compose -f compose.prod.yaml up -d --build; then
+              echo "ERROR: docker compose build/up failed"
+              exit 1
+            fi
+
+            SUCCESS=false
+            for i in $(seq 1 20); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator || echo "000")
+              if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+                echo "Health check passed (status: $STATUS)"
+                SUCCESS=true
+                break
+              fi
+              echo "Waiting for server... (attempt $i, status: $STATUS)"
+              sleep 6
+            done
+
+            if [ "$SUCCESS" != "true" ]; then
+              echo "=== Server logs before rollback ==="
+              sudo docker compose -f compose.prod.yaml logs server --tail 50
+              echo "ERROR: Health check failed after 120s. Rolling back to $PREV_COMMIT"
+              git reset --hard "$PREV_COMMIT"
+              git submodule update --init --recursive
+              sudo docker compose -f compose.prod.yaml up -d --build
+
+              ROLLBACK_OK=false
+              for i in $(seq 1 10); do
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator || echo "000")
+                if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+                  ROLLBACK_OK=true
+                  break
+                fi
+                sleep 6
+              done
+              if [ "$ROLLBACK_OK" != "true" ]; then
+                echo "CRITICAL: Rollback also failed health check!"
+              fi
+              exit 1
+            fi
+
+            echo "Deploy successful."
