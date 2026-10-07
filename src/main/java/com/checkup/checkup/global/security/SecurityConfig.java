@@ -24,6 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  * - {@code /api/v1/auth/me}를 제외한 {@code /api/v1/auth/**}는 로그인 없이 접근할 수 있다.
  * - {@code /api/v1/webhook}은 DataGSM이 로그인 없이 호출하며, 컨트롤러에서 서명으로 검증한다.
  * - API 문서({@code /v3/api-docs}, {@code /swagger-ui})는 로그인 없이 볼 수 있다. 끄려면 {@code SWAGGER_ENABLED=false}.
+ * - 상태 확인({@code /actuator/health})은 배포·컨테이너 점검이 로그인 없이 호출한다(REQ-OPS-001). 다른 actuator 경로는 로그인이 필요하다.
  * - CSRF 토큰 대신 {@link OriginCheckFilter}로 상태 변경 요청의 출처를 확인한다. 로그아웃도 확인하도록 {@link LogoutFilter} 앞에 둔다.
  */
 @Configuration
@@ -54,6 +55,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/v1/auth/me").authenticated()
                                 .requestMatchers("/api/v1/auth/**", "/error", "/api/v1/webhook").permitAll()
                                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                                 .anyRequest().authenticated()
                 );
         return http.build();

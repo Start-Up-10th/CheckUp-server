@@ -22,6 +22,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Redis가 내려갔을 때 기본 60초를 기다리지 않고 바로 실패하게 한다. 상태 확인이 503을 빨리 준다
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:3s}
   session:
     data:
       redis:
@@ -48,6 +51,17 @@ server:
         http-only: true # JS가 쿠키 못 읽음, XSS 방지
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
+
+# 상태 확인(/actuator/health)만 연다. 로그인 없이 호출되므로 DB·Redis 주소나 장애 원인은 응답에 넣지 않는다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
 
 # API 문서(/swagger-ui/index.html, /v3/api-docs). 노출하지 않을 환경에서는 SWAGGER_ENABLED=false로 끈다.
 springdoc:
