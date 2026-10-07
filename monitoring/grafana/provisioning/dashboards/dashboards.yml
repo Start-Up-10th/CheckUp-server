@@ -1,0 +1,9 @@
+# Grafana가 뜰 때 monitoring/grafana/dashboards의 대시보드 JSON을 자동으로 불러온다.
+apiVersion: 1
+
+providers:
+  - name: checkup
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
