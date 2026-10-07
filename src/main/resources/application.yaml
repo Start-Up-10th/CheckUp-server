@@ -123,3 +123,5 @@ checkup:
     session-idle-timeout: ${FACE_SESSION_IDLE_TIMEOUT:5m}
     cleanup-interval-ms: ${FACE_CLEANUP_INTERVAL_MS:60000}
     consent-version: ${FACE_CONSENT_VERSION:v1}
+    # 얼굴 인식 세션 후보(등록 학생) 상한. 넘으면 세션을 만들지 못한다(422). 기숙사생 약 200명이라 기본 200이다. AI 서버가 감당하는 후보 수를 확인한 뒤 올린다
+    max-candidates: ${FACE_MAX_CANDIDATES:200}

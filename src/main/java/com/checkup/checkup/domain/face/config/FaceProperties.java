@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
@@ -24,8 +25,34 @@ public record FaceProperties(
         @NotNull Duration enrollmentWaitTimeout,
         @NotNull Duration sessionIdleTimeout,
         @Positive long cleanupIntervalMs,
-        @NotBlank String consentVersion
+        @NotBlank String consentVersion,
+        @Positive int maxCandidates
 ) {
+    /** 얼굴 인식 세션 후보 상한의 기본값. 기숙사생 약 200명(scope.md)과 같다. 계약은 "설정된 최대치"를 넘으면 422라고 한다. */
+    public static final int DEFAULT_MAX_CANDIDATES = 200;
+
+    /** 후보 상한을 따로 정하지 않는 호출용. {@link #DEFAULT_MAX_CANDIDATES}를 쓴다. */
+    public FaceProperties(
+            String aiBaseUrl,
+            String serviceToken,
+            Duration connectTimeout,
+            Duration responseTimeout,
+            long maxUploadBytes,
+            long maxFrameBytes,
+            Duration minFrameInterval,
+            int maxConcurrentFrames,
+            int maxConcurrentEnrollments,
+            Duration enrollmentWaitTimeout,
+            Duration sessionIdleTimeout,
+            long cleanupIntervalMs,
+            String consentVersion
+    ) {
+        this(aiBaseUrl, serviceToken, connectTimeout, responseTimeout, maxUploadBytes, maxFrameBytes,
+                minFrameInterval, maxConcurrentFrames, maxConcurrentEnrollments, enrollmentWaitTimeout,
+                sessionIdleTimeout, cleanupIntervalMs, consentVersion, DEFAULT_MAX_CANDIDATES);
+    }
+
+    @ConstructorBinding
     public FaceProperties {
         if (aiBaseUrl != null) {
             aiBaseUrl = aiBaseUrl.replaceFirst("/+$", "");
