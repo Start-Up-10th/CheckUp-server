@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
@@ -14,6 +15,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.security.AdminRoleCache;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -33,8 +35,9 @@ class StudentSyncServiceTest {
     private final StudentRepository studentRepository = mock(StudentRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     /** 허용 목록: DataGSM 계정 id 1060(학생 60의 회원). */
+    private final AdminRoleCache adminRoleCache = mock(AdminRoleCache.class);
     private final StudentSyncService service = new StudentSyncService(studentRepository, eventPublisher,
-            new AdminProperties(Set.of(1060L)));
+            new AdminProperties(Set.of(1060L)), adminRoleCache);
 
     @Test
     @DisplayName("목록에 없는 저장된 학생은 조회하지도 바꾸지도 않는다")
@@ -112,6 +115,31 @@ class StudentSyncServiceTest {
 
         assertThat(count).isZero();
         verify(studentRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("계정이 있는 학생의 역할을 갱신하거나 졸업 처리하면 관리자 역할 기억을 지운다")
+    void evictsAdminRoleCacheWhenMemberRoleIsUpdated() {
+        Student updated = student(70L, MemberRole.STUDENT, 301);
+        Student graduated = student(71L, MemberRole.ADMIN, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(updated, graduated));
+
+        service.syncAll(List.of(
+                enrolled(70L, 302),
+                new StudentSyncData(71L, "학생", null, null, null, null, null, "GRADUATE")), SYNCED_AT);
+
+        verify(adminRoleCache, times(2)).evictAfterCommit(any());
+    }
+
+    @Test
+    @DisplayName("계정이 없는 학생은 관리자 역할 기억을 지우지 않는다")
+    void doesNotEvictAdminRoleCacheForStudentWithoutMember() {
+        Student student = Student.createWithoutMember(50L, "옛이름", 2, 1, 5, 2105, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(any())).willReturn(List.of(student));
+
+        service.syncAll(List.of(enrolled(50L, 302)), SYNCED_AT);
+
+        verify(adminRoleCache, never()).evictAfterCommit(any());
     }
 
     @Test
