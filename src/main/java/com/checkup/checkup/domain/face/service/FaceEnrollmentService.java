@@ -51,16 +51,7 @@ public class FaceEnrollmentService {
      */
     public FaceEnrollmentResponse enroll(Long memberId, String contentType, byte[] rawVideo) {
         try {
-            FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
-            if (!status.consented()) {
-                throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
-            }
-            if (!status.eligible()) {
-                throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
-            }
-            if (status.enrolled()) {
-                throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
-            }
+            verifyEnrollable(memberId);
             if (rawVideo == null || rawVideo.length == 0) {
                 throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
             }
@@ -88,6 +79,29 @@ public class FaceEnrollmentService {
             if (rawVideo != null) {
                 Arrays.fill(rawVideo, (byte) 0);
             }
+        }
+    }
+
+    /**
+     * 지금 얼굴을 등록할 수 있는 학생인지 확인한다. 영상 본문을 받기 전에도 불러, 등록할 수 없는 요청이 영상을 올리며
+     * 처리 자리를 차지하지 않게 한다({@link com.checkup.checkup.domain.face.controller.FacePayloadLimitFilter}).
+     *
+     * @param memberId 세션의 회원 id
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
+     *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
+     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409)
+     */
+    public void verifyEnrollable(Long memberId) {
+        FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
+        if (!status.consented()) {
+            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        }
+        if (!status.eligible()) {
+            throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
+        }
+        if (status.enrolled()) {
+            throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
         }
     }
 
