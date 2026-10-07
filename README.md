@@ -96,6 +96,22 @@ checkup:
 DataGSM 호출은 연결 3초·응답 5초까지만 기다립니다. `DATAGSM_CONNECT_TIMEOUT`, `DATAGSM_RESPONSE_TIMEOUT`(예: `5s`)으로 바꿀 수 있고, 시간 안에 응답이 없으면 `DATAGSM_UNAVAILABLE`로 응답합니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
+### 지표 대시보드 (로컬 전용)
+
+API별 응답 시간, DB 쿼리 수, DB 연결 풀, JVM 메모리를 Grafana로 볼 수 있습니다. 운영에는 적용하지 않았습니다.
+
+```bash
+docker compose --profile metrics up -d
+METRICS_ENABLED=true ./gradlew bootRun
+```
+
+- Grafana: http://localhost:3001 (로그인 없이 보기 전용. `CheckUp 서버` 대시보드가 바로 열립니다)
+- Prometheus: http://localhost:9090 (`Status > Target health`에서 서버가 `UP`인지 확인)
+- `METRICS_ENABLED=true`이면 `/actuator/prometheus`가 로그인 없이 열립니다. 기본은 꺼져 있고 그때는 경로 자체가 없습니다.
+- `docker compose up -d`만 실행하면 Prometheus와 Grafana는 뜨지 않습니다.
+- 대시보드는 `monitoring/grafana/dashboards/checkup-server.json`, 수집 설정은 `monitoring/prometheus.yml`입니다.
+- 끌 때는 `docker compose --profile metrics stop prometheus grafana`입니다.
+
 ### 얼굴 AI 서비스 연결
 
 Spring은 얼굴 등록·프레임 추론 요청을 AI 서비스에 위임하고 브라우저는 Spring API만 호출합니다. 로컬에서는 `application-local.yaml`, 운영에서는 Spring 프로세스 환경변수로 설정합니다.
