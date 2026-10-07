@@ -360,6 +360,254 @@
       ]
     },
     {
+      "id": 11,
+      "type": "timeseries",
+      "title": "얼굴 프레임 처리 시간: 전체와 AI",
+      "description": "프레임 한 장의 평균 처리 시간. 전체는 Spring이 요청을 받아 응답할 때까지, AI는 그중 AI 서버 응답을 기다린 시간이다. 나머지는 Spring의 DB 작업 등이다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_sum{uri=\"/api/v1/face/sessions/{sessionId}/frames\"}[1m])) / sum(rate(http_server_requests_seconds_count{uri=\"/api/v1/face/sessions/{sessionId}/frames\"}[1m]))",
+          "legendFormat": "전체"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_client_requests_seconds_sum{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m])) / sum(rate(http_client_requests_seconds_count{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m]))",
+          "legendFormat": "AI 서버 호출"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_sum{uri=\"/api/v1/face/sessions/{sessionId}/frames\"}[1m])) / sum(rate(http_server_requests_seconds_count{uri=\"/api/v1/face/sessions/{sessionId}/frames\"}[1m]))) - (sum(rate(http_client_requests_seconds_sum{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m])) / sum(rate(http_client_requests_seconds_count{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m])))",
+          "legendFormat": "나머지 (Spring·DB)"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "얼굴 프레임 AI 호출 시간 (p50·p95)",
+      "description": "AI 서버가 프레임 한 장에 응답하는 시간. 절반이 p50 안에, 100개 중 95개가 p95 안에 끝난다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_client_requests_seconds_bucket{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_client_requests_seconds_bucket{uri=\"/internal/v1/face/sessions/{sessionId}/frames\"}[1m])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "AI 서버 호출별 평균 시간",
+      "description": "준비 확인, 세션 생성·삭제, 프레임 인식, 등록 영상 처리별 평균 응답 시간.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (method, uri) (rate(http_client_requests_seconds_sum{uri=~\"/internal/v1/face/.*|/health/ready\"}[1m])) / sum by (method, uri) (rate(http_client_requests_seconds_count{uri=~\"/internal/v1/face/.*|/health/ready\"}[1m]))",
+          "legendFormat": "{{method}} {{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "얼굴 프레임 수와 AI 오류",
+      "description": "초당 처리한 프레임 수와 AI 서버가 오류로 답한 호출 수.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/api/v1/face/sessions/{sessionId}/frames\"}[1m]))",
+          "legendFormat": "초당 프레임"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (status) (rate(http_client_requests_seconds_count{uri=~\"/internal/v1/face/.*\",outcome!=\"SUCCESS\"}[1m]))",
+          "legendFormat": "AI 오류 {{status}}"
+        }
+      ]
+    },
+    {
       "id": 7,
       "type": "timeseries",
       "title": "JVM 힙 메모리",
