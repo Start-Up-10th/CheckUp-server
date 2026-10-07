@@ -32,5 +32,33 @@ services:
       timeout: 5s
       retries: 10
 
+  # 지표 수집·대시보드. 평소 `docker compose up -d`에는 뜨지 않고 `--profile metrics`를 줄 때만 뜬다.
+  # 호스트에서 METRICS_ENABLED=true로 실행한 Spring 서버를 긁어 온다. 로컬 전용이며 운영 compose에는 없다.
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    profiles: ["metrics"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  # 웹 개발 서버(3000)와 겹치지 않게 3001로 연다. 로그인 없이 보기 전용으로 열리며 127.0.0.1에만 바인딩한다.
+  grafana:
+    image: grafana/grafana:13.2.3
+    profiles: ["metrics"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/checkup-server.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+
 volumes:
   postgres-data:

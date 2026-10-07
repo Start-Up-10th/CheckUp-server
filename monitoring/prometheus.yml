@@ -1,0 +1,10 @@
+# 로컬 개발용 Prometheus 설정. 호스트에서 실행 중인 Spring 서버(8080)의 지표를 15초마다 긁어 온다.
+# 서버를 METRICS_ENABLED=true로 띄워야 /actuator/prometheus가 열린다.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: checkup-server
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
