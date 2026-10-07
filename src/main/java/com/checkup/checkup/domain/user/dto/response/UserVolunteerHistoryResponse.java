@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.dto.Response;
+package com.checkup.checkup.domain.user.dto.response;
 
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import io.swagger.v3.oas.annotations.media.Schema;
