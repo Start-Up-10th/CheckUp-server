@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 관리자 또는 본인의 학생 정보·봉사 횟수·봉사 완료 내역 조회 API. DataGSM 호출이 있어 회원별 요청 수를 제한한다. */
+/** 관리자 또는 본인의 학생 정보·봉사 횟수·봉사 완료 내역 조회 API. 학생 정보와 봉사 횟수 조회는 회원별 요청 수를 제한한다. */
 @Tag(name = "학생 정보", description = "DataGSM 학생 정보와 봉사 횟수 조회")
 @RestController
 @RequestMapping("/api/v1/users")
