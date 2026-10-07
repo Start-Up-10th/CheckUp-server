@@ -20,6 +20,8 @@ public record FaceProperties(
         @Positive long maxFrameBytes,
         @NotNull Duration minFrameInterval,
         @Positive int maxConcurrentFrames,
+        @Positive int maxConcurrentEnrollments,
+        @NotNull Duration enrollmentWaitTimeout,
         @NotNull Duration sessionIdleTimeout,
         @Positive long cleanupIntervalMs,
         @NotBlank String consentVersion
@@ -32,6 +34,9 @@ public record FaceProperties(
         requirePositive(responseTimeout, "response-timeout");
         requirePositive(minFrameInterval, "min-frame-interval");
         requirePositive(sessionIdleTimeout, "session-idle-timeout");
+        if (enrollmentWaitTimeout != null && enrollmentWaitTimeout.isNegative()) {
+            throw new IllegalArgumentException("enrollment-wait-timeout must not be negative");
+        }
         if (maxUploadBytes > Integer.MAX_VALUE - 1L || maxFrameBytes > Integer.MAX_VALUE - 1L) {
             throw new IllegalArgumentException("face request body limits must fit in a byte array");
         }

@@ -1,6 +1,8 @@
 package com.checkup.checkup.domain.face.controller;
 
 import com.checkup.checkup.domain.face.config.FaceProperties;
+import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
+import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.ErrorResponse;
 import jakarta.servlet.FilterChain;
@@ -11,7 +13,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,20 +25,28 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
-/** Spring MVC가 바이트 배열을 만들기 전에 카메라 원본 요청 본문의 크기를 제한한다. */
+/**
+ * Spring MVC가 바이트 배열을 만들기 전에 얼굴 등록 영상·카메라 프레임 요청 본문의 크기와 동시 처리 수를 제한한다.
+ *
+ * - 얼굴 등록은 본문을 받기 전에 등록할 수 있는 학생인지 먼저 확인한다. 등록할 수 없는 요청이 영상을 올리는 동안 자리를 차지하지 않는다.
+ * - 얼굴 등록은 자리가 없으면 잠깐 기다리고, 그래도 없으면 429와 {@code Retry-After}를 준다.
+ * - 프레임은 다음 프레임이 곧 오므로 기다리지 않고 바로 429를 준다.
+ */
 @RequiredArgsConstructor
 public class FacePayloadLimitFilter extends OncePerRequestFilter {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
+    private final FaceEnrollmentService faceEnrollmentService;
     private Semaphore framePermits;
     private Semaphore enrollmentPermits;
 
     @jakarta.annotation.PostConstruct
     void initialize() {
         framePermits = new Semaphore(properties.maxConcurrentFrames());
-        // 클 수 있는 얼굴 등록 영상 본문은 한 번에 하나만 메모리에 올린다.
-        enrollmentPermits = new Semaphore(1);
+        // 얼굴 등록 영상 본문은 메모리에 올라가므로 동시에 받는 수를 설정값으로 묶는다. 먼저 기다린 요청부터 받는다.
+        enrollmentPermits = new Semaphore(properties.maxConcurrentEnrollments(), true);
     }
 
     @Override
@@ -54,7 +67,13 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
             writeError(response, ErrorCode.FACE_UPLOAD_TOO_LARGE);
             return;
         }
-        if (!permits.tryAcquire()) {
+        if (enrollment && !canEnroll(response)) {
+            return;
+        }
+        if (!acquire(permits, enrollment)) {
+            if (enrollment) {
+                response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds()));
+            }
             writeError(response, ErrorCode.FACE_SERVICE_BUSY);
             return;
         }
@@ -72,6 +91,39 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
         } finally {
             permits.release();
         }
+    }
+
+    /**
+     * 본문을 받기 전에 등록할 수 있는 학생인지 확인하고, 아니면 오류 응답을 쓴다. 같은 확인을 서비스가 저장 전에 다시 한다.
+     */
+    private boolean canEnroll(HttpServletResponse response) throws IOException {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Long memberId)) {
+            return true;
+        }
+        try {
+            faceEnrollmentService.verifyEnrollable(memberId);
+            return true;
+        } catch (CustomException e) {
+            writeError(response, e.getErrorCode());
+            return false;
+        }
+    }
+
+    private boolean acquire(Semaphore permits, boolean enrollment) {
+        if (!enrollment) {
+            return permits.tryAcquire();
+        }
+        try {
+            return permits.tryAcquire(properties.enrollmentWaitTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private long retryAfterSeconds() {
+        return Math.max(1, properties.enrollmentWaitTimeout().toSeconds());
     }
 
     private static boolean isEnrollmentPath(String path) {
