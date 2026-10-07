@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerHistoryResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerResponse;
 import com.checkup.checkup.domain.user.service.UserSearchService;
 import com.checkup.checkup.domain.user.service.UserVolunteerService;
 import com.checkup.checkup.global.exception.CustomException;

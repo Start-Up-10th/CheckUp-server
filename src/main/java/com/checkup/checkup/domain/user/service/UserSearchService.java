@@ -2,7 +2,7 @@ package com.checkup.checkup.domain.user.service;
 
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.service.MemberService;
-import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
+import com.checkup.checkup.domain.user.dto.response.UserSearchResponse;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;

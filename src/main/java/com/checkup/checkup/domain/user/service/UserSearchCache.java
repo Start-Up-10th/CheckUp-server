@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.springframework.stereotype.Component;
 
-import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
+import com.checkup.checkup.domain.user.dto.response.UserSearchResponse;
 
 import lombok.RequiredArgsConstructor;
 
