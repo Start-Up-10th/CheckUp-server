@@ -70,6 +70,15 @@ public class FaceSessionStore {
      *
      * @return 없거나 다른 관리자의 세션이면 비어 있다
      */
+    /**
+     * 세션이 아직 이 관리자의 활성 세션인지만 확인한다. 후보 목록은 읽지 않는다.
+     * AI 응답을 기다리는 동안 세션이 닫혔는지 보는 데 쓴다(#210). 후보는 세션이 열려 있는 동안 바뀌지 않으므로 처음 읽은 값을 그대로 쓴다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isOwnedActive(UUID sessionId, Long adminMemberId) {
+        return sessionRepository.existsByIdAndAdminMemberIdAndActiveTrue(sessionId, adminMemberId);
+    }
+
     @Transactional(readOnly = true)
     public Optional<FaceSessionView> findOwnedIfPresent(UUID sessionId, Long adminMemberId) {
         return sessionRepository.findByIdAndAdminMemberId(sessionId, adminMemberId)
