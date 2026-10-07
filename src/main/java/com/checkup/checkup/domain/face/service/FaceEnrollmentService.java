@@ -37,12 +37,17 @@ public class FaceEnrollmentService {
      * @param contentType {@code video/webm} 또는 {@code video/mp4}
      * @param rawVideo    원본 영상. 처리 뒤 0으로 덮어쓴다
      * @return 등록 결과
-     * @throws CustomException 필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
      *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
-     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED},
-     *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA},
-     *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE},
-     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}
+     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409),
+     *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA}(400),
+     *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE}(413),
+     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
+     *                         AI가 영상을 거부하면 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
+     *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_ENROLLMENT_LOW_LIGHT}·
+     *                         {@link ErrorCode#FACE_ENROLLMENT_MULTIPLE_IDENTITIES}·{@link ErrorCode#FACE_ENROLLMENT_REJECTED}(422),
+     *                         {@link ErrorCode#FACE_AI_UNAVAILABLE}(503), {@link ErrorCode#FACE_AI_TIMEOUT}(504) 등으로 바꾼다
      */
     public FaceEnrollmentResponse enroll(Long memberId, String contentType, byte[] rawVideo) {
         try {
