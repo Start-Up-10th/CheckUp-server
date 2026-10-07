@@ -41,7 +41,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
 
         server.expect(requestTo("http://face-ai.test/health/ready"))
@@ -61,7 +61,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
 
         server.expect(requestTo("http://face-ai.test/health/ready"))
@@ -82,7 +82,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
         byte[] video = new byte[]{7, 3, 2, 1};
 
@@ -109,7 +109,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
         UUID sessionId = UUID.randomUUID();
         AiFaceSessionRequest request = new AiFaceSessionRequest(
@@ -139,7 +139,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
         UUID sessionId = UUID.randomUUID();
         byte[] frame = new byte[]{1, 2, 3, 4};
@@ -169,7 +169,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
         UUID sessionId = UUID.randomUUID();
 
@@ -189,7 +189,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
 
         server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))
@@ -216,7 +216,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
 
         server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))
@@ -238,7 +238,7 @@ class AiFaceClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         FaceProperties properties = new FaceProperties("http://face-ai.test", "face-secret",
                 Duration.ofSeconds(2), Duration.ofSeconds(30), 1024, 512,
-                Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+                Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
         AiFaceClient client = new AiFaceClient(builder.build(), properties, JsonMapper.builder().build());
 
         server.expect(requestTo("http://face-ai.test/internal/v1/face/enrollments/extract"))

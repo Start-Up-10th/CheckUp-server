@@ -91,6 +91,10 @@ checkup:
     max-frame-bytes: ${FACE_MAX_FRAME_BYTES:2097152}
     min-frame-interval: ${FACE_MIN_FRAME_INTERVAL:200ms}
     max-concurrent-frames: ${FACE_MAX_CONCURRENT_FRAMES:4}
+    # 얼굴 등록 영상을 동시에 받아 처리하는 수. 영상 본문이 메모리에 올라가므로 서버 메모리에 맞춰 정한다
+    max-concurrent-enrollments: ${FACE_MAX_CONCURRENT_ENROLLMENTS:3}
+    # 자리가 없을 때 바로 거절하지 않고 기다려 주는 시간. 지나면 429와 Retry-After를 준다
+    enrollment-wait-timeout: ${FACE_ENROLLMENT_WAIT_TIMEOUT:5s}
     session-idle-timeout: ${FACE_SESSION_IDLE_TIMEOUT:5m}
     cleanup-interval-ms: ${FACE_CLEANUP_INTERVAL_MS:60000}
     consent-version: ${FACE_CONSENT_VERSION:v1}
