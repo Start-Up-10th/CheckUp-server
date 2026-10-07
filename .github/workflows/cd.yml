@@ -45,8 +45,8 @@ jobs:
 
             SUCCESS=false
             for i in $(seq 1 20); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator || echo "000")
-              if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+              STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || echo "000")
+              if [ "$STATUS" = "200" ]; then
                 echo "Health check passed (status: $STATUS)"
                 SUCCESS=true
                 break
@@ -65,8 +65,8 @@ jobs:
 
               ROLLBACK_OK=false
               for i in $(seq 1 10); do
-                STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator || echo "000")
-                if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+                STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || echo "000")
+                if [ "$STATUS" = "200" ]; then
                   ROLLBACK_OK=true
                   break
                 fi

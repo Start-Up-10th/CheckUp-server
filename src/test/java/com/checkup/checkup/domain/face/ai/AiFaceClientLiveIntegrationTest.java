@@ -37,7 +37,7 @@ class AiFaceClientLiveIntegrationTest {
         Duration responseTimeout = Duration.ofSeconds(30);
         FaceProperties properties = new FaceProperties(
                 baseUrl, serviceToken, connectTimeout, responseTimeout,
-                60_000_000L, 2_097_152L, Duration.ofMillis(200), 4,
+                60_000_000L, 2_097_152L, Duration.ofMillis(200), 4, 2, Duration.ofSeconds(1),
                 Duration.ofMinutes(5), 60_000L, "v1");
         HttpClient httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)

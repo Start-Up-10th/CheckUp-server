@@ -37,25 +37,21 @@ public class FaceEnrollmentService {
      * @param contentType {@code video/webm} 또는 {@code video/mp4}
      * @param rawVideo    원본 영상. 처리 뒤 0으로 덮어쓴다
      * @return 등록 결과
-     * @throws CustomException 필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
      *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
-     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED},
-     *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA},
-     *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE},
-     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}
+     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409),
+     *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA}(400),
+     *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE}(413),
+     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
+     *                         AI가 영상을 거부하면 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
+     *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_ENROLLMENT_LOW_LIGHT}·
+     *                         {@link ErrorCode#FACE_ENROLLMENT_MULTIPLE_IDENTITIES}·{@link ErrorCode#FACE_ENROLLMENT_REJECTED}(422),
+     *                         {@link ErrorCode#FACE_AI_UNAVAILABLE}(503), {@link ErrorCode#FACE_AI_TIMEOUT}(504) 등으로 바꾼다
      */
     public FaceEnrollmentResponse enroll(Long memberId, String contentType, byte[] rawVideo) {
         try {
-            FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
-            if (!status.consented()) {
-                throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
-            }
-            if (!status.eligible()) {
-                throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
-            }
-            if (status.enrolled()) {
-                throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
-            }
+            verifyEnrollable(memberId);
             if (rawVideo == null || rawVideo.length == 0) {
                 throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
             }
@@ -83,6 +79,29 @@ public class FaceEnrollmentService {
             if (rawVideo != null) {
                 Arrays.fill(rawVideo, (byte) 0);
             }
+        }
+    }
+
+    /**
+     * 지금 얼굴을 등록할 수 있는 학생인지 확인한다. 영상 본문을 받기 전에도 불러, 등록할 수 없는 요청이 영상을 올리며
+     * 처리 자리를 차지하지 않게 한다({@link com.checkup.checkup.domain.face.controller.FacePayloadLimitFilter}).
+     *
+     * @param memberId 세션의 회원 id
+     * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
+     *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
+     *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
+     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409)
+     */
+    public void verifyEnrollable(Long memberId) {
+        FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
+        if (!status.consented()) {
+            throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
+        }
+        if (!status.eligible()) {
+            throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
+        }
+        if (status.enrolled()) {
+            throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
         }
     }
 

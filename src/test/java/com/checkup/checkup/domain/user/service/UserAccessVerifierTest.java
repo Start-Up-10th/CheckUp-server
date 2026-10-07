@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

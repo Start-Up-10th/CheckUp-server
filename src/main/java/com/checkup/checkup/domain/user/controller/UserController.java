@@ -3,11 +3,11 @@ package com.checkup.checkup.domain.user.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
-import com.checkup.checkup.domain.user.serivce.UserSearchService;
-import com.checkup.checkup.domain.user.serivce.UserVolunteerService;
+import com.checkup.checkup.domain.user.dto.response.UserSearchResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerHistoryResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerResponse;
+import com.checkup.checkup.domain.user.service.UserSearchService;
+import com.checkup.checkup.domain.user.service.UserVolunteerService;
 import com.checkup.checkup.global.ratelimit.RateLimiter;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 관리자 또는 본인의 학생 정보·봉사 횟수·봉사 완료 내역 조회 API. DataGSM 호출이 있어 회원별 요청 수를 제한한다. */
+/** 관리자 또는 본인의 학생 정보·봉사 횟수·봉사 완료 내역 조회 API. 학생 정보와 봉사 횟수 조회는 회원별 요청 수를 제한한다. */
 @Tag(name = "학생 정보", description = "DataGSM 학생 정보와 봉사 횟수 조회")
 @RestController
 @RequestMapping("/api/v1/users")

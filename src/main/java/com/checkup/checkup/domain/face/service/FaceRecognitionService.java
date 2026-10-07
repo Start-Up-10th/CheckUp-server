@@ -90,8 +90,12 @@ public class FaceRecognitionService {
      * @param purpose       출석 용도
      * @return 새 세션 id와 용도
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
-     *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS},
-     *                         후보가 200명을 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}
+     *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
+     *                         후보가 200명을 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
+     *                         저장된 템플릿의 모델이 서로 다르거나 벡터가 깨졌으면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
+     *                         AI 서버 오류는 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
+     *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_AI_UNAVAILABLE}(503),
+     *                         {@link ErrorCode#FACE_AI_TIMEOUT}(504), {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502) 등으로 바꾼다
      */
     public FaceSessionResponse create(Long adminMemberId, AttendancePurpose purpose) {
         adminVerifier.verify(adminMemberId);
@@ -134,10 +138,15 @@ public class FaceRecognitionService {
      * @return 얼굴별 위치·품질·인식·출석 결과
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
      *                         세션이 없거나 닫혔으면 {@link ErrorCode#FACE_SESSION_NOT_FOUND}(404),
-     *                         프레임 간격이 너무 짧으면 {@link ErrorCode#FACE_FRAME_RATE_LIMITED},
-     *                         동시 처리 한도를 넘으면 {@link ErrorCode#FACE_SERVICE_BUSY},
-     *                         이미지가 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA},
-     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}
+     *                         프레임 간격이 너무 짧으면 {@link ErrorCode#FACE_FRAME_RATE_LIMITED}(429),
+     *                         동시 처리 한도를 넘으면 {@link ErrorCode#FACE_SERVICE_BUSY}(429),
+     *                         이미지가 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA}(400),
+     *                         이미지가 너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE}(413),
+     *                         프레임 id가 128자를 넘거나 줄바꿈이 있으면 {@link ErrorCode#INVALID_REQUEST}(400),
+     *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
+     *                         AI 서버 오류는 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
+     *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_AI_UNAVAILABLE}(503),
+     *                         {@link ErrorCode#FACE_AI_TIMEOUT}(504), {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502) 등으로 바꾼다
      */
     public FaceFrameResponse recognize(
             Long adminMemberId,
@@ -257,7 +266,10 @@ public class FaceRecognitionService {
         faceSessionStore.findWithStudent(studentId).forEach(this::closeOwnedQuietly);
     }
 
-    /** 유휴 시간이 지났고 처리 중인 프레임이 없는 세션을 닫는다. 정리 작업이 주기적으로 부른다. */
+    /**
+     * 유휴 시간이 지났고 처리 중인 프레임이 없는 세션을 닫는다. 정리 작업이 주기적으로 부른다.
+     * AI 쪽 삭제가 실패해 비활성 상태로 남은 세션도 여기서 다시 정리한다.
+     */
     public void cleanupIdleSessions() {
         Instant now = clock.instant();
         Instant cutoff = now.minus(properties.sessionIdleTimeout());

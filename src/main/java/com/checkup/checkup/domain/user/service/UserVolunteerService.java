@@ -1,11 +1,11 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerHistoryResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
 import com.checkup.checkup.global.exception.CustomException;

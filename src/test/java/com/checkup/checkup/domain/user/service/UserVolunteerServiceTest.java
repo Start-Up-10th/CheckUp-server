@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -11,8 +11,8 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
-import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerHistoryResponse;
+import com.checkup.checkup.domain.user.dto.response.UserVolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;

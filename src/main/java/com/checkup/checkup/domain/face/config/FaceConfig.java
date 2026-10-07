@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.face.config;
 
 import com.checkup.checkup.domain.face.controller.FacePayloadLimitFilter;
+import com.checkup.checkup.domain.face.service.FaceEnrollmentService;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -31,7 +32,8 @@ public class FaceConfig {
     }
 
     @Bean
-    FacePayloadLimitFilter facePayloadLimitFilter(FaceProperties properties, ObjectMapper objectMapper) {
-        return new FacePayloadLimitFilter(properties, objectMapper);
+    FacePayloadLimitFilter facePayloadLimitFilter(FaceProperties properties, ObjectMapper objectMapper,
+                                                  FaceEnrollmentService faceEnrollmentService) {
+        return new FacePayloadLimitFilter(properties, objectMapper, faceEnrollmentService);
     }
 }

@@ -83,7 +83,7 @@ class FaceStudentLeftListenerTest {
                     studentRepository, mock(AttendanceService.class), mock(FaceRecognitionLogService.class),
                     mock(AdminVerifier.class),
                     new FaceProperties("http://face-ai.test", "test-token", Duration.ofSeconds(2),
-                            Duration.ofSeconds(5), 1024, 512, Duration.ofMillis(200), 2,
+                            Duration.ofSeconds(5), 1024, 512, Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1),
                             Duration.ofMinutes(5), 60_000, "v1"),
                     tools.jackson.databind.json.JsonMapper.builder().build(),
                     Clock.fixed(Instant.parse("2026-09-30T12:00:00Z"), ZoneOffset.UTC));

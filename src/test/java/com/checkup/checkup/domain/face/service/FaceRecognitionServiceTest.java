@@ -57,7 +57,7 @@ class FaceRecognitionServiceTest {
     private final MutableClock clock = new MutableClock(NOW);
     private final FaceProperties properties = new FaceProperties(
             "http://face-ai.test", "secret", Duration.ofSeconds(2), Duration.ofSeconds(30),
-            1024, 512, Duration.ofMillis(200), 2, Duration.ofMinutes(5), 60_000, "v1");
+            1024, 512, Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
     private final FaceRecognitionService service = new FaceRecognitionService(
             templateRepository, sessionStore, aiFaceClient, studentRepository,
             attendanceService, logService, adminVerifier, properties,

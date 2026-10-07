@@ -20,7 +20,8 @@ public class FaceEnrollmentStore {
     private final FaceTemplateRepository faceTemplateRepository;
 
     /**
-     * 로그인한 학생이 필수 동의를 마쳤는지 확인하고 학생을 돌려준다. 얼굴 등록 전에 AI를 부르기 전에 확인한다.
+     * 로그인한 학생이 필수 동의를 마쳤는지 확인하고 학생을 돌려준다. {@code POST /api/v1/face/consent}에서 쓴다.
+     * 얼굴 등록은 이 메서드가 아니라 {@link #status}로 동의·대상·중복 등록을 확인한다.
      *
      * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
      *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403)

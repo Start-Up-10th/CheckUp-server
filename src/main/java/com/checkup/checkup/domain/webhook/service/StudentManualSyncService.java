@@ -7,6 +7,7 @@ import com.checkup.checkup.global.exception.DataGsmErrorCodes;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
@@ -25,6 +26,7 @@ import java.util.List;
  *
  * 반영 로직은 웹훅과 같은 {@link StudentSyncService}를 쓴다. 목록에 없는 학생은 삭제하거나 졸업 처리하지 않는다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StudentManualSyncService {
@@ -92,6 +94,7 @@ public class StudentManualSyncService {
                 page++;
             } while (page < response.getTotalPages());
         } catch (DataGsmException e) {
+            log.warn("DataGSM student list fetch failed: page={}, {}", page, DataGsmErrorCodes.describe(e));
             throw new CustomException(DataGsmErrorCodes.of(e));
         }
         return students;

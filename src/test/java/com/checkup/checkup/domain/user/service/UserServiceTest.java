@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,9 +13,9 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.MemberService;
-import com.checkup.checkup.domain.user.dto.Response.UserSearchResponse;
-import com.checkup.checkup.domain.user.dto.Response.Sex;
-import com.checkup.checkup.domain.user.dto.Response.StudentRole;
+import com.checkup.checkup.domain.user.dto.response.UserSearchResponse;
+import com.checkup.checkup.domain.user.dto.response.Sex;
+import com.checkup.checkup.domain.user.dto.response.StudentRole;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import team.themoment.datagsm.sdk.openapi.DataGsmOpenApiClient;
 import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
@@ -38,7 +40,7 @@ import java.util.Optional;
 /**
  * 학생 조회의 접근 권한(관리자·본인)과 DataGSM 응답 변환을 검증한다.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class UserServiceTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -167,6 +169,34 @@ class UserServiceTest {
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("DataGSM이 404를 주면 STUDENT_NOT_FOUND이고 경고 로그를 남기지 않는다")
+    void notFoundWhenDataGsmReturns404(CapturedOutput output) {
+        givenMember(MemberRole.ADMIN);
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudent(anyLong())).willThrow(new DataGsmException("not found", 404));
+
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
+        assertThat(output.getOut()).doesNotContain("DataGSM student lookup failed");
+    }
+
+    @Test
+    @DisplayName("DataGSM 호출 실패는 예외 종류와 상태만 로그에 남기고 SDK 메시지는 남기지 않는다")
+    void failureIsLoggedWithoutUpstreamMessage(CapturedOutput output) {
+        givenMember(MemberRole.ADMIN);
+        given(dataGsmOpenApiClient.students()).willReturn(studentApi);
+        given(studentApi.getStudent(anyLong())).willThrow(new DataGsmException("upstream-body", 418));
+
+        assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DATAGSM_ERROR));
+        assertThat(output.getOut())
+                .contains("DataGSM student lookup failed: type=DataGsmException, status=418, cause=none")
+                .doesNotContain("upstream-body");
     }
 
     @Test

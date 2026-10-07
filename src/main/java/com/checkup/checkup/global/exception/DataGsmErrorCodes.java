@@ -44,6 +44,15 @@ public final class DataGsmErrorCodes {
     }
 
     /**
+     * DataGSM OpenAPI 예외를 로그에 남길 형태로 줄인다. 예외 종류, HTTP 상태(SDK가 알려 주지 않으면 0), 원인 예외 종류만 담는다.
+     * SDK 메시지에는 DataGSM 응답 본문이 섞일 수 있어 넣지 않는다.
+     */
+    public static String describe(team.themoment.datagsm.sdk.openapi.exception.DataGsmException e) {
+        String cause = e.getCause() == null ? "none" : e.getCause().getClass().getSimpleName();
+        return "type=" + e.getClass().getSimpleName() + ", status=" + e.getStatusCode() + ", cause=" + cause;
+    }
+
+    /**
      * DataGSM에 닿지 못했거나 시간 안에 응답을 받지 못한 경우다. SDK는 이때 HTTP 상태 없이 IOException을 감싸서 던진다.
      */
     private static boolean isConnectionFailure(DataGsmException e) {

@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.dto.Response;
+package com.checkup.checkup.domain.user.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import team.themoment.datagsm.sdk.openapi.model.Student;
