@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import java.time.Clock;
 import java.time.Duration;

@@ -10,8 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.checkup.checkup.domain.user.dto.Response.UserVolunteerHistoryResponse;
 import com.checkup.checkup.domain.user.dto.Response.UserVolunteerResponse;
-import com.checkup.checkup.domain.user.serivce.UserSearchService;
-import com.checkup.checkup.domain.user.serivce.UserVolunteerService;
+import com.checkup.checkup.domain.user.service.UserSearchService;
+import com.checkup.checkup.domain.user.service.UserVolunteerService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.GlobalExceptionHandler;

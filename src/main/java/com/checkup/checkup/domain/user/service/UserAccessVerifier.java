@@ -1,4 +1,4 @@
-package com.checkup.checkup.domain.user.serivce;
+package com.checkup.checkup.domain.user.service;
 
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
