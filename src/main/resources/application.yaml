@@ -22,6 +22,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Redis가 내려갔을 때 기본 60초를 기다리지 않고 바로 실패하게 한다. 상태 확인이 503을 빨리 준다
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:3s}
   session:
     data:
       redis:
