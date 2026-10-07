@@ -18,6 +18,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        # 쿼리 수·실행 시간 통계. 지표를 켰을 때만 모은다
+        generate_statistics: ${checkup.metrics.enabled}
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -53,15 +57,30 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
 
 # 상태 확인(/actuator/health)만 연다. 로그인 없이 호출되므로 DB·Redis 주소나 장애 원인은 응답에 넣지 않는다.
+# 지표(/actuator/prometheus)는 checkup.metrics.enabled가 true일 때만 생긴다. 꺼져 있으면 그 경로 자체가 없다.
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
       show-components: never
+  prometheus:
+    metrics:
+      export:
+        enabled: ${checkup.metrics.enabled}
+  metrics:
+    distribution:
+      # API 응답 시간의 p95 같은 분위수를 Prometheus에서 계산할 수 있게 구간별 횟수를 남긴다
+      percentiles-histogram:
+        http.server.requests: true
+
+# Hibernate 통계를 켜면 트랜잭션마다 찍히는 요약 로그를 끈다. 값은 지표로 본다.
+logging:
+  level:
+    org.hibernate.engine.internal.StatisticalLoggingSessionEventListener: warn
 
 # API 문서(/swagger-ui/index.html, /v3/api-docs). 노출하지 않을 환경에서는 SWAGGER_ENABLED=false로 끈다.
 springdoc:
@@ -75,6 +94,9 @@ checkup:
     datagsm-ids: ${CHECKUP_ADMIN_DATAGSM_IDS:}   # 개발·테스트용 관리자 DataGSM 계정 id, 쉼표 구분. 운영 전 비운다
   web:
     base-url: ${PUBLIC_ORIGIN}
+  # Prometheus가 긁어 갈 지표를 /actuator/prometheus로 내보낸다. 켜면 로그인 없이 열리므로 로컬에서만 켠다.
+  metrics:
+    enabled: ${METRICS_ENABLED:false}
   # 요청마다 DB 쿼리 수와 걸린 시간을 로그로 남긴다. 느린 API를 찾을 때만 켠다.
   query-log:
     enabled: ${QUERY_LOG_ENABLED:false}
