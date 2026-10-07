@@ -21,10 +21,10 @@ public interface FaceRecognitionSessionRepository extends JpaRepository<FaceReco
     List<FaceRecognitionSession> findAllByIdIn(List<UUID> ids);
 
     @Modifying
-    @Query("UPDATE FaceRecognitionSession s SET s.lastActivityAt = :now, " +
+    @Query("UPDATE FaceRecognitionSession s SET s.lastActivityAt = :now, s.lastFrameStartedAt = :now, " +
             "s.frameLockToken = :token, s.frameLockUntil = :lockUntil " +
             "WHERE s.id = :id AND s.adminMemberId = :adminId AND s.active = true " +
-            "AND s.lastActivityAt <= :cutoff " +
+            "AND (s.lastFrameStartedAt IS NULL OR s.lastFrameStartedAt <= :cutoff) " +
             "AND (s.frameLockToken IS NULL OR s.frameLockUntil <= :now)")
     int claimFrame(
             @Param("id") UUID id,

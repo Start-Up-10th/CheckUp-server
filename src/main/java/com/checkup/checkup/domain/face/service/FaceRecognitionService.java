@@ -20,6 +20,8 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class FaceRecognitionService {
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
     private final Semaphore framePermits;
 
     public FaceRecognitionService(
@@ -65,7 +68,8 @@ public class FaceRecognitionService {
             AdminVerifier adminVerifier,
             FaceProperties properties,
             ObjectMapper objectMapper,
-            Clock clock
+            Clock clock,
+            MeterRegistry meterRegistry
     ) {
         this.faceTemplateRepository = faceTemplateRepository;
         this.faceSessionStore = faceSessionStore;
@@ -76,6 +80,7 @@ public class FaceRecognitionService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
         this.framePermits = new Semaphore(properties.maxConcurrentFrames());
     }
 
@@ -94,7 +99,7 @@ public class FaceRecognitionService {
         // AI를 부르기 전에 세션 소유 정보를 먼저 저장한다. 그래야 AI 쪽 정리가 실패해도 다시 시도할 수 있다.
         faceSessionStore.create(sessionId, adminMemberId, purpose,
                 templates.stream().map(template -> template.getStudent().getId()).toList(),
-                now, now.minus(properties.minFrameInterval()));
+                now);
         try {
             aiFaceClient.createSession(sessionId, request);
         } catch (RuntimeException e) {
@@ -116,21 +121,28 @@ public class FaceRecognitionService {
             String contentType,
             byte[] image
     ) {
-        adminVerifier.verify(adminMemberId);
-        if (image == null || image.length == 0) {
-            throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
-        }
-        if (image.length > properties.maxFrameBytes()) {
-            throw new CustomException(ErrorCode.FACE_UPLOAD_TOO_LARGE);
-        }
-        MediaType mediaType = frameMediaType(contentType);
-        String frameId = normalizeFrameId(frameIdHeader);
-        if (!framePermits.tryAcquire()) {
-            throw new CustomException(ErrorCode.FACE_SERVICE_BUSY);
-        }
+        Timer.Sample totalTiming = startTiming();
+        Timer.Sample stageTiming = startTiming();
+        String stage = "pre_ai";
+        String stageOutcome = "error";
+        String outcome = "error";
         UUID frameLockToken = UUID.randomUUID();
         boolean frameClaimed = false;
+        boolean permitAcquired = false;
         try {
+            adminVerifier.verify(adminMemberId);
+            if (image == null || image.length == 0) {
+                throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
+            }
+            if (image.length > properties.maxFrameBytes()) {
+                throw new CustomException(ErrorCode.FACE_UPLOAD_TOO_LARGE);
+            }
+            MediaType mediaType = frameMediaType(contentType);
+            String frameId = normalizeFrameId(frameIdHeader);
+            permitAcquired = framePermits.tryAcquire();
+            if (!permitAcquired) {
+                throw new CustomException(ErrorCode.FACE_SERVICE_BUSY);
+            }
             FaceSessionView session = faceSessionStore.findOwned(sessionId, adminMemberId);
             Instant now = clock.instant();
             if (!session.lastActivityAt().isAfter(now.minus(properties.sessionIdleTimeout()))) {
@@ -143,13 +155,17 @@ public class FaceRecognitionService {
                 closeOwned(session);
                 throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
             }
-            Instant lockUntil = now.plus(properties.connectTimeout())
+            Instant frameStartedAt = clock.instant();
+            Instant lockUntil = frameStartedAt.plus(properties.connectTimeout())
                     .plus(properties.responseTimeout().multipliedBy(2)).plusSeconds(30);
-            frameClaimed = faceSessionStore.claimFrame(sessionId, adminMemberId, now,
-                    now.minus(properties.minFrameInterval()), frameLockToken, lockUntil);
+            frameClaimed = faceSessionStore.claimFrame(sessionId, adminMemberId, frameStartedAt,
+                    frameStartedAt.minus(properties.minFrameInterval()), frameLockToken, lockUntil);
             if (!frameClaimed) {
                 throw new CustomException(ErrorCode.FACE_FRAME_RATE_LIMITED);
             }
+            recordTiming(stageTiming, stage, "success");
+            stage = "ai";
+            stageTiming = startTiming();
 
             AiFaceFrameResponse result;
             try {
@@ -172,6 +188,9 @@ public class FaceRecognitionService {
                     throw recoveryFailure;
                 }
             }
+            recordTiming(stageTiming, stage, "success");
+            stage = "result";
+            stageTiming = startTiming();
             if (result == null || !frameId.equals(result.frameId()) || result.faces() == null) {
                 throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
             }
@@ -183,31 +202,73 @@ public class FaceRecognitionService {
                 deleteAiSessionQuietly(sessionId);
                 throw closed;
             }
-            return new FaceFrameResponse(frameId, result.faces().stream()
+            FaceFrameResponse response = new FaceFrameResponse(frameId, result.faces().stream()
                     .map(face -> toPublicFace(currentSession, face, now)).toList());
+            stageOutcome = "success";
+            outcome = "success";
+            return response;
         } catch (AiFaceException e) {
             if (e.getStatus() >= 500 || e.getStatus() == 404) {
                 faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwnedQuietly);
             }
             throw e;
         } catch (CustomException e) {
+            outcome = switch (e.getErrorCode()) {
+                case FACE_SERVICE_BUSY -> "busy";
+                case FACE_FRAME_RATE_LIMITED -> "rate_limited";
+                default -> "error";
+            };
             if (e.getErrorCode() == ErrorCode.FACE_AI_BAD_GATEWAY) {
                 faceSessionStore.findOwnedIfPresent(sessionId, adminMemberId).ifPresent(this::closeOwnedQuietly);
             }
             throw e;
         } finally {
+            recordTiming(stageTiming, stage, stageOutcome);
             if (frameClaimed) {
+                Timer.Sample releaseTiming = startTiming();
+                String releaseOutcome = "error";
                 try {
                     faceSessionStore.releaseFrame(sessionId, adminMemberId, frameLockToken, clock.instant());
+                    releaseOutcome = "success";
                 } catch (RuntimeException e) {
                     // DB에 닿지 못해 잠금을 풀지 못해도, 설정한 AI 요청 시간이 지나면 잠금이 저절로 풀린다.
                     log.warn("Face frame lock release failed: reason={}", e.getClass().getSimpleName());
+                } finally {
+                    recordTiming(releaseTiming, "release", releaseOutcome);
                 }
             }
-            framePermits.release();
+            if (permitAcquired) {
+                framePermits.release();
+            }
             if (image != null) {
                 Arrays.fill(image, (byte) 0);
             }
+            recordTiming(totalTiming, "total", outcome);
+        }
+    }
+
+    private Timer.Sample startTiming() {
+        try {
+            return Timer.start(meterRegistry);
+        } catch (RuntimeException e) {
+            log.warn("Face frame timing unavailable: reason={}", e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private void recordTiming(Timer.Sample sample, String stage, String outcome) {
+        if (sample == null) {
+            return;
+        }
+        try {
+            long elapsedNanos = sample.stop(Timer.builder("checkup.face.frame.duration")
+                    .tags("stage", stage, "outcome", outcome)
+                    .register(meterRegistry));
+            log.debug("Face frame timing: stage={}, outcome={}, durationMs={}",
+                    stage, outcome, elapsedNanos / 1_000_000.0);
+        } catch (RuntimeException e) {
+            // 계측 장애가 출석 결과, 프레임 잠금 해제 또는 원본 폐기를 막지 않게 한다.
+            log.warn("Face frame timing unavailable: reason={}", e.getClass().getSimpleName());
         }
     }
 

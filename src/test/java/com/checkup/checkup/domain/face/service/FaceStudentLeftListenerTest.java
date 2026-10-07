@@ -11,6 +11,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -85,7 +86,7 @@ class FaceStudentLeftListenerTest {
                             Duration.ofSeconds(5), 1024, 512, Duration.ofMillis(200), 2,
                             Duration.ofMinutes(5), 60_000, "v1"),
                     tools.jackson.databind.json.JsonMapper.builder().build(),
-                    Clock.fixed(Instant.parse("2026-09-30T12:00:00Z"), ZoneOffset.UTC));
+                    Clock.fixed(Instant.parse("2026-09-30T12:00:00Z"), ZoneOffset.UTC), new SimpleMeterRegistry());
         }
     }
 

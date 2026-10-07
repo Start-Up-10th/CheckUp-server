@@ -31,9 +31,9 @@ public class FaceSessionStore {
 
     @Transactional
     public void create(UUID sessionId, Long adminMemberId, AttendancePurpose purpose, List<Long> studentIds,
-                       Instant createdAt, Instant initialLastActivityAt) {
+                       Instant createdAt) {
         FaceRecognitionSession session = sessionRepository.save(
-                FaceRecognitionSession.create(sessionId, adminMemberId, purpose, createdAt, initialLastActivityAt));
+                FaceRecognitionSession.create(sessionId, adminMemberId, purpose, createdAt));
         List<Student> students = studentRepository.findAllById(studentIds);
         if (students.size() != studentIds.size()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);

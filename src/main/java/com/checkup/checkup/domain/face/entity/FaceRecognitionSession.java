@@ -37,6 +37,9 @@ public class FaceRecognitionSession {
     @Column(name = "last_activity_at", nullable = false)
     private Instant lastActivityAt;
 
+    @Column(name = "last_frame_started_at")
+    private Instant lastFrameStartedAt;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -50,15 +53,14 @@ public class FaceRecognitionSession {
             UUID id,
             Long adminMemberId,
             AttendancePurpose purpose,
-            Instant createdAt,
-            Instant lastActivityAt
+            Instant createdAt
     ) {
         FaceRecognitionSession session = new FaceRecognitionSession();
         session.id = id;
         session.adminMemberId = adminMemberId;
         session.purpose = purpose;
         session.createdAt = createdAt;
-        session.lastActivityAt = lastActivityAt;
+        session.lastActivityAt = createdAt;
         session.active = true;
         return session;
     }
