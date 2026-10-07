@@ -75,6 +75,9 @@ checkup:
     datagsm-ids: ${CHECKUP_ADMIN_DATAGSM_IDS:}   # 개발·테스트용 관리자 DataGSM 계정 id, 쉼표 구분. 운영 전 비운다
   web:
     base-url: ${PUBLIC_ORIGIN}
+  # 요청마다 DB 쿼리 수와 걸린 시간을 로그로 남긴다. 느린 API를 찾을 때만 켠다.
+  query-log:
+    enabled: ${QUERY_LOG_ENABLED:false}
   qr:
     token-ttl: 15m
     lease-ttl: 60s
