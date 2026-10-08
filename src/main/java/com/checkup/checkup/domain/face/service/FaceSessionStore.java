@@ -5,8 +5,6 @@ import com.checkup.checkup.domain.face.entity.FaceRecognitionSession;
 import com.checkup.checkup.domain.face.entity.FaceRecognitionSessionCandidate;
 import com.checkup.checkup.domain.face.repository.FaceRecognitionSessionCandidateRepository;
 import com.checkup.checkup.domain.face.repository.FaceRecognitionSessionRepository;
-import com.checkup.checkup.domain.member.entity.Student;
-import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +25,6 @@ import java.util.stream.Collectors;
 public class FaceSessionStore {
     private final FaceRecognitionSessionRepository sessionRepository;
     private final FaceRecognitionSessionCandidateRepository candidateRepository;
-    private final StudentRepository studentRepository;
 
     /**
      * 관리자 얼굴 인식 세션과 후보 학생 목록을 저장한다. AI 세션을 만들기 전에 먼저 저장해, AI 쪽 정리가 실패해도 다시 시도할 수 있게 한다.
@@ -38,15 +35,12 @@ public class FaceSessionStore {
     @Transactional
     public void create(UUID sessionId, Long adminMemberId, AttendancePurpose purpose, List<Long> studentIds,
                        Instant createdAt, Instant initialLastActivityAt) {
-        FaceRecognitionSession session = sessionRepository.save(
+        sessionRepository.save(
                 FaceRecognitionSession.create(sessionId, adminMemberId, purpose, createdAt, initialLastActivityAt));
-        List<Student> students = studentRepository.findAllById(studentIds);
-        if (students.size() != studentIds.size()) {
+        // 후보 수만큼 insert하지 않고 한 문장으로 저장한다. 저장되지 않은 학생이 있으면 개수가 모자라 트랜잭션째 취소된다.
+        if (candidateRepository.insertAll(sessionId, studentIds) != studentIds.size()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
-        candidateRepository.saveAll(students.stream()
-                .map(student -> FaceRecognitionSessionCandidate.create(session, student))
-                .toList());
     }
 
     /**
