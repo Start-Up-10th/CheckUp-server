@@ -1,7 +1,6 @@
 package com.checkup.checkup.domain.notification.service;
 
-import com.checkup.checkup.domain.member.entity.Student;
-import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.domain.notification.dto.response.NotificationListResponse;
 import com.checkup.checkup.domain.notification.dto.response.NotificationResponse;
 import com.checkup.checkup.domain.notification.dto.response.UnreadResponse;
@@ -29,7 +28,7 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final StudentRepository studentRepository;
+    private final StudentIdCache studentIdCache;
     private final Clock clock;
     private final OperatingDayCalculator operatingDayCalculator;
 
@@ -112,8 +111,7 @@ public class NotificationService {
     }
 
     private Long studentIdOf(Long memberId) {
-        Student student = studentRepository.findByMemberId(memberId)
+        return studentIdCache.findStudentId(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
-        return student.getId();
     }
 }

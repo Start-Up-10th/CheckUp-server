@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.member.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -11,6 +12,7 @@ import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.MemberRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.global.security.AdminRoleCache;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,11 +38,13 @@ class MemberServiceTest {
     @Mock
     private StudentRepository studentRepository;
 
+    private final AdminRoleCache adminRoleCache = mock(AdminRoleCache.class);
+
     private MemberService memberService;
 
     @BeforeEach
     void setUp() {
-        memberService = new MemberService(memberRepository, studentRepository);
+        memberService = new MemberService(memberRepository, studentRepository, adminRoleCache);
     }
 
     @Test
@@ -56,6 +60,7 @@ class MemberServiceTest {
         Member member = memberService.saveOrUpdate(studentUser(301), MemberRole.STUDENT);
 
         assertThat(inserted.getMember()).isSameAs(member);
+        verify(adminRoleCache).evictAfterCommit(member.getId());
         assertThat(inserted.getDormitoryRoom()).isEqualTo(301);
         assertThat(inserted.getDormitoryFloor()).isEqualTo(3);
         verify(studentRepository, never()).save(any(Student.class));

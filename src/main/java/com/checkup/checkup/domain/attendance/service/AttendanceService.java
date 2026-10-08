@@ -17,6 +17,7 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.global.exception.CustomException;
@@ -40,6 +41,7 @@ public class AttendanceService {
     private final Clock clock;
     private final NotificationService notificationService;
     private final StudentRepository studentRepository;
+    private final StudentIdCache studentIdCache;
 
     /**
      * 자동 인증 성공을 출석으로 기록한다. 동시에 여러 요청이 와도 한 번만 기록된다.
@@ -183,11 +185,11 @@ public class AttendanceService {
      */
     @Transactional(readOnly = true)
     public MyAttendanceResponse getMyToday(Long memberId) {
-        Student student = studentRepository.findByMemberId(memberId)
+        Long studentId = studentIdCache.findStudentId(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
         LocalDate operatingDay = operatingDayCalculator.today();
         return MyAttendanceResponse.of(operatingDay,
-                attendanceRepository.findAllByStudentIdAndOperatingDay(student.getId(), operatingDay));
+                attendanceRepository.findAllByStudentIdAndOperatingDay(studentId, operatingDay));
     }
 
     /** 출석 완료 알림 문구. */

@@ -43,7 +43,6 @@ import java.util.concurrent.Semaphore;
 @Slf4j
 @Service
 public class FaceRecognitionService {
-    private static final int MAX_CANDIDATES = 200;
     private static final int VECTOR_DIMENSION = 256;
 
     private final FaceTemplateRepository faceTemplateRepository;
@@ -91,7 +90,7 @@ public class FaceRecognitionService {
      * @return 새 세션 id와 용도
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
      *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
-     *                         후보가 200명을 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
+     *                         후보가 설정된 최대(기본 200명)를 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
      *                         저장된 템플릿의 모델이 서로 다르거나 벡터가 깨졌으면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
      *                         AI 서버 오류는 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
      *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_AI_UNAVAILABLE}(503),
@@ -103,7 +102,7 @@ public class FaceRecognitionService {
         if (templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
-        if (templates.size() > MAX_CANDIDATES) {
+        if (templates.size() > properties.maxCandidates()) {
             throw new CustomException(ErrorCode.FACE_TOO_MANY_CANDIDATES);
         }
         AiFaceSessionRequest request = sessionRequest(templates);
@@ -421,7 +420,7 @@ public class FaceRecognitionService {
         List<FaceTemplate> templates = faceTemplateRepository.findAllByStudent_IdIn(studentIds).stream()
                 .filter(template -> eligibleStudent(template.getStudent()))
                 .toList();
-        if (templates.size() != studentIds.size() || templates.size() > MAX_CANDIDATES || templates.isEmpty()) {
+        if (templates.size() != studentIds.size() || templates.size() > properties.maxCandidates() || templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
         }
         return sessionRequest(templates);

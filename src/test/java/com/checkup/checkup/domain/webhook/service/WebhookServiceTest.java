@@ -20,6 +20,7 @@ import com.checkup.checkup.domain.webhook.dto.request.WebhookEvent;
 import com.checkup.checkup.domain.webhook.dto.request.WebhookStudent;
 import com.checkup.checkup.domain.webhook.repository.WebhookEventLogRepository;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.security.AdminRoleCache;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -92,7 +93,8 @@ class WebhookServiceTest {
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final WebhookService webhookService = new WebhookService(
             objectMapper, webhookEventLogRepository, Clock.fixed(NOW, ZoneOffset.UTC),
-            new StudentSyncService(studentRepository, eventPublisher, new AdminProperties(Set.of())));
+            new StudentSyncService(studentRepository, eventPublisher, new AdminProperties(Set.of()),
+                    mock(AdminRoleCache.class)));
 
     @BeforeEach
     void setUp() {

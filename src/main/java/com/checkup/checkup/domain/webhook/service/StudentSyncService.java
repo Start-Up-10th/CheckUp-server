@@ -7,6 +7,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.security.AdminRoleCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,6 +37,7 @@ public class StudentSyncService {
     private final StudentRepository studentRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AdminProperties adminProperties;
+    private final AdminRoleCache adminRoleCache;
 
     /**
      * 받은 학생들을 반영한다. {@code syncedAt}보다 새로운 정보를 이미 반영한 학생은 건너뛴다.
@@ -111,6 +113,7 @@ public class StudentSyncService {
         if (GRADUATE.equals(changed.role()) || WITHDRAWN.equals(changed.role())) {
             if (member != null) {
                 member.update(member.getName(), roleFor(member, MemberRole.STUDENT));
+                adminRoleCache.evictAfterCommit(member.getId());
             }
             student.leaveDormitory();
             eventPublisher.publishEvent(new StudentLeftEvent(student.getId(), changed.role()));
@@ -125,6 +128,7 @@ public class StudentSyncService {
 
         if (member != null) {
             member.update(changed.name(), roleFor(member, role));
+            adminRoleCache.evictAfterCommit(member.getId());
         }
         student.update(
                 changed.datagsmStudentId(),
