@@ -31,6 +31,8 @@ import team.themoment.datagsm.sdk.openapi.client.StudentApi;
 import team.themoment.datagsm.sdk.openapi.exception.DataGsmException;
 import team.themoment.datagsm.sdk.openapi.exception.ServerErrorException;
 
+import com.checkup.checkup.global.security.AdminRoleCache;
+import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.support.MutableClock;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
@@ -65,7 +67,8 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         userSearchService = new UserSearchService(
-                dataGsmOpenApiClient, memberService, new UserAccessVerifier(studentRepository),
+                dataGsmOpenApiClient,
+                new UserAccessVerifier(new AdminVerifier(memberService, new AdminRoleCache(clock)), studentRepository),
                 new UserSearchCache(clock));
     }
 
@@ -91,8 +94,8 @@ class UserServiceTest {
     @Test
     @DisplayName("학생은 본인 정보를 조회할 수 있다")
     void studentCanFindSelf() {
-        Member member = givenMember(MemberRole.STUDENT);
-        givenOwnStudent(member, STUDENT_ID);
+        givenMember(MemberRole.STUDENT);
+        givenOwnStudent(MEMBER_ID, STUDENT_ID);
         givenDataGsmStudent(sdkStudent());
 
         UserSearchResponse response = userSearchService.findUser(MEMBER_ID, STUDENT_ID);
@@ -103,8 +106,8 @@ class UserServiceTest {
     @Test
     @DisplayName("학생이 다른 학생을 조회하면 FORBIDDEN이고 DataGSM을 호출하지 않는다")
     void studentCannotFindOthers() {
-        Member member = givenMember(MemberRole.STUDENT);
-        givenOwnStudent(member, 999L);
+        givenMember(MemberRole.STUDENT);
+        givenOwnStudent(MEMBER_ID, 999L);
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -115,8 +118,8 @@ class UserServiceTest {
     @Test
     @DisplayName("학생 정보가 없는 STUDENT 회원은 FORBIDDEN이다")
     void studentWithoutStudentRecordIsForbidden() {
-        Member member = givenMember(MemberRole.STUDENT);
-        given(studentRepository.findByMember(member)).willReturn(Optional.empty());
+        givenMember(MemberRole.STUDENT);
+        given(studentRepository.findDatagsmStudentIdByMemberId(MEMBER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userSearchService.findUser(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -222,7 +225,7 @@ class UserServiceTest {
         Member student = Member.create(11L, "학생", MemberRole.STUDENT);
         given(memberService.getById(1L)).willReturn(admin);
         given(memberService.getById(2L)).willReturn(student);
-        givenOwnStudent(student, 999L);
+        givenOwnStudent(2L, 999L);
         givenDataGsmStudent(sdkStudent());
         userSearchService.findUser(1L, STUDENT_ID);
 
@@ -237,9 +240,8 @@ class UserServiceTest {
         return member;
     }
 
-    private void givenOwnStudent(Member member, Long datagsmStudentId) {
-        Student student = Student.create(member, datagsmStudentId, "홍길동", 2, 3, 4, 2304, 301);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(student));
+    private void givenOwnStudent(Long memberId, Long datagsmStudentId) {
+        given(studentRepository.findDatagsmStudentIdByMemberId(memberId)).willReturn(Optional.of(datagsmStudentId));
     }
 
     private void givenDataGsmStudent(team.themoment.datagsm.sdk.openapi.model.Student student) {

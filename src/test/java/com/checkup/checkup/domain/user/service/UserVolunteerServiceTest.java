@@ -18,6 +18,8 @@ import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerDutyRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import com.checkup.checkup.global.security.AdminRoleCache;
+import com.checkup.checkup.global.security.AdminVerifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -54,8 +57,9 @@ class UserVolunteerServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserVolunteerService(memberService, studentRepository,
-                new UserAccessVerifier(studentRepository), volunteerDutyRepository);
+        AdminVerifier adminVerifier = new AdminVerifier(memberService, new AdminRoleCache(Clock.systemUTC()));
+        service = new UserVolunteerService(studentRepository,
+                new UserAccessVerifier(adminVerifier, studentRepository), volunteerDutyRepository);
     }
 
     @Test
@@ -77,7 +81,7 @@ class UserVolunteerServiceTest {
     void studentCanReadSelf() {
         Member member = givenMember(MemberRole.STUDENT);
         Student own = student(member, STUDENT_ID);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(own));
+        given(studentRepository.findDatagsmStudentIdByMemberId(MEMBER_ID)).willReturn(Optional.of(STUDENT_ID));
         given(studentRepository.findByDatagsmStudentId(STUDENT_ID)).willReturn(Optional.of(own));
 
         assertThat(service.findVolunteer(MEMBER_ID, STUDENT_ID).volunteerCount()).isZero();
@@ -86,8 +90,8 @@ class UserVolunteerServiceTest {
     @Test
     @DisplayName("학생이 다른 학생의 봉사 횟수를 조회하면 403이다")
     void studentCannotReadOthers() {
-        Member member = givenMember(MemberRole.STUDENT);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(student(member, 999L)));
+        givenMember(MemberRole.STUDENT);
+        given(studentRepository.findDatagsmStudentIdByMemberId(MEMBER_ID)).willReturn(Optional.of(999L));
 
         assertThatThrownBy(() -> service.findVolunteer(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -112,7 +116,7 @@ class UserVolunteerServiceTest {
         Member member = givenMember(MemberRole.STUDENT);
         Student own = student(member, STUDENT_ID);
         ReflectionTestUtils.setField(own, "id", 7L);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(own));
+        given(studentRepository.findDatagsmStudentIdByMemberId(MEMBER_ID)).willReturn(Optional.of(STUDENT_ID));
         given(studentRepository.findByDatagsmStudentId(STUDENT_ID)).willReturn(Optional.of(own));
         Instant completedAt = Instant.parse("2026-10-03T09:00:00Z");
         given(volunteerDutyRepository.findAllByStudentIdAndStatusOrderByOperatingDayDescIdDesc(7L, DutyStatus.COMPLETED))
@@ -128,8 +132,8 @@ class UserVolunteerServiceTest {
     @Test
     @DisplayName("학생이 다른 학생의 봉사 완료 내역을 조회하면 403이다")
     void studentCannotReadOthersHistory() {
-        Member member = givenMember(MemberRole.STUDENT);
-        given(studentRepository.findByMember(member)).willReturn(Optional.of(student(member, 999L)));
+        givenMember(MemberRole.STUDENT);
+        given(studentRepository.findDatagsmStudentIdByMemberId(MEMBER_ID)).willReturn(Optional.of(999L));
 
         assertThatThrownBy(() -> service.findVolunteerHistory(MEMBER_ID, STUDENT_ID))
                 .isInstanceOfSatisfying(CustomException.class,

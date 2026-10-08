@@ -30,10 +30,20 @@ public class AdminVerifier {
      *                         관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
      */
     public void verify(Long memberId) {
-        MemberRole role = adminRoleCache.get(memberId).orElseGet(() -> load(memberId));
-        if (role != MemberRole.ADMIN) {
+        if (!isAdmin(memberId)) {
             throw new CustomException(ErrorCode.ADMIN_ONLY);
         }
+    }
+
+    /**
+     * 관리자인지 알려준다. 학생과 관리자가 함께 쓰는 API에서 관리자면 범위 검사를 건너뛸 때 쓴다.
+     *
+     * @param memberId 세션의 회원 id
+     * @return 관리자면 true, 학생이면 false
+     * @throws CustomException 회원이 없으면 {@link ErrorCode#MEMBER_NOT_FOUND}(401)
+     */
+    public boolean isAdmin(Long memberId) {
+        return adminRoleCache.get(memberId).orElseGet(() -> load(memberId)) == MemberRole.ADMIN;
     }
 
     private MemberRole load(Long memberId) {

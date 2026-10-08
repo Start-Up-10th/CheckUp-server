@@ -117,4 +117,42 @@ class AdminVerifierTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ONLY));
     }
+
+    @Test
+    @DisplayName("관리자 여부를 알려주고, 기억 시간 안에는 DB를 다시 읽지 않는다")
+    void isAdminReportsRoleAndUsesCache() {
+        given(memberService.getById(1L)).willReturn(Member.create(100L, "관리자", MemberRole.ADMIN));
+        given(memberService.getById(2L)).willReturn(Member.create(200L, "학생", MemberRole.STUDENT));
+
+        assertThat(adminVerifier.isAdmin(1L)).isTrue();
+        assertThat(adminVerifier.isAdmin(2L)).isFalse();
+        assertThat(adminVerifier.isAdmin(1L)).isTrue();
+        assertThat(adminVerifier.isAdmin(2L)).isFalse();
+
+        verify(memberService, times(1)).getById(1L);
+        verify(memberService, times(1)).getById(2L);
+    }
+
+    @Test
+    @DisplayName("관리자 여부를 묻는 경우에도 없는 회원은 401이다")
+    void isAdminRejectsUnknownMember() {
+        given(memberService.getById(3L)).willThrow(new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        assertThatThrownBy(() -> adminVerifier.isAdmin(3L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("학생으로 기억된 회원이 관리자가 되면 항목을 지운 뒤 바로 관리자로 판정한다")
+    void promotedMemberIsAdminAfterEviction() {
+        given(memberService.getById(1L))
+                .willReturn(Member.create(100L, "학생", MemberRole.STUDENT))
+                .willReturn(Member.create(100L, "학생", MemberRole.ADMIN));
+
+        assertThat(adminVerifier.isAdmin(1L)).isFalse();
+        cache.evict(1L);
+
+        assertThat(adminVerifier.isAdmin(1L)).isTrue();
+    }
 }

@@ -1,9 +1,7 @@
 package com.checkup.checkup.domain.user.service;
 
-import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.response.UserVolunteerHistoryResponse;
 import com.checkup.checkup.domain.user.dto.response.UserVolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
@@ -21,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserVolunteerService {
 
-    private final MemberService memberService;
     private final StudentRepository studentRepository;
     private final UserAccessVerifier userAccessVerifier;
     private final VolunteerDutyRepository volunteerDutyRepository;
@@ -33,8 +30,7 @@ public class UserVolunteerService {
      */
     @Transactional(readOnly = true)
     public UserVolunteerResponse findVolunteer(Long memberId, Long studentId) {
-        Member requester = memberService.getById(memberId);
-        userAccessVerifier.verify(requester, studentId);
+        userAccessVerifier.verify(memberId, studentId);
 
         Student student = studentRepository.findByDatagsmStudentId(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
@@ -50,8 +46,7 @@ public class UserVolunteerService {
      */
     @Transactional(readOnly = true)
     public UserVolunteerHistoryResponse findVolunteerHistory(Long memberId, Long studentId) {
-        Member requester = memberService.getById(memberId);
-        userAccessVerifier.verify(requester, studentId);
+        userAccessVerifier.verify(memberId, studentId);
 
         Student student = studentRepository.findByDatagsmStudentId(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
