@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +16,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 
 /**
- * 실제 PostgreSQL에서 학생 조회 쿼리의 필터와 회원 정보 함께 조회, 없을 때만 저장을 검증한다(#152).
+ * 실제 PostgreSQL에서 학생 조회 쿼리의 필터·회원 조인 범위(#214)와 없을 때만 저장을 검증한다(#152).
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -30,18 +31,24 @@ class StudentRepositoryTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired
+    private EntityManager entityManager;
+
     @Test
-    @DisplayName("같은 호실 학생만 회원 정보와 함께 조회한다")
-    void findsRoomStudentsWithMember() {
+    @DisplayName("같은 호실 학생만 조회하고 회원은 읽지 않는다")
+    void findsRoomStudentsWithoutMember() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, 301);
         saveStudent("다른 방", 1201, 401);
+
+        studentRepository.flush();
+        entityManager.clear();
 
         List<Student> students = studentRepository.findAllByDormitoryRoom(301);
 
         assertThat(students).extracting(Student::getName).containsExactlyInAnyOrder("김학생", "홍길동");
         assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
-                .isLoaded(student, "member")).isTrue());
+                .isLoaded(student, "member")).isFalse());
     }
 
     @Test
@@ -64,18 +71,33 @@ class StudentRepositoryTest {
     }
 
     @Test
-    @DisplayName("DataGSM 학생 id가 있는 학생만 회원 정보와 함께 조회한다")
+    @DisplayName("DataGSM 학생 id가 있는 학생만 조회하고 회원은 읽지 않는다")
     void findsOnlyStudentsWithDatagsmStudentId() {
         saveStudent("홍길동", 1102, 301);
         saveStudent("김학생", 1103, null);
         Member noId = memberRepository.save(Member.create(88_888L, "아이디 없음", MemberRole.STUDENT));
         studentRepository.saveAndFlush(Student.create(noId, null, "아이디 없음", 1, 1, 1, 1104, 301));
 
+        entityManager.clear();
+
         List<Student> students = studentRepository.findAllByDatagsmStudentIdIsNotNull();
 
         assertThat(students).extracting(Student::getStudentNumber).contains(1102, 1103).doesNotContain(1104);
         assertThat(students).allSatisfy(student -> assertThat(entityManagerFactory.getPersistenceUnitUtil()
-                .isLoaded(student, "member")).isTrue());
+                .isLoaded(student, "member")).isFalse());
+    }
+
+    @Test
+    @DisplayName("DataGSM 학생 id 목록 조회(동기화 경로)는 회원을 함께 읽는다")
+    void findsByDatagsmStudentIdsWithMember() {
+        saveStudent("홍길동", 1102, 301);
+        studentRepository.flush();
+        entityManager.clear();
+
+        List<Student> students = studentRepository.findAllByDatagsmStudentIdIn(List.of(1102L));
+
+        assertThat(students).hasSize(1);
+        assertThat(entityManagerFactory.getPersistenceUnitUtil().isLoaded(students.getFirst(), "member")).isTrue();
     }
 
     @Test
