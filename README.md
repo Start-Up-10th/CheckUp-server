@@ -98,6 +98,16 @@ DB 커넥션 풀은 기본 10개이고 가득 차면 10초 뒤 실패합니다. 
 서버 JVM은 `OutOfMemoryError`가 나면 종료하고 컨테이너 restart 정책이 다시 띄웁니다(`SERVER_JAVA_OPTS`로 옵션 변경). 힙 크기와 컨테이너 메모리 제한은 운영 VM 메모리를 확인하기 전까지 정하지 않아 JVM 기본값(호스트 메모리의 25%)입니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
+### 부하 기준값 측정 (로컬 전용)
+출석 시간대에 몰리는 요청(QR 스캔 폭주, 학생 홈 조회, 관리자 호실·층 조회)을 서비스 계층에서 동시에 호출해 응답 시간과 호출당 DB 쿼리 수를 잽니다. 로컬 Postgres·Redis(`docker compose up -d postgres redis`)가 필요하고, 학생 200명을 임시로 만들었다 지웁니다.
+
+```bash
+LOADTEST=true ./gradlew test --rerun --tests "*ServiceLoadTest"
+# 결과: build/loadtest/report.md (동시 호출 수는 LOADTEST_CONCURRENCY, 기본 50)
+```
+
+평소 `./gradlew build`에서는 `LOADTEST`가 없어 건너뜁니다. HTTP·로그인·직렬화와 DataGSM·얼굴 AI 호출은 포함하지 않으므로, 절대값이 아니라 변경 전후 비교와 호출당 쿼리 수를 보는 용도입니다. 실행마다 20% 안팎 흔들리니 같은 조건에서 두세 번 돌려 비교하세요.
+
 ### 지표 대시보드 (로컬 전용)
 
 API별 응답 시간, DB 쿼리 수, DB 연결 풀, JVM 메모리를 Grafana로 볼 수 있습니다. 운영에는 적용하지 않았습니다.
