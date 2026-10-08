@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.face.repository.FaceTemplateRepository;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.support.MutableClock;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +57,8 @@ class FaceRecognitionServiceTest {
     private final FaceRecognitionLogService logService = mock(FaceRecognitionLogService.class);
     private final AdminVerifier adminVerifier = mock(AdminVerifier.class);
     private final MutableClock clock = new MutableClock(NOW);
+    /** {@link #givenEligibleStudent}가 만든 학생. */
+    private Student eligibleStudent;
     private final FaceProperties properties = new FaceProperties(
             "http://face-ai.test", "secret", Duration.ofSeconds(2), Duration.ofSeconds(30),
             1024, 512, Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1");
@@ -62,6 +66,11 @@ class FaceRecognitionServiceTest {
             templateRepository, sessionStore, aiFaceClient, studentRepository,
             attendanceService, logService, adminVerifier, properties,
             tools.jackson.databind.json.JsonMapper.builder().build(), clock);
+
+    @BeforeEach
+    void sessionStaysActiveDuringAiCall() {
+        given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
+    }
 
     @Test
     @DisplayName("KNOWN 후보만 현재 출석 대상으로 기록한다")
@@ -83,7 +92,7 @@ class FaceRecognitionServiceTest {
         given(student.getStudentNumber()).willReturn(15);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
-        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+        given(attendanceService.markAttendedFor(student, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.RECORDED);
 
         var response = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
@@ -93,7 +102,7 @@ class FaceRecognitionServiceTest {
         assertThat(response.faces().getFirst().recognition().studentName()).isEqualTo("Student Name");
         assertThat(response.faces().getFirst().recognition().studentNumber()).isEqualTo(15);
         assertThat(response.faces().getFirst().recognition().attendance()).isEqualTo("RECORDED");
-        verify(attendanceService).markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE);
+        verify(attendanceService).markAttendedFor(student, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE);
     }
 
     @Test
@@ -115,7 +124,7 @@ class FaceRecognitionServiceTest {
 
         assertThat(response.faces().getFirst().recognition().status()).isEqualTo("UNKNOWN");
         assertThat(response.faces().getFirst().recognition().studentName()).isNull();
-        verify(attendanceService, never()).markAttended(any(), any(), any(), any());
+        verify(attendanceService, never()).markAttendedFor(any(), any(), any(), any());
     }
 
     @Test
@@ -133,7 +142,7 @@ class FaceRecognitionServiceTest {
 
         assertThat(response.faces()).extracting(f -> f.recognition().status())
                 .containsExactly("UNKNOWN", "NOT_ATTEMPTED");
-        verify(attendanceService, never()).markAttended(any(), any(), any(), any());
+        verify(attendanceService, never()).markAttendedFor(any(), any(), any(), any());
     }
 
     @Test
@@ -156,7 +165,7 @@ class FaceRecognitionServiceTest {
                         error -> assertThat(error.getErrorCode()).isEqualTo(
                                 com.checkup.checkup.global.exception.ErrorCode.FACE_AI_BAD_GATEWAY));
 
-        verify(attendanceService, never()).markAttended(any(), any(), any(), any());
+        verify(attendanceService, never()).markAttendedFor(any(), any(), any(), any());
     }
 
     @Test
@@ -307,7 +316,7 @@ class FaceRecognitionServiceTest {
     void recordedFaceIsLoggedAsSuccess() {
         FaceSessionView session = givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
-        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.RECORDED);
 
         service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
@@ -320,7 +329,7 @@ class FaceRecognitionServiceTest {
     void staleFaceIsLoggedAsFailed() {
         FaceSessionView session = givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
-        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.STALE);
 
         service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
@@ -333,7 +342,7 @@ class FaceRecognitionServiceTest {
     void duplicateFaceIsNotLogged() {
         givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
-        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.ALREADY_ATTENDED);
 
         service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
@@ -357,11 +366,43 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
+    @DisplayName("프레임 하나에 세션·후보는 한 번만 읽고, AI 응답 뒤에는 세션이 열려 있는지만 확인한다")
+    void readsSessionOncePerFrame() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.RECORDED);
+
+        service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2});
+
+        verify(sessionStore, times(1)).findOwned(SESSION_ID, ADMIN_ID);
+        verify(sessionStore, times(1)).isOwnedActive(SESSION_ID, ADMIN_ID);
+        verify(studentRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("AI를 기다리는 동안 세션이 닫히면 출석을 기록하지 않고 404 FACE_SESSION_NOT_FOUND다")
+    void sessionClosedDuringAiCallIsNotRecorded() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        givenEligibleStudent();
+        given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(false);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2}))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.FACE_SESSION_NOT_FOUND));
+
+        verify(attendanceService, never()).markAttendedFor(any(), any(), any(), any());
+        verify(aiFaceClient).deleteSession(SESSION_ID);
+    }
+
+    @Test
     @DisplayName("최근 인식 기록에 실패해도 인식·출석 응답은 그대로 돌려준다")
     void logFailureDoesNotBreakRecognition() {
         givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
-        given(attendanceService.markAttended(STUDENT_DB_ID, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
                 .willReturn(AttendanceRecordResult.RECORDED);
         willThrow(new IllegalStateException("db down")).given(logService).record(any(), any(), any(), any(), any());
 
@@ -382,6 +423,7 @@ class FaceRecognitionServiceTest {
 
     private void givenEligibleStudent() {
         Student student = mock(Student.class);
+        eligibleStudent = student;
         given(student.getId()).willReturn(STUDENT_DB_ID);
         given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
