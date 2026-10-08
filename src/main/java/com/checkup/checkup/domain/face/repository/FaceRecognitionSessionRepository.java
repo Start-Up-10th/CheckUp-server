@@ -17,6 +17,8 @@ public interface FaceRecognitionSessionRepository extends JpaRepository<FaceReco
 
     Optional<FaceRecognitionSession> findByIdAndAdminMemberIdAndActiveTrue(UUID id, Long adminMemberId);
 
+    boolean existsByIdAndAdminMemberIdAndActiveTrue(UUID id, Long adminMemberId);
+
     List<FaceRecognitionSession> findAllByAdminMemberId(Long adminMemberId);
 
     List<FaceRecognitionSession> findAllByIdIn(List<UUID> ids);
