@@ -9,10 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
-import com.checkup.checkup.domain.member.entity.Student;
-import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.domain.notification.dto.response.NotificationListResponse;
 import com.checkup.checkup.domain.notification.dto.response.NotificationResponse;
 import com.checkup.checkup.domain.notification.entity.Notification;
@@ -41,10 +38,10 @@ class NotificationServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-30T03:00:00Z");
 
     private final NotificationRepository notificationRepository = mock(NotificationRepository.class);
-    private final StudentRepository studentRepository = mock(StudentRepository.class);
+    private final StudentIdCache studentIdCache = mock(StudentIdCache.class);
     private final MutableClock clock = new MutableClock(NOW);
     private final NotificationService service = new NotificationService(
-            notificationRepository, studentRepository, clock, new OperatingDayCalculator(clock));
+            notificationRepository, studentIdCache, clock, new OperatingDayCalculator(clock));
 
     @Test
     @DisplayName("본인 학생 id로 최근 알림과 미확인 여부를 조회해 응답으로 바꾼다")
@@ -86,7 +83,7 @@ class NotificationServiceTest {
     @Test
     @DisplayName("학생 정보가 없는 회원은 403 MISSING_STUDENT_INFO이고 알림을 조회·변경하지 않는다")
     void nonStudentIsRejected() {
-        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.empty());
+        given(studentIdCache.findStudentId(MEMBER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getNotifications(MEMBER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -129,9 +126,6 @@ class NotificationServiceTest {
     }
 
     private void givenStudent() {
-        Student student = Student.create(
-                Member.create(100L, "학생", MemberRole.STUDENT), 200L, "학생", 2, 1, 5, 2105, 301);
-        ReflectionTestUtils.setField(student, "id", STUDENT_ID);
-        given(studentRepository.findByMemberId(MEMBER_ID)).willReturn(Optional.of(student));
+        given(studentIdCache.findStudentId(MEMBER_ID)).willReturn(Optional.of(STUDENT_ID));
     }
 }

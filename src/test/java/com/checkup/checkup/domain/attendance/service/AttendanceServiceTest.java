@@ -34,6 +34,7 @@ import com.checkup.checkup.domain.attendance.dto.response.MyAttendanceResponse;
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
@@ -50,7 +51,7 @@ import com.checkup.checkup.domain.notification.service.NotificationService;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({AttendanceService.class, NotificationService.class, OperatingDayCalculator.class,
+@Import({AttendanceService.class, NotificationService.class, StudentIdCache.class, OperatingDayCalculator.class,
         AttendanceServiceTest.ClockTestConfig.class})
 class AttendanceServiceTest {
 

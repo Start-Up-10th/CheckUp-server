@@ -235,6 +235,49 @@ class FaceRecognitionServiceTest {
         verify(sessionStore, never()).delete(any());
     }
 
+    @Test
+    @DisplayName("후보가 설정된 최대를 넘으면 세션을 만들지 않고 422 FACE_TOO_MANY_CANDIDATES다")
+    void tooManyCandidatesAreRejectedByConfiguredMaximum() {
+        FaceProperties limited = new FaceProperties(
+                "http://face-ai.test", "secret", Duration.ofSeconds(2), Duration.ofSeconds(30),
+                1024, 512, Duration.ofMillis(200), 2, 2, Duration.ofSeconds(1), Duration.ofMinutes(5), 60_000, "v1",
+                1);
+        FaceRecognitionService limitedService = new FaceRecognitionService(
+                templateRepository, sessionStore, aiFaceClient, studentRepository,
+                attendanceService, logService, adminVerifier, limited,
+                tools.jackson.databind.json.JsonMapper.builder().build(), clock);
+        FaceTemplate first = eligibleTemplate(1L);
+        FaceTemplate second = eligibleTemplate(2L);
+        given(templateRepository.findAllByOrderByStudent_IdAsc()).willReturn(List.of(first, second));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.FACE_TOO_MANY_CANDIDATES));
+
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(aiFaceClient, never()).createSession(any(), any());
+    }
+
+    @Test
+    @DisplayName("후보 상한을 따로 정하지 않으면 기본 200명이다")
+    void defaultMaximumIs200() {
+        assertThat(properties.maxCandidates()).isEqualTo(200);
+    }
+
+    private FaceTemplate eligibleTemplate(Long studentId) {
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(studentId);
+        given(student.getDatagsmStudentId()).willReturn(900L + studentId);
+        given(student.getDormitoryRoom()).willReturn(301);
+        given(student.isAttendanceEligible()).willReturn(true);
+        given(student.hasRequiredConsent()).willReturn(true);
+        FaceTemplate template = mock(FaceTemplate.class);
+        given(template.getStudent()).willReturn(student);
+        return template;
+    }
+
     private static String toVectorsJson() throws Exception {
         List<Double> vector = new java.util.ArrayList<>(java.util.Collections.nCopies(256, 0.0));
         vector.set(0, 1.0);

@@ -7,6 +7,7 @@ import com.checkup.checkup.domain.member.repository.MemberRepository;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
+import com.checkup.checkup.global.security.AdminRoleCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final StudentRepository studentRepository;
+    private final AdminRoleCache adminRoleCache;
 
     /**
      * DataGSM 사용자 정보로 회원을 저장하거나 갱신한다. 학생이면 학생 정보도 함께 저장·갱신한다.
@@ -42,6 +44,7 @@ public class MemberService {
         Member member = memberRepository.findByDatagsmId(userInfo.getId())
                 .orElseGet(() -> memberRepository.save(Member.create(userInfo.getId(), name, role)));
         member.update(name, role);
+        adminRoleCache.evictAfterCommit(member.getId());
 
         if (dataGsmStudent != null) {
             Student student = studentRepository.findByMember(member)

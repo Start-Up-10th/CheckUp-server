@@ -18,6 +18,14 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     Optional<Student> findByMemberId(Long memberId);
 
+    /**
+     * 회원 id에 연결된 학생의 id만 읽는다. 학생 행 전체를 읽지 않는다.
+     *
+     * @return 학생 id. 학생이 아닌 회원이면 비어 있다
+     */
+    @Query("SELECT s.id FROM Student s WHERE s.member.id = :memberId")
+    Optional<Long> findIdByMemberId(@Param("memberId") Long memberId);
+
     /** DataGSM 학생 id로 학생 한 명을 조회한다. 회원은 읽지 않는다(필요하면 지연 로딩). */
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
 
