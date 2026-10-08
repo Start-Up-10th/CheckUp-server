@@ -14,6 +14,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/checkup}
     username: ${DB_USERNAME:checkup}
     password: ${DB_PASSWORD:checkup}
+    # 풀 크기는 기본 10이다. 서버 1대·학생 약 200명 규모에서 쿼리 하나가 수 ms라 충분하다. 서버 대수 × 풀 크기가 Postgres max_connections(기본 100)보다 작아야 한다.
+    # 풀이 가득 찼을 때 기본 30초 대신 10초만 기다리고 실패시켜, 요청이 오래 쌓이지 않게 한다.
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:10000}
   jpa:
     open-in-view: false
     hibernate:

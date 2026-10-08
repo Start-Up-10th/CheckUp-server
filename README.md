@@ -94,6 +94,8 @@ checkup:
 `PUBLIC_ORIGIN`(웹 주소)도 반드시 넣습니다. QR 링크와 로그인 후 웹으로 돌아가는 주소에 쓰이며, 비어 있으면 서버가 기동하지 않습니다.
 로그인 콜백은 성공하면 `{PUBLIC_ORIGIN}/login/complete`(또는 `GET /api/v1/auth/login?redirect=/경로`로 정한 경로), 실패하면 `{PUBLIC_ORIGIN}/login?error=<오류 코드>`로 302 리다이렉트합니다.
 DataGSM 호출은 연결 3초·응답 5초까지만 기다립니다. `DATAGSM_CONNECT_TIMEOUT`, `DATAGSM_RESPONSE_TIMEOUT`(예: `5s`)으로 바꿀 수 있고, 시간 안에 응답이 없으면 `DATAGSM_UNAVAILABLE`로 응답합니다.
+DB 커넥션 풀은 기본 10개이고 가득 차면 10초 뒤 실패합니다. `DB_POOL_SIZE`, `DB_POOL_TIMEOUT_MS`로 바꿀 수 있으며, 서버 대수 × 풀 크기는 Postgres `max_connections`보다 작아야 합니다.
+서버 JVM은 `OutOfMemoryError`가 나면 종료하고 컨테이너 restart 정책이 다시 띄웁니다(`SERVER_JAVA_OPTS`로 옵션 변경). 힙 크기와 컨테이너 메모리 제한은 운영 VM 메모리를 확인하기 전까지 정하지 않아 JVM 기본값(호스트 메모리의 25%)입니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
 ### 지표 대시보드 (로컬 전용)
