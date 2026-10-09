@@ -3,11 +3,8 @@ package com.checkup.checkup.domain.room.service;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
-import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
@@ -31,7 +28,6 @@ public class RoomService {
 
     private static final int ROOMS_PER_FLOOR = 100;
 
-    private final MemberService memberService;
     private final StudentRepository studentRepository;
     private final AttendanceRepository attendanceRepository;
     private final OperatingDayCalculator operatingDayCalculator;
@@ -48,10 +44,8 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public List<RoomStudentResponse> getStudents(Long memberId, Integer dormitoryRoom, AttendancePurpose purpose) {
-        Member member = memberService.getById(memberId);
-
-        if (member.getRole() != MemberRole.ADMIN) {
-            Student currentStudent = studentRepository.findByMember(member)
+        if (!adminVerifier.isAdmin(memberId)) {
+            Student currentStudent = studentRepository.findByMemberId(memberId)
                     .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
             Integer currentRoom = currentStudent.getDormitoryRoom();
             if (currentRoom == null || !currentRoom.equals(dormitoryRoom)) {
