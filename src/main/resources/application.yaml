@@ -1,4 +1,7 @@
 spring:
+  # 종료 신호를 받으면 새 요청은 받지 않고 처리 중인 요청을 이 시간까지 기다린다. 얼굴 AI 응답 대기(FACE_AI_RESPONSE_TIMEOUT 30s)보다 짧으면 얼굴 요청이 끊긴다. compose의 stop_grace_period보다 짧아야 한다.
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   # @Scheduled 작업이 서로 기다리지 않도록 스레드 2개
   task:
     scheduling:
@@ -53,6 +56,8 @@ datagsm:
   response-timeout: ${DATAGSM_RESPONSE_TIMEOUT:5s} # DataGSM 응답 대기 시간. 로그인 콜백은 DataGSM을 두 번 불러 최대 (연결+응답)×2 동안 기다린다
 
 server:
+  # 재시작·배포 때 처리 중인 요청(얼굴 등록, 세션 생성, 출석 저장)을 끝까지 마친 뒤 종료한다(#233)
+  shutdown: graceful
   servlet:
     session:
       timeout: ${SESSION_TIMEOUT:7d} # 요청이 없을 때 세션 유지 시간

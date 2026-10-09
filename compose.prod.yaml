@@ -39,6 +39,10 @@ services:
       # 메모리가 모자라 OutOfMemoryError가 나면 반쯤 죽은 채 응답하지 않고 종료해, restart 정책이 다시 띄우게 한다.
       # 힙 크기는 정하지 않는다(기본: 호스트 메모리의 25%). 필요하면 SERVER_JAVA_OPTS에 -XX:MaxRAMPercentage=... 를 함께 넣는다.
       JAVA_TOOL_OPTIONS: ${SERVER_JAVA_OPTS:--XX:+ExitOnOutOfMemoryError}
+      # 종료 신호 뒤 처리 중인 요청을 기다리는 시간(#233). 비워 두어도 기본값이 적용되도록 여기서 기본값을 준다.
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-30s}
+    # docker가 SIGKILL로 강제 종료하기 전까지 기다리는 시간. SHUTDOWN_TIMEOUT보다 길어야 한다(기본 10초면 얼굴 요청이 끊긴다).
+    stop_grace_period: ${SHUTDOWN_GRACE_PERIOD:-45s}
     # DB·Redis까지 닿아야 healthy다(REQ-OPS-001). 로그인 없이 열린 경로는 /actuator/health뿐이다.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://127.0.0.1:8080/actuator/health"]
