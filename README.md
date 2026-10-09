@@ -95,6 +95,7 @@ checkup:
 로그인 콜백은 성공하면 `{PUBLIC_ORIGIN}/login/complete`(또는 `GET /api/v1/auth/login?redirect=/경로`로 정한 경로), 실패하면 `{PUBLIC_ORIGIN}/login?error=<오류 코드>`로 302 리다이렉트합니다.
 DataGSM 호출은 연결 3초·응답 5초까지만 기다립니다. `DATAGSM_CONNECT_TIMEOUT`, `DATAGSM_RESPONSE_TIMEOUT`(예: `5s`)으로 바꿀 수 있고, 시간 안에 응답이 없으면 `DATAGSM_UNAVAILABLE`로 응답합니다.
 DB 커넥션 풀은 기본 10개이고 가득 차면 10초 뒤 실패합니다. `DB_POOL_SIZE`, `DB_POOL_TIMEOUT_MS`로 바꿀 수 있으며, 서버 대수 × 풀 크기는 Postgres `max_connections`보다 작아야 합니다.
+서버는 재시작·배포 때 종료 신호를 받으면 새 요청을 받지 않고 처리 중인 요청을 `SHUTDOWN_TIMEOUT`(기본 30초)까지 마친 뒤 종료합니다. docker는 `SHUTDOWN_GRACE_PERIOD`(기본 45초)가 지나면 강제 종료하므로 이 값이 더 커야 합니다. 서버가 한 대라 배포 중 잠깐의 중단은 남습니다.
 서버 JVM은 `OutOfMemoryError`가 나면 종료하고 컨테이너 restart 정책이 다시 띄웁니다(`SERVER_JAVA_OPTS`로 옵션 변경). 힙 크기와 컨테이너 메모리 제한은 운영 VM 메모리를 확인하기 전까지 정하지 않아 JVM 기본값(호스트 메모리의 25%)입니다.
 운영 Redis는 `maxmemory-policy noeviction`으로 설정합니다. 로그인 세션·QR 세션·QR 토큰 기록이 Redis에 있어, 메모리가 부족할 때 키를 먼저 지우는 정책(`allkeys-lru` 등)이면 로그인이 풀리거나 만료된 QR이 `INVALID`로 잘못 안내됩니다.
 
