@@ -7,6 +7,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.config.StudentExclusionProperties;
 import com.checkup.checkup.global.security.AdminRoleCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,10 +39,12 @@ public class StudentSyncService {
     private final ApplicationEventPublisher eventPublisher;
     private final AdminProperties adminProperties;
     private final AdminRoleCache adminRoleCache;
+    private final StudentExclusionProperties studentExclusionProperties;
 
     /**
      * 받은 학생들을 반영한다. {@code syncedAt}보다 새로운 정보를 이미 반영한 학생은 건너뛴다.
      * 저장되지 않은 재학생은 로그인 계정 없이 새로 저장한다.
+     * 제외 목록의 학생은 저장하지도 갱신하지도 않는다(DEC-034).
      *
      * @param students DataGSM에서 받은 학생 목록
      * @param syncedAt 이 정보의 기준 시각. 웹훅은 이벤트 시각, 수동 동기화는 목록을 받은 시각이다.
@@ -49,6 +52,9 @@ public class StudentSyncService {
      */
     @Transactional
     public int syncAll(List<StudentSyncData> students, Instant syncedAt) {
+        students = students.stream()
+                .filter(changed -> !studentExclusionProperties.isExcluded(changed.datagsmStudentId()))
+                .toList();
         Map<Long, Student> saved = studentRepository.findAllByDatagsmStudentIdIn(
                         students.stream().map(StudentSyncData::datagsmStudentId).toList())
                 .stream()
