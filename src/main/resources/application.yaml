@@ -60,7 +60,7 @@ server:
   shutdown: graceful
   servlet:
     session:
-      timeout: ${SESSION_TIMEOUT:7d} # 요청이 없을 때 세션 유지 시간
+      timeout: ${SESSION_TIMEOUT:30d} # 요청이 없을 때 세션 유지 시간
       cookie:
         http-only: true # JS가 쿠키 못 읽음, XSS 방지
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
