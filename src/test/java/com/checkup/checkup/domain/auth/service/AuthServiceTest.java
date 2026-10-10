@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.config.StudentExclusionProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,8 @@ class AuthServiceTest {
     private static final String CODE_VERIFIER = "verifier";
     private static final String ACCESS_TOKEN = "test-access-token";
     private static final String REDIRECT_PATH = "/login/complete";
+    /** 학생 제외 목록의 DataGSM 학생 id(DEC-034). */
+    private static final long EXCLUDED_STUDENT_ID = 77L;
 
     @Mock
     private DataGsmOAuthClient dataGsmOAuthClient;
@@ -241,9 +244,30 @@ class AuthServiceTest {
         assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
     }
 
+    @Test
+    @DisplayName("학생 제외 목록의 학생 계정은 403으로 거부하고 회원을 만들지 않는다")
+    void excludedStudentIsRejected() {
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        userInfo.getStudent().setId(EXCLUDED_STUDENT_ID);
+        givenLoginReturns(userInfo);
+
+        assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
+    }
+
+    @Test
+    @DisplayName("관리자 허용 목록에 있어도 학생 제외 목록의 학생 계정은 403으로 거부한다")
+    void allowlistedExcludedStudentIsRejected() {
+        authService = authServiceAllowing(100L);
+        UserInfo userInfo = studentUser(StudentRole.GENERAL_STUDENT);
+        userInfo.getStudent().setId(EXCLUDED_STUDENT_ID);
+        givenLoginReturns(userInfo);
+
+        assertRejectedWith(ErrorCode.UNSUPPORTED_ACCOUNT);
+    }
+
     private AuthService authServiceAllowing(Long... adminDatagsmIds) {
         return new AuthService(dataGsmOAuthClient, oAuthStateService, REDIRECT_URI, memberService,
-                new AdminProperties(Set.of(adminDatagsmIds)));
+                new AdminProperties(Set.of(adminDatagsmIds)), new StudentExclusionProperties(Set.of(EXCLUDED_STUDENT_ID)));
     }
 
     private void givenLoginReturns(UserInfo userInfo) {

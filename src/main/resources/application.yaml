@@ -105,6 +105,8 @@ springdoc:
 checkup:
   admin:
     datagsm-ids: ${CHECKUP_ADMIN_DATAGSM_IDS:}   # 개발·테스트용 관리자 DataGSM 계정 id, 쉼표 구분. 운영 전 비운다
+  student:
+    excluded-datagsm-ids: ${CHECKUP_EXCLUDED_DATAGSM_STUDENT_IDS:}   # 실제 학생이 아닌 DataGSM 학생 id, 쉼표 구분(DEC-034)
   web:
     base-url: ${PUBLIC_ORIGIN}
   # Prometheus가 긁어 갈 지표를 /actuator/prometheus로 내보낸다. 켜면 로그인 없이 열리므로 로컬에서만 켠다.

@@ -36,6 +36,7 @@ services:
       FACE_SERVICE_TOKEN: ${FACE_SERVICE_TOKEN}
       FACE_AI_BASE_URL: ${FACE_AI_BASE_URL}
       CHECKUP_ADMIN_DATAGSM_IDS: ${CHECKUP_ADMIN_DATAGSM_IDS:-}
+      CHECKUP_EXCLUDED_DATAGSM_STUDENT_IDS: ${CHECKUP_EXCLUDED_DATAGSM_STUDENT_IDS:-}
       # 메모리가 모자라 OutOfMemoryError가 나면 반쯤 죽은 채 응답하지 않고 종료해, restart 정책이 다시 띄우게 한다.
       # 힙 크기는 정하지 않는다(기본: 호스트 메모리의 25%). 필요하면 SERVER_JAVA_OPTS에 -XX:MaxRAMPercentage=... 를 함께 넣는다.
       JAVA_TOOL_OPTIONS: ${SERVER_JAVA_OPTS:--XX:+ExitOnOutOfMemoryError}

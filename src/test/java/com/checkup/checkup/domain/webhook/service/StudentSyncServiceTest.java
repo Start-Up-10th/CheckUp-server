@@ -15,6 +15,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.webhook.dto.StudentSyncData;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.config.StudentExclusionProperties;
 import com.checkup.checkup.global.security.AdminRoleCache;
 import java.time.Instant;
 import java.util.List;
@@ -36,8 +37,36 @@ class StudentSyncServiceTest {
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     /** 허용 목록: DataGSM 계정 id 1060(학생 60의 회원). */
     private final AdminRoleCache adminRoleCache = mock(AdminRoleCache.class);
+    /** 제외 목록: DataGSM 학생 id 77(실제 학생이 아닌 데이터). */
     private final StudentSyncService service = new StudentSyncService(studentRepository, eventPublisher,
-            new AdminProperties(Set.of(1060L)), adminRoleCache);
+            new AdminProperties(Set.of(1060L)), adminRoleCache, new StudentExclusionProperties(Set.of(77L)));
+
+    @Test
+    @DisplayName("제외 목록의 학생은 저장되지 않았어도 새로 저장하지 않는다")
+    void excludedStudentIsNotCreated() {
+        given(studentRepository.findAllByDatagsmStudentIdIn(List.of())).willReturn(List.of());
+
+        int count = service.syncAll(List.of(enrolled(77L, 301)), SYNCED_AT);
+
+        assertThat(count).isZero();
+        verify(studentRepository, never()).insertIfAbsent(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("이미 저장된 제외 목록 학생은 갱신하지 않고, 같은 목록의 다른 학생은 그대로 반영한다")
+    void excludedSavedStudentIsNotUpdated() {
+        Student excluded = student(77L, MemberRole.STUDENT, 301);
+        Student other = student(42L, MemberRole.STUDENT, 301);
+        given(studentRepository.findAllByDatagsmStudentIdIn(List.of(42L))).willReturn(List.of(other));
+
+        int count = service.syncAll(List.of(enrolled(77L, 302), enrolled(42L, 302)), SYNCED_AT);
+
+        assertThat(count).isEqualTo(1);
+        verify(studentRepository).findAllByDatagsmStudentIdIn(List.of(42L));
+        assertThat(excluded.getDormitoryRoom()).isEqualTo(301);
+        assertThat(excluded.getDatagsmSyncedAt()).isNull();
+        assertThat(other.getDormitoryRoom()).isEqualTo(302);
+    }
 
     @Test
     @DisplayName("목록에 없는 저장된 학생은 조회하지도 바꾸지도 않는다")
