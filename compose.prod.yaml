@@ -17,6 +17,8 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/checkup
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_POOL_TIMEOUT_MS: ${DB_POOL_TIMEOUT_MS:-10000}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       DATAGSM_CLIENT_ID: ${DATAGSM_CLIENT_ID}
@@ -26,13 +28,21 @@ services:
       DATAGSM_WEBHOOK_SECRET: ${DATAGSM_WEBHOOK_SECRET}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
-      # .env에 빈 값으로 두면 application.yaml의 기본값(7d)이 적용되지 않으므로 여기서 기본값을 준다(#156).
-      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-7d}
-      SWAGGER_ENABLED: ${SWAGGER_ENABLED}
+      # .env에 빈 값으로 두면 application.yaml의 기본값(30d)이 적용되지 않으므로 여기서 기본값을 준다(#156).
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-30d}
+      # 운영은 기본 비공개다. .env에 빈 값으로 두어도 false가 되도록 여기서 기본값을 준다(#100).
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       QUERY_LOG_ENABLED: ${QUERY_LOG_ENABLED:-false}
       FACE_SERVICE_TOKEN: ${FACE_SERVICE_TOKEN}
       FACE_AI_BASE_URL: ${FACE_AI_BASE_URL}
       CHECKUP_ADMIN_DATAGSM_IDS: ${CHECKUP_ADMIN_DATAGSM_IDS:-}
+      # 메모리가 모자라 OutOfMemoryError가 나면 반쯤 죽은 채 응답하지 않고 종료해, restart 정책이 다시 띄우게 한다.
+      # 힙 크기는 정하지 않는다(기본: 호스트 메모리의 25%). 필요하면 SERVER_JAVA_OPTS에 -XX:MaxRAMPercentage=... 를 함께 넣는다.
+      JAVA_TOOL_OPTIONS: ${SERVER_JAVA_OPTS:--XX:+ExitOnOutOfMemoryError}
+      # 종료 신호 뒤 처리 중인 요청을 기다리는 시간(#233). 비워 두어도 기본값이 적용되도록 여기서 기본값을 준다.
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-30s}
+    # docker가 SIGKILL로 강제 종료하기 전까지 기다리는 시간. SHUTDOWN_TIMEOUT보다 길어야 한다(기본 10초면 얼굴 요청이 끊긴다).
+    stop_grace_period: ${SHUTDOWN_GRACE_PERIOD:-45s}
     # DB·Redis까지 닿아야 healthy다(REQ-OPS-001). 로그인 없이 열린 경로는 /actuator/health뿐이다.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-m", "5", "http://127.0.0.1:8080/actuator/health"]

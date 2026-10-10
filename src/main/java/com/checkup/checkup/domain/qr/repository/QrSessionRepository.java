@@ -51,6 +51,30 @@ public class QrSessionRepository {
             return 1
             """, Long.class);
 
+    /** 토큰 해시와 그 토큰이 가리키는 세션 해시를 Redis 한 번에 읽는다. 토큰이 없으면 둘 다 빈 목록이다. */
+    private static final RedisScript<List> FIND_TOKEN_WITH_SESSION = new DefaultRedisScript<>("""
+            local token = redis.call('HGETALL', KEYS[1])
+            local sessionId
+            for i = 1, #token, 2 do
+                if token[i] == 'sessionId' then
+                    sessionId = token[i + 1]
+                end
+            end
+            if not sessionId then
+                return {token, {}}
+            end
+            return {token, redis.call('HGETALL', ARGV[1] .. sessionId)}
+            """, List.class);
+
+    /**
+     * 토큰과 그 토큰의 세션을 함께 읽은 결과.
+     *
+     * @param token   토큰. 없으면 비어 있다
+     * @param session 토큰이 가리키는 세션. 토큰이 없거나 세션 키가 이미 사라졌으면 비어 있다
+     */
+    public record TokenLookup(Optional<QrToken> token, Optional<QrSession> session) {
+    }
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -96,7 +120,10 @@ public class QrSessionRepository {
      * 세션을 조회한다.
      */
     public Optional<QrSession> findById(String id) {
-        Map<Object, Object> hash = redisTemplate.opsForHash().entries(SESSION_KEY + id);
+        return toSession(id, redisTemplate.opsForHash().entries(SESSION_KEY + id));
+    }
+
+    private static Optional<QrSession> toSession(String id, Map<?, ?> hash) {
         if (hash.isEmpty()) {
             return Optional.empty();
         }
@@ -156,7 +183,34 @@ public class QrSessionRepository {
      * 토큰을 조회한다.
      */
     public Optional<QrToken> findToken(String token) {
-        Map<Object, Object> hash = redisTemplate.opsForHash().entries(TOKEN_KEY + token);
+        return toToken(token, redisTemplate.opsForHash().entries(TOKEN_KEY + token));
+    }
+
+    /**
+     * 토큰과 그 토큰의 세션을 Redis 한 번(Lua)으로 읽는다. QR 스캔이 토큰 조회와 세션 조회를 차례로 왕복하지 않게 한다(#211).
+     * 두 키는 한 스크립트 안에서 읽으므로 그 사이에 세션이 바뀌어 어긋난 값을 보지 않는다.
+     */
+    public TokenLookup findTokenWithSession(String token) {
+        List<?> result = redisTemplate.execute(FIND_TOKEN_WITH_SESSION, List.of(TOKEN_KEY + token), SESSION_KEY);
+        if (result == null || result.size() != 2) {
+            return new TokenLookup(Optional.empty(), Optional.empty());
+        }
+        Optional<QrToken> qrToken = toToken(token, toHash(result.get(0)));
+        Optional<QrSession> session = qrToken.flatMap(found -> toSession(found.sessionId(), toHash(result.get(1))));
+        return new TokenLookup(qrToken, session);
+    }
+
+    private static Map<String, String> toHash(Object flat) {
+        Map<String, String> hash = new java.util.HashMap<>();
+        if (flat instanceof List<?> values) {
+            for (int i = 0; i + 1 < values.size(); i += 2) {
+                hash.put((String) values.get(i), (String) values.get(i + 1));
+            }
+        }
+        return hash;
+    }
+
+    private static Optional<QrToken> toToken(String token, Map<?, ?> hash) {
         if (hash.isEmpty()) {
             return Optional.empty();
         }

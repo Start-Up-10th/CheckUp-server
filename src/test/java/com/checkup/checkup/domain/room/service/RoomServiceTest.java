@@ -16,7 +16,6 @@ import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
@@ -51,9 +50,6 @@ class RoomServiceTest {
     private static final AttendancePurpose DORMITORY = AttendancePurpose.DORMITORY;
 
     @Mock
-    private MemberService memberService;
-
-    @Mock
     private StudentRepository studentRepository;
 
     @Mock
@@ -73,16 +69,15 @@ class RoomServiceTest {
     @BeforeEach
     void setUp() {
         roomService = new RoomService(
-                memberService, studentRepository, attendanceRepository, operatingDayCalculator, adminVerifier,
+                studentRepository, attendanceRepository, operatingDayCalculator, adminVerifier,
                 attendanceService);
     }
 
     @Test
     @DisplayName("학생 정보가 없는 교사 관리자도 호실 명단을 조회할 수 있다")
     void teacherAdminCanReadAnyRoom() {
-        Member admin = Member.create(10L, "사감", MemberRole.ADMIN);
         Student rosterStudent = student(20L, "학생", 1101, ROOM);
-        given(memberService.getById(ADMIN_ID)).willReturn(admin);
+        given(adminVerifier.isAdmin(ADMIN_ID)).willReturn(true);
         given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(rosterStudent));
 
@@ -91,17 +86,16 @@ class RoomServiceTest {
         List<RoomStudentResponse> response = roomService.getStudents(ADMIN_ID, ROOM, DORMITORY);
 
         assertThat(response).containsExactly(new RoomStudentResponse(20L, "학생", 1, 1, 1101, false));
-        verify(studentRepository, never()).findByMember(admin);
+        verify(studentRepository, never()).findByMemberId(ADMIN_ID);
     }
 
     @Test
     @DisplayName("학생은 본인에게 배정된 호실의 명단을 조회할 수 있다")
     void studentCanReadOwnRoom() {
-        Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
         Student currentStudent = student(20L, "학생", 1101, ROOM);
         Student roommate = student(21L, "룸메이트", 1102, ROOM);
-        given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
-        given(studentRepository.findByMember(currentMember)).willReturn(Optional.of(currentStudent));
+        given(adminVerifier.isAdmin(STUDENT_ID)).willReturn(false);
+        given(studentRepository.findByMemberId(STUDENT_ID)).willReturn(Optional.of(currentStudent));
         given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(roommate, currentStudent));
 
@@ -115,9 +109,8 @@ class RoomServiceTest {
     @Test
     @DisplayName("학생의 다른 호실 접근은 명단 조회 전에 거부한다")
     void studentIsRejectedForOtherRoom() {
-        Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
-        given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
-        given(studentRepository.findByMember(currentMember))
+        given(adminVerifier.isAdmin(STUDENT_ID)).willReturn(false);
+        given(studentRepository.findByMemberId(STUDENT_ID))
                 .willReturn(Optional.of(student(20L, "학생", 1101, ROOM)));
 
         assertThatThrownBy(() -> roomService.getStudents(STUDENT_ID, 401, DORMITORY))
@@ -131,9 +124,8 @@ class RoomServiceTest {
     @Test
     @DisplayName("학생 정보가 없으면 403을 반환한다")
     void missingStudentReturnsForbidden() {
-        Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
-        given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
-        given(studentRepository.findByMember(currentMember)).willReturn(Optional.empty());
+        given(adminVerifier.isAdmin(STUDENT_ID)).willReturn(false);
+        given(studentRepository.findByMemberId(STUDENT_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> roomService.getStudents(STUDENT_ID, ROOM, DORMITORY))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -146,9 +138,8 @@ class RoomServiceTest {
     @Test
     @DisplayName("호실이 미배정된 학생에게 403을 반환한다")
     void studentWithoutRoomReturnsForbidden() {
-        Member currentMember = Member.create(20L, "학생", MemberRole.STUDENT);
-        given(memberService.getById(STUDENT_ID)).willReturn(currentMember);
-        given(studentRepository.findByMember(currentMember))
+        given(adminVerifier.isAdmin(STUDENT_ID)).willReturn(false);
+        given(studentRepository.findByMemberId(STUDENT_ID))
                 .willReturn(Optional.of(student(20L, "학생", 1101, null)));
 
         assertThatThrownBy(() -> roomService.getStudents(STUDENT_ID, ROOM, DORMITORY))
@@ -159,7 +150,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("관리자가 학생이 없는 호실을 조회하면 빈 목록을 반환하고 출석을 조회하지 않는다")
     void emptyRoomReturnsEmptyListForAdmin() {
-        given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
+        given(adminVerifier.isAdmin(ADMIN_ID)).willReturn(true);
         given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of());
 
@@ -170,7 +161,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("삭제된 회원의 요청은 401을 반환한다")
     void deletedMemberReturnsUnauthorized() {
-        given(memberService.getById(STUDENT_ID))
+        given(adminVerifier.isAdmin(STUDENT_ID))
                 .willThrow(new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
         assertThatThrownBy(() -> roomService.getStudents(STUDENT_ID, ROOM, DORMITORY))
@@ -184,10 +175,9 @@ class RoomServiceTest {
     @Test
     @DisplayName("요청한 용도의 오늘 운영일에 출석한 학생만 attended가 true다")
     void marksStudentsAttendedForPurposeToday() {
-        Member admin = Member.create(10L, "사감", MemberRole.ADMIN);
         Student attendedStudent = withId(student(20L, "출석", 1101, ROOM), 100L);
         Student absentStudent = withId(student(21L, "미출석", 1102, ROOM), 101L);
-        given(memberService.getById(ADMIN_ID)).willReturn(admin);
+        given(adminVerifier.isAdmin(ADMIN_ID)).willReturn(true);
         given(studentRepository.findAllByDormitoryRoom(ROOM))
                 .willReturn(List.of(absentStudent, attendedStudent));
         given(operatingDayCalculator.today()).willReturn(TODAY);
@@ -326,7 +316,7 @@ class RoomServiceTest {
     @Test
     @DisplayName("호실 명단은 DB가 돌려준 순서와 상관없이 이름 가나다순, 같은 이름은 학번순이다")
     void studentsAreSortedInKoreanOrder() {
-        given(memberService.getById(ADMIN_ID)).willReturn(Member.create(10L, "사감", MemberRole.ADMIN));
+        given(adminVerifier.isAdmin(ADMIN_ID)).willReturn(true);
         given(studentRepository.findAllByDormitoryRoom(ROOM)).willReturn(List.of(
                 student(31L, "홍길동", 1102, ROOM),
                 student(32L, "계정", 1103, ROOM),

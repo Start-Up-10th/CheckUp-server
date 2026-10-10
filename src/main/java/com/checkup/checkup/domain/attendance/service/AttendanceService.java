@@ -17,6 +17,7 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.global.exception.CustomException;
@@ -40,6 +41,7 @@ public class AttendanceService {
     private final Clock clock;
     private final NotificationService notificationService;
     private final StudentRepository studentRepository;
+    private final StudentIdCache studentIdCache;
 
     /**
      * 자동 인증 성공을 출석으로 기록한다. 동시에 여러 요청이 와도 한 번만 기록된다.
@@ -70,6 +72,33 @@ public class AttendanceService {
             Instant verifiedAt,
             AttendanceMethod method
     ) {
+        return mark(studentId, null, purpose, verifiedAt, method);
+    }
+
+    /**
+     * {@link #markAttended}와 같지만, 호출하는 쪽이 방금 읽은 학생을 넘겨 학생을 DB에서 다시 읽지 않는다(#211).
+     * 넘겨받은 학생의 필수 동의·호실은 메모리에서 다시 확인하므로 마지막 방어선은 그대로다.
+     *
+     * @param student    출석할 학생. 호출하는 쪽이 방금 DB에서 읽은 값이어야 한다
+     * @throws CustomException 필수 동의가 없거나 호실이 없으면 {@link ErrorCode#FORBIDDEN}(403)
+     */
+    @Transactional
+    public AttendanceRecordResult markAttendedFor(
+            Student student,
+            AttendancePurpose purpose,
+            Instant verifiedAt,
+            AttendanceMethod method
+    ) {
+        return mark(student.getId(), student, purpose, verifiedAt, method);
+    }
+
+    private AttendanceRecordResult mark(
+            Long studentId,
+            Student known,
+            AttendancePurpose purpose,
+            Instant verifiedAt,
+            AttendanceMethod method
+    ) {
         Instant now = clock.instant();
         if (verifiedAt.isAfter(now.plus(MAX_CLOCK_SKEW))) {
             return AttendanceRecordResult.FUTURE;
@@ -80,7 +109,11 @@ public class AttendanceService {
             return AttendanceRecordResult.STALE;
         }
 
-        verifyEligible(studentId);
+        if (known == null) {
+            verifyEligible(studentId);
+        } else {
+            verifyEligible(known);
+        }
 
         int changed = attendanceRepository.markAttended(
                 studentId, purpose.name(), operatingDay, recordedAt, method.name());
@@ -97,8 +130,11 @@ public class AttendanceService {
     }
 
     private void verifyEligible(Long studentId) {
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+        verifyEligible(studentRepository.findById(studentId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND)));
+    }
+
+    private void verifyEligible(Student student) {
         if (!student.isAttendanceEligible()) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
@@ -149,11 +185,11 @@ public class AttendanceService {
      */
     @Transactional(readOnly = true)
     public MyAttendanceResponse getMyToday(Long memberId) {
-        Student student = studentRepository.findByMemberId(memberId)
+        Long studentId = studentIdCache.findStudentId(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MISSING_STUDENT_INFO));
         LocalDate operatingDay = operatingDayCalculator.today();
         return MyAttendanceResponse.of(operatingDay,
-                attendanceRepository.findAllByStudentIdAndOperatingDay(student.getId(), operatingDay));
+                attendanceRepository.findAllByStudentIdAndOperatingDay(studentId, operatingDay));
     }
 
     /** 출석 완료 알림 문구. */

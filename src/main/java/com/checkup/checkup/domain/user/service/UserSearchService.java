@@ -1,7 +1,5 @@
 package com.checkup.checkup.domain.user.service;
 
-import com.checkup.checkup.domain.member.entity.Member;
-import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.domain.user.dto.response.UserSearchResponse;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.DataGsmErrorCodes;
@@ -27,7 +25,6 @@ public class UserSearchService {
     private static final int NOT_FOUND = 404;
 
     private final DataGsmOpenApiClient dataGsmOpenApiClient;
-    private final MemberService memberService;
     private final UserAccessVerifier userAccessVerifier;
     private final UserSearchCache userSearchCache;
 
@@ -40,8 +37,7 @@ public class UserSearchService {
      *                         그 밖의 DataGSM 호출 실패는 {@link ErrorCode#DATAGSM_ERROR}(502)
      */
     public UserSearchResponse findUser(Long memberId, Long studentId) {
-        Member requester = memberService.getById(memberId);
-        userAccessVerifier.verify(requester, studentId);
+        userAccessVerifier.verify(memberId, studentId);
 
         Optional<UserSearchResponse> cached = userSearchCache.get(studentId);
         if (cached.isPresent()) {

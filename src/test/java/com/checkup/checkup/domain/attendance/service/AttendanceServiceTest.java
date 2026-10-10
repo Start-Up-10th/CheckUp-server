@@ -34,6 +34,9 @@ import com.checkup.checkup.domain.attendance.dto.response.MyAttendanceResponse;
 import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
+import com.checkup.checkup.domain.member.entity.Student;
+import com.checkup.checkup.domain.member.repository.StudentRepository;
+import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
@@ -50,7 +53,7 @@ import com.checkup.checkup.domain.notification.service.NotificationService;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({AttendanceService.class, NotificationService.class, OperatingDayCalculator.class,
+@Import({AttendanceService.class, NotificationService.class, StudentIdCache.class, OperatingDayCalculator.class,
         AttendanceServiceTest.ClockTestConfig.class})
 class AttendanceServiceTest {
 
@@ -71,6 +74,9 @@ class AttendanceServiceTest {
 
     @Autowired
     private AttendanceService attendanceService;
+
+    @Autowired
+    private StudentRepository studentRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -140,6 +146,31 @@ class AttendanceServiceTest {
                 -1L, AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STUDENT_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("방금 읽은 학생을 넘기면 학생을 다시 읽지 않고 출석으로 기록한다")
+    void markAttendedForRecordsWithKnownStudent() {
+        Student student = studentRepository.findById(studentId).orElseThrow();
+
+        AttendanceRecordResult result = attendanceService.markAttendedFor(
+                student, AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR);
+
+        assertThat(result).isEqualTo(AttendanceRecordResult.RECORDED);
+        assertThat(attended(AttendancePurpose.DORMITORY, DAY)).isTrue();
+    }
+
+    @Test
+    @DisplayName("넘겨받은 학생이 동의나 호실이 없으면 기록하지 않고 403이다")
+    void markAttendedForRejectsIneligibleStudent() {
+        jdbcTemplate.update("UPDATE student SET dormitory_room = NULL WHERE id = ?", studentId);
+        Student student = studentRepository.findById(studentId).orElseThrow();
+
+        assertThatThrownBy(() -> attendanceService.markAttendedFor(
+                student, AttendancePurpose.DORMITORY, AT, AttendanceMethod.QR))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThat(attendanceCount()).isZero();
     }
 
     @Test

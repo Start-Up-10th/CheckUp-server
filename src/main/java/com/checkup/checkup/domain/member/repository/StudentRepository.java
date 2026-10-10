@@ -18,7 +18,23 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
     Optional<Student> findByMemberId(Long memberId);
 
-    @EntityGraph(attributePaths = "member")
+    /**
+     * 회원 id에 연결된 학생의 id만 읽는다. 학생 행 전체를 읽지 않는다.
+     *
+     * @return 학생 id. 학생이 아닌 회원이면 비어 있다
+     */
+    @Query("SELECT s.id FROM Student s WHERE s.member.id = :memberId")
+    Optional<Long> findIdByMemberId(@Param("memberId") Long memberId);
+
+    /**
+     * 회원 id에 연결된 학생의 DataGSM 학생 id만 읽는다. 본인 확인에 쓰며 학생 행 전체를 읽지 않는다.
+     *
+     * @return DataGSM 학생 id. 학생이 아니거나 DataGSM 학생 id가 없으면 비어 있다
+     */
+    @Query("SELECT s.datagsmStudentId FROM Student s WHERE s.member.id = :memberId")
+    Optional<Long> findDatagsmStudentIdByMemberId(@Param("memberId") Long memberId);
+
+    /** DataGSM 학생 id로 학생 한 명을 조회한다. 회원은 읽지 않는다(필요하면 지연 로딩). */
     Optional<Student> findByDatagsmStudentId(Long datagsmStudentId);
 
     /**
@@ -58,17 +74,15 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     long countByIdInAndDormitoryRoomIsNotNull(Collection<Long> ids);
 
     /**
-     * 한 호실의 학생을 회원 정보와 함께 조회한다. 순서는 정하지 않는다.
+     * 한 호실의 학생을 조회한다. 순서는 정하지 않는다. 회원은 읽지 않는다.
      * 이름 정렬은 DB 정렬 규칙에 따라 가나다순이 아닐 수 있어 쓰는 쪽에서 {@link Student#NAME_ORDER}로 한다(#150).
      */
-    @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoom(Integer dormitoryRoom);
 
     /**
-     * 한 호실에서 DataGSM 학생 id가 있는 학생을 회원 정보와 함께 조회한다. 순서는 정하지 않는다.
+     * 한 호실에서 DataGSM 학생 id가 있는 학생을 조회한다. 순서는 정하지 않는다. 회원은 읽지 않는다.
      * 이름 정렬은 쓰는 쪽에서 {@link Student#NAME_ORDER}로 한다(#150).
      */
-    @EntityGraph(attributePaths = "member")
     List<Student> findAllByDormitoryRoomAndDatagsmStudentIdIsNotNull(Integer dormitoryRoom);
 
     /**
@@ -81,10 +95,9 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     List<Student> findAllByDatagsmStudentIdIn(Collection<Long> datagsmStudentIds);
 
     /**
-     * DataGSM 학생 id가 있는 모든 학생을 회원 정보와 함께 조회한다. 봉사 관리 명단에 쓴다.
+     * DataGSM 학생 id가 있는 모든 학생을 조회한다. 봉사 관리 명단에 쓴다. 회원은 읽지 않는다.
      * 명단의 조정 API 경로가 DataGSM 학생 id라서 그 값이 없는 학생은 뺀다. 정렬은 쓰는 쪽에서 한다.
      */
-    @EntityGraph(attributePaths = "member")
     List<Student> findAllByDatagsmStudentIdIsNotNull();
 
     /**

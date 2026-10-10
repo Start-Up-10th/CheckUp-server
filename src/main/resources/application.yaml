@@ -1,4 +1,7 @@
 spring:
+  # 종료 신호를 받으면 새 요청은 받지 않고 처리 중인 요청을 이 시간까지 기다린다. 얼굴 AI 응답 대기(FACE_AI_RESPONSE_TIMEOUT 30s)보다 짧으면 얼굴 요청이 끊긴다. compose의 stop_grace_period보다 짧아야 한다.
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   # @Scheduled 작업이 서로 기다리지 않도록 스레드 2개
   task:
     scheduling:
@@ -14,6 +17,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/checkup}
     username: ${DB_USERNAME:checkup}
     password: ${DB_PASSWORD:checkup}
+    # 풀 크기는 기본 10이다. 서버 1대·학생 약 200명 규모에서 쿼리 하나가 수 ms라 충분하다. 서버 대수 × 풀 크기가 Postgres max_connections(기본 100)보다 작아야 한다.
+    # 풀이 가득 찼을 때 기본 30초 대신 10초만 기다리고 실패시켜, 요청이 오래 쌓이지 않게 한다.
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:10000}
   jpa:
     open-in-view: false
     hibernate:
@@ -48,10 +56,13 @@ datagsm:
   response-timeout: ${DATAGSM_RESPONSE_TIMEOUT:5s} # DataGSM 응답 대기 시간. 로그인 콜백은 DataGSM을 두 번 불러 최대 (연결+응답)×2 동안 기다린다
 
 server:
+  # 재시작·배포 때 처리 중인 요청(얼굴 등록, 세션 생성, 출석 저장)을 끝까지 마친 뒤 종료한다(#233)
+  shutdown: graceful
   servlet:
     session:
-      timeout: ${SESSION_TIMEOUT:7d} # 요청이 없을 때 세션 유지 시간
+      timeout: ${SESSION_TIMEOUT:30d} # 요청이 없을 때 세션 유지 시간
       cookie:
+        max-age: ${SESSION_TIMEOUT:30d} # 브라우저·PWA를 닫아도 SESSION 쿠키 유지. 세션 유지 시간과 같게 둔다
         http-only: true # JS가 쿠키 못 읽음, XSS 방지
         same-site: lax # 다른 사이트에서 보내는 POST 요청에는 쿠키X -> CSRF 1차 방어
         secure: ${SESSION_COOKIE_SECURE:false} # HTTPS에서만 쿠키 전송, 로컬은 http라 false, 운영에서는 환경변수로 true
@@ -76,6 +87,8 @@ management:
       # API 응답 시간의 p95 같은 분위수를 Prometheus에서 계산할 수 있게 구간별 횟수를 남긴다
       percentiles-histogram:
         http.server.requests: true
+        # 얼굴 AI 서버 호출 시간. Spring Boot가 RestClient 호출을 자동으로 잰다
+        http.client.requests: true
 
 # Hibernate 통계를 켜면 트랜잭션마다 찍히는 요약 로그를 끈다. 값은 지표로 본다.
 logging:
@@ -123,3 +136,5 @@ checkup:
     session-idle-timeout: ${FACE_SESSION_IDLE_TIMEOUT:5m}
     cleanup-interval-ms: ${FACE_CLEANUP_INTERVAL_MS:60000}
     consent-version: ${FACE_CONSENT_VERSION:v1}
+    # 얼굴 인식 세션 후보(등록 학생) 상한. 넘으면 세션을 만들지 못한다(422). 기숙사생 약 200명이라 기본 200이다. AI 서버가 감당하는 후보 수를 확인한 뒤 올린다
+    max-candidates: ${FACE_MAX_CANDIDATES:200}
