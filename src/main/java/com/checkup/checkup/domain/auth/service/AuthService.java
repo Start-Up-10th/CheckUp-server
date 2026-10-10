@@ -5,6 +5,7 @@ import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
 import com.checkup.checkup.domain.member.service.MemberService;
 import com.checkup.checkup.global.config.AdminProperties;
+import com.checkup.checkup.global.config.StudentExclusionProperties;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,18 +26,21 @@ public class AuthService {
     private final String redirectUri;
     private final MemberService memberService;
     private final AdminProperties adminProperties;
+    private final StudentExclusionProperties studentExclusionProperties;
 
     public AuthService(
             DataGsmOAuthClient dataGsmOAuthClient,
             OAuthStateService oAuthStateService,
             @Value("${datagsm.redirect-uri}") String redirectUri, MemberService memberService,
-            AdminProperties adminProperties
+            AdminProperties adminProperties,
+            StudentExclusionProperties studentExclusionProperties
     ) {
         this.dataGsmOAuthClient = dataGsmOAuthClient;
         this.oAuthStateService = oAuthStateService;
         this.redirectUri = redirectUri;
         this.memberService = memberService;
         this.adminProperties = adminProperties;
+        this.studentExclusionProperties = studentExclusionProperties;
     }
 
     /**
@@ -83,6 +87,7 @@ public class AuthService {
      * 비활성 계정이나 그 밖의 계정은 403으로 거부한다.
      * 이름·학년·반·번호·학번이 하나라도 없는 학생도 403으로 거부한다. 졸업·자퇴하면 이 값이 비어 올 수 있고,
      * 값 없이는 학생을 저장할 수 없어 회원도 만들지 않는다.
+     * 학생 제외 목록(DEC-034)의 학생은 실제 학생이 아니므로 지원하지 않는 계정으로 거부한다.
      */
     private MemberRole resolveRole(UserInfo userInfo) {
         Student student = userInfo.getStudent();
@@ -93,6 +98,8 @@ public class AuthService {
                 && (student == null || student.getRole() == null)) throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
                 && !hasProfile(student)) throw new CustomException(ErrorCode.MISSING_STUDENT_INFO);
+        if (userInfo.getObjectType() == AccountObjectType.STUDENT
+                && studentExclusionProperties.isExcluded(student.getId())) throw new CustomException(ErrorCode.UNSUPPORTED_ACCOUNT);
         if (userInfo.getObjectType() == AccountObjectType.STUDENT
                 && student.getRole() == StudentRole.DORMITORY_MANAGER) return MemberRole.ADMIN;
         if (userInfo.getObjectType() == AccountObjectType.STUDENT) return MemberRole.STUDENT;
