@@ -16,11 +16,14 @@ import com.checkup.checkup.domain.attendance.entity.AttendanceMethod;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
-import com.checkup.checkup.domain.face.entity.FaceRecognitionResult;
+import com.checkup.checkup.domain.face.ai.AiFaceCandidate;
 import com.checkup.checkup.domain.face.ai.AiFaceClient;
 import com.checkup.checkup.domain.face.ai.AiFaceException;
 import com.checkup.checkup.domain.face.ai.AiFaceFrameResponse;
+import com.checkup.checkup.domain.face.ai.AiFaceModel;
+import com.checkup.checkup.domain.face.ai.AiFaceSessionRequest;
 import com.checkup.checkup.domain.face.config.FaceProperties;
+import com.checkup.checkup.domain.face.entity.FaceRecognitionResult;
 import com.checkup.checkup.domain.face.entity.FaceTemplate;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -30,9 +33,11 @@ import com.checkup.checkup.support.MutableClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -46,6 +51,8 @@ class FaceRecognitionServiceTest {
     private static final Long ADMIN_ID = 12L;
     private static final Long STUDENT_DB_ID = 40L;
     private static final Long DATAGSM_STUDENT_ID = 900L;
+    private static final Long OTHER_STUDENT_DB_ID = 41L;
+    private static final Long OTHER_DATAGSM_STUDENT_ID = 901L;
     private static final UUID SESSION_ID = UUID.randomUUID();
     private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
 
@@ -70,6 +77,67 @@ class FaceRecognitionServiceTest {
     @BeforeEach
     void sessionStaysActiveDuringAiCall() {
         given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
+    }
+
+    @Test
+    @DisplayName("재등록된 학생의 벡터로 활성 AI 세션 전체 후보를 갱신한다")
+    void refreshesActiveSessionWithCurrentCandidates() {
+        FaceSessionView session = session(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID));
+        FaceTemplate refreshedTemplate = template(STUDENT_DB_ID, DATAGSM_STUDENT_ID, vectorJson(0));
+        FaceTemplate otherTemplate = template(OTHER_STUDENT_DB_ID, OTHER_DATAGSM_STUDENT_ID, vectorJson(1));
+        given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
+        given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
+        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
+                .willReturn(List.of(refreshedTemplate, otherTemplate));
+        service.refreshStudentTemplate(STUDENT_DB_ID);
+
+        ArgumentCaptor<AiFaceSessionRequest> request = ArgumentCaptor.forClass(AiFaceSessionRequest.class);
+        verify(aiFaceClient).createSession(eq(SESSION_ID), request.capture());
+        assertThat(request.getValue().candidates()).extracting(AiFaceCandidate::studentId)
+                .containsExactlyInAnyOrder("900", "901");
+        assertThat(request.getValue().candidates().stream()
+                .filter(candidate -> candidate.studentId().equals("900"))
+                .findFirst().orElseThrow().vectors().getFirst()).containsExactlyElementsOf(vectorValues(0));
+    }
+
+    @Test
+    @DisplayName("같은 세션의 다른 학생도 동시에 재등록되면 최신 전체 후보로 다시 갱신한다")
+    void retriesWhenAnotherCandidateChangesDuringRefresh() {
+        FaceSessionView session = session(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID));
+        FaceTemplate target = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
+        FaceTemplate otherBefore = versionedTemplate(OTHER_STUDENT_DB_ID, OTHER_DATAGSM_STUDENT_ID, 0L, vectorJson(1));
+        FaceTemplate otherAfter = versionedTemplate(OTHER_STUDENT_DB_ID, OTHER_DATAGSM_STUDENT_ID, 1L, vectorJson(2));
+        given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
+        given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
+        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
+                .willReturn(List.of(target, otherBefore), List.of(target, otherAfter));
+
+        service.refreshStudentTemplate(STUDENT_DB_ID);
+
+        ArgumentCaptor<AiFaceSessionRequest> requests = ArgumentCaptor.forClass(AiFaceSessionRequest.class);
+        verify(aiFaceClient, times(2)).createSession(eq(SESSION_ID), requests.capture());
+        assertThat(requests.getAllValues().get(1).candidates().stream()
+                .filter(candidate -> candidate.studentId().equals("901"))
+                .findFirst().orElseThrow().vectors().getFirst()).containsExactlyElementsOf(vectorValues(2));
+    }
+
+    @Test
+    @DisplayName("AI 세션 갱신이 실패하면 오래된 템플릿을 쓰지 않도록 세션을 닫는다")
+    void closesSessionWhenTemplateRefreshFails() {
+        FaceSessionView session = session(Set.of(STUDENT_DB_ID));
+        FaceTemplate refreshedTemplate = template(STUDENT_DB_ID, DATAGSM_STUDENT_ID, vectorJson(0));
+        given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
+        given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
+        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID)))
+                .willReturn(List.of(refreshedTemplate));
+        willThrow(new IllegalStateException("AI unavailable"))
+                .given(aiFaceClient).createSession(eq(SESSION_ID), any());
+
+        service.refreshStudentTemplate(STUDENT_DB_ID);
+
+        verify(sessionStore).markInactive(SESSION_ID, ADMIN_ID);
+        verify(aiFaceClient).deleteSession(SESSION_ID);
+        verify(sessionStore).delete(SESSION_ID);
     }
 
     @Test
@@ -440,6 +508,44 @@ class FaceRecognitionServiceTest {
     private static FaceSessionView session(Set<Long> candidates) {
         return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY,
                 NOW.minusSeconds(2), true, candidates);
+    }
+
+    private static FaceTemplate template(Long studentId, Long dataGsmStudentId, String vectorsJson) {
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(studentId);
+        given(student.getDatagsmStudentId()).willReturn(dataGsmStudentId);
+        given(student.isAttendanceEligible()).willReturn(true);
+        return FaceTemplate.create(student, new AiFaceModel("model-a", "v1", 256, "l2"), vectorsJson);
+    }
+
+    private static FaceTemplate versionedTemplate(
+            Long studentId, Long dataGsmStudentId, long revision, String vectorsJson
+    ) {
+        Student student = mock(Student.class);
+        given(student.getId()).willReturn(studentId);
+        given(student.getDatagsmStudentId()).willReturn(dataGsmStudentId);
+        given(student.isAttendanceEligible()).willReturn(true);
+        FaceTemplate template = mock(FaceTemplate.class);
+        given(template.getStudent()).willReturn(student);
+        given(template.getRevision()).willReturn(revision);
+        given(template.getModelId()).willReturn("model-a");
+        given(template.getModelVersion()).willReturn("v1");
+        given(template.getDimension()).willReturn(256);
+        given(template.getNormalization()).willReturn("l2");
+        given(template.getVectorsJson()).willReturn(vectorsJson);
+        return template;
+    }
+
+    private static String vectorJson(int hotIndex) {
+        return "[[" + vectorValues(hotIndex).stream()
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(",")) + "]]";
+    }
+
+    private static List<Double> vectorValues(int hotIndex) {
+        List<Double> vector = new java.util.ArrayList<>(Collections.nCopies(256, 0.0));
+        vector.set(hotIndex, 1.0);
+        return vector;
     }
 
     private static AiFaceFrameResponse frame(String status, String studentId) {

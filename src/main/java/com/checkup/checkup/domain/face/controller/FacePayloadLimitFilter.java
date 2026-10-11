@@ -102,7 +102,7 @@ public class FacePayloadLimitFilter extends OncePerRequestFilter {
             return true;
         }
         try {
-            faceEnrollmentService.verifyEnrollable(memberId);
+            faceEnrollmentService.verifyEnrollmentAllowed(memberId);
             return true;
         } catch (CustomException e) {
             writeError(response, e.getErrorCode());

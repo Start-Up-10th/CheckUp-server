@@ -1,8 +1,12 @@
 package com.checkup.checkup.domain.face.repository;
 
 import com.checkup.checkup.domain.face.entity.FaceTemplate;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +17,10 @@ public interface FaceTemplateRepository extends JpaRepository<FaceTemplate, Long
     boolean existsByStudent_Id(Long studentId);
 
     Optional<FaceTemplate> findByStudent_Id(Long studentId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT template FROM FaceTemplate template WHERE template.student.id = :studentId")
+    Optional<FaceTemplate> findForUpdateByStudentId(@Param("studentId") Long studentId);
 
     @EntityGraph(attributePaths = "student")
     List<FaceTemplate> findAllByOrderByStudent_IdAsc();

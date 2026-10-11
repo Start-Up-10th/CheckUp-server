@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -47,6 +48,11 @@ public class FaceTemplate {
     @Column(name = "vectors_json", nullable = false, columnDefinition = "TEXT")
     private String vectorsJson;
 
+    /** Monotonic revision lets recognition sessions detect a concurrent re-enrollment. */
+    @Version
+    @Column(name = "revision", nullable = false)
+    private long revision;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -54,11 +60,15 @@ public class FaceTemplate {
     public static FaceTemplate create(Student student, AiFaceModel model, String vectorsJson) {
         FaceTemplate template = new FaceTemplate();
         template.student = student;
-        template.modelId = model.modelId();
-        template.modelVersion = model.version();
-        template.dimension = model.dimension();
-        template.normalization = model.normalization();
-        template.vectorsJson = vectorsJson;
+        template.replace(model, vectorsJson);
         return template;
+    }
+
+    public void replace(AiFaceModel model, String vectorsJson) {
+        this.modelId = model.modelId();
+        this.modelVersion = model.version();
+        this.dimension = model.dimension();
+        this.normalization = model.normalization();
+        this.vectorsJson = vectorsJson;
     }
 }

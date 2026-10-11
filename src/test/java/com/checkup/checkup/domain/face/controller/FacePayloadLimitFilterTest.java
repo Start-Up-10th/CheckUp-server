@@ -45,10 +45,10 @@ class FacePayloadLimitFilterTest {
     }
 
     @Test
-    @DisplayName("등록할 수 없는 학생의 요청은 본문을 받지 않고 바로 거절한다")
-    void notEnrollableIsRejectedBeforeReadingBody() throws Exception {
-        willThrow(new CustomException(ErrorCode.FACE_ALREADY_REGISTERED))
-                .given(enrollmentService).verifyEnrollable(MEMBER_ID);
+    @DisplayName("필수 동의가 없는 학생의 요청은 본문을 받지 않고 바로 거절한다")
+    void missingConsentIsRejectedBeforeReadingBody() throws Exception {
+        willThrow(new CustomException(ErrorCode.FACE_CONSENT_REQUIRED))
+                .given(enrollmentService).verifyEnrollmentAllowed(MEMBER_ID);
         FacePayloadLimitFilter filter = filter(1, Duration.ofSeconds(1));
         AtomicInteger handled = new AtomicInteger();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -56,8 +56,8 @@ class FacePayloadLimitFilterTest {
         login();
         filter.doFilter(request(ENROLLMENT_PATH), response, (req, res) -> handled.incrementAndGet());
 
-        assertThat(response.getStatus()).isEqualTo(409);
-        assertThat(response.getContentAsString()).contains("FACE_ALREADY_REGISTERED");
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getContentAsString()).contains("FACE_CONSENT_REQUIRED");
         assertThat(handled).hasValue(0);
     }
 

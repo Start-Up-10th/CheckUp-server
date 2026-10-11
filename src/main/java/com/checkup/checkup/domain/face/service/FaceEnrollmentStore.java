@@ -48,16 +48,16 @@ public class FaceEnrollmentStore {
     }
 
     /**
-     * AI가 뽑은 대표 벡터를 학생의 얼굴 템플릿으로 저장한다. 등록은 한 번만 할 수 있다.
+     * AI가 뽑은 대표 벡터를 새 템플릿으로 저장하거나 기존 템플릿에 교체한다.
      *
      * @param vectorsJson 대표 벡터 목록 JSON. 로그에 남기지 않는다
      * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
      *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
      *                         DataGSM 학생 id나 호실이 없으면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
-     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}
+     * @return AI 세션 갱신에 사용할 내부 학생 id
      */
     @Transactional
-    public void saveTemplate(Long memberId, AiFaceModel model, String vectorsJson) {
+    public Long saveOrReplaceTemplate(Long memberId, AiFaceModel model, String vectorsJson) {
         Student student = findStudent(memberId);
         if (!student.hasRequiredConsent()) {
             throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
@@ -65,10 +65,11 @@ public class FaceEnrollmentStore {
         if (!isEligible(student)) {
             throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
         }
-        if (faceTemplateRepository.existsByStudent_Id(student.getId())) {
-            throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
-        }
-        faceTemplateRepository.save(FaceTemplate.create(student, model, vectorsJson));
+        FaceTemplate template = faceTemplateRepository.findForUpdateByStudentId(student.getId())
+                .orElseGet(() -> FaceTemplate.create(student, model, vectorsJson));
+        template.replace(model, vectorsJson);
+        faceTemplateRepository.saveAndFlush(template);
+        return student.getId();
     }
 
     /** 학생의 얼굴 템플릿을 지운다. 졸업·자퇴 처리에서 쓰며, 호출한 쪽 트랜잭션과 상관없이 지우도록 새 트랜잭션에서 한다. */
