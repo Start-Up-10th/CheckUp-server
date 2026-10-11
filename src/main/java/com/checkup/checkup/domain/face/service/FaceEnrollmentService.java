@@ -27,6 +27,7 @@ public class FaceEnrollmentService {
 
     private final FaceEnrollmentStore enrollmentStore;
     private final AiFaceClient aiFaceClient;
+    private final FaceRecognitionService faceRecognitionService;
     private final FaceProperties properties;
     private final ObjectMapper objectMapper;
 
@@ -40,7 +41,6 @@ public class FaceEnrollmentService {
      * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
      *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
      *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
-     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409),
      *                         영상이 없거나 형식이 다르면 {@link ErrorCode#FACE_INVALID_MEDIA}(400),
      *                         너무 크면 {@link ErrorCode#FACE_UPLOAD_TOO_LARGE}(413),
      *                         AI 응답이 계약과 다르면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
@@ -51,7 +51,7 @@ public class FaceEnrollmentService {
      */
     public FaceEnrollmentResponse enroll(Long memberId, String contentType, byte[] rawVideo) {
         try {
-            verifyEnrollable(memberId);
+            verifyEnrollmentAllowed(memberId);
             if (rawVideo == null || rawVideo.length == 0) {
                 throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
             }
@@ -60,7 +60,7 @@ public class FaceEnrollmentService {
             }
 
             MediaType mediaType = mediaType(contentType);
-            // AI 네트워크 호출은 짧은 저장 트랜잭션보다 먼저 한다. 동시 요청 경합은 DB unique 제약이 막는다.
+            // AI 영상 추출은 저장 트랜잭션보다 먼저 한다. 실패하면 기존 템플릿은 그대로 남는다.
             AiFaceEnrollmentResponse extracted = aiFaceClient.extract(rawVideo, mediaType);
             validate(extracted);
             String vectorsJson;
@@ -69,11 +69,14 @@ public class FaceEnrollmentService {
             } catch (JacksonException e) {
                 throw new CustomException(ErrorCode.FACE_AI_BAD_GATEWAY);
             }
+            Long studentId;
             try {
-                enrollmentStore.saveTemplate(memberId, extracted.model(), vectorsJson);
+                studentId = enrollmentStore.saveOrReplaceTemplate(memberId, extracted.model(), vectorsJson);
             } catch (DataIntegrityViolationException e) {
                 throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
             }
+            // 저장 트랜잭션이 끝난 뒤 활성 AI 세션을 새 벡터로 갱신한다.
+            faceRecognitionService.refreshStudentTemplate(studentId);
             return FaceEnrollmentResponse.registered();
         } finally {
             if (rawVideo != null) {
@@ -89,19 +92,15 @@ public class FaceEnrollmentService {
      * @param memberId 세션의 회원 id
      * @throws CustomException 학생이 아니면 {@link ErrorCode#MISSING_STUDENT_INFO}(403),
      *                         필수 동의가 없으면 {@link ErrorCode#FACE_CONSENT_REQUIRED}(403),
-     *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403),
-     *                         이미 등록했으면 {@link ErrorCode#FACE_ALREADY_REGISTERED}(409)
+     *                         등록 대상이 아니면 {@link ErrorCode#FACE_ENROLLMENT_NOT_ELIGIBLE}(403)
      */
-    public void verifyEnrollable(Long memberId) {
+    public void verifyEnrollmentAllowed(Long memberId) {
         FaceEnrollmentStore.FaceStatusResponseData status = enrollmentStore.status(memberId);
         if (!status.consented()) {
             throw new CustomException(ErrorCode.FACE_CONSENT_REQUIRED);
         }
         if (!status.eligible()) {
             throw new CustomException(ErrorCode.FACE_ENROLLMENT_NOT_ELIGIBLE);
-        }
-        if (status.enrolled()) {
-            throw new CustomException(ErrorCode.FACE_ALREADY_REGISTERED);
         }
     }
 

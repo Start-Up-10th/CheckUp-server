@@ -34,16 +34,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
+import java.util.stream.Collectors;
 
 /** AI 세션을 시작하고, 카메라 프레임 속도를 제한하며, 출석 전에 얼굴 일치 결과를 검증한다. */
 @Slf4j
 @Service
 public class FaceRecognitionService {
     private static final int VECTOR_DIMENSION = 256;
+    private static final int MAX_TEMPLATE_REFRESH_ATTEMPTS = 3;
 
     private final FaceTemplateRepository faceTemplateRepository;
     private final FaceSessionStore faceSessionStore;
@@ -263,6 +266,45 @@ public class FaceRecognitionService {
         faceSessionStore.findWithStudent(studentId).forEach(this::closeOwnedQuietly);
     }
 
+    /** 학생 템플릿을 재등록한 뒤 그 학생이 포함된 활성 AI 세션의 후보 벡터를 교체한다. */
+    public void refreshStudentTemplate(Long studentId) {
+        for (FaceSessionView session : faceSessionStore.findWithStudent(studentId)) {
+            if (!session.active()) {
+                continue;
+            }
+            try {
+                refreshSessionTemplate(session, studentId);
+            } catch (RuntimeException e) {
+                // 갱신이 불확실한 세션은 오래된 벡터로 출석을 처리하지 않도록 fail closed 한다.
+                log.warn("Face session template refresh failed: reason={}", e.getClass().getSimpleName());
+                closeOwnedQuietly(session);
+            }
+        }
+    }
+
+    private void refreshSessionTemplate(FaceSessionView session, Long studentId) {
+        for (int attempt = 0; attempt < MAX_TEMPLATE_REFRESH_ATTEMPTS; attempt++) {
+            if (!faceSessionStore.isOwnedActive(session.id(), session.adminMemberId())) {
+                deleteAiSessionQuietly(session.id());
+                return;
+            }
+
+            CandidateRequestSnapshot snapshot = candidateRequestSnapshot(session.candidateStudentIds(), studentId);
+            aiFaceClient.createSession(session.id(), snapshot.request());
+
+            // 세션 종료와 AI PUT의 경합으로 종료 직후 AI 세션이 다시 만들어졌다면 제거한다.
+            if (!faceSessionStore.isOwnedActive(session.id(), session.adminMemberId())) {
+                deleteAiSessionQuietly(session.id());
+                return;
+            }
+            Map<Long, Long> currentRevisions = candidateTemplateRevisions(session.candidateStudentIds());
+            if (currentRevisions.equals(snapshot.templateRevisions())) {
+                return;
+            }
+        }
+        throw new IllegalStateException("Face template changed repeatedly during session refresh");
+    }
+
     /**
      * 유휴 시간이 지났고 처리 중인 프레임이 없는 세션을 닫는다. 정리 작업이 주기적으로 부른다.
      * AI 쪽 삭제가 실패해 비활성 상태로 남은 세션도 여기서 다시 정리한다.
@@ -415,13 +457,36 @@ public class FaceRecognitionService {
     }
 
     private AiFaceSessionRequest candidateRequest(Set<Long> studentIds) {
+        return candidateRequestSnapshot(studentIds, null).request();
+    }
+
+    private CandidateRequestSnapshot candidateRequestSnapshot(Set<Long> studentIds, Long refreshedStudentId) {
+        List<FaceTemplate> templates = candidateTemplates(studentIds);
+        if (refreshedStudentId != null && templates.stream()
+                .noneMatch(template -> refreshedStudentId.equals(template.getStudent().getId()))) {
+            throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
+        }
+        Map<Long, Long> templateRevisions = templateRevisions(templates);
+        return new CandidateRequestSnapshot(sessionRequest(templates), templateRevisions);
+    }
+
+    private Map<Long, Long> candidateTemplateRevisions(Set<Long> studentIds) {
+        return templateRevisions(candidateTemplates(studentIds));
+    }
+
+    private List<FaceTemplate> candidateTemplates(Set<Long> studentIds) {
         List<FaceTemplate> templates = faceTemplateRepository.findAllByStudent_IdIn(studentIds).stream()
                 .filter(template -> eligibleStudent(template.getStudent()))
                 .toList();
         if (templates.size() != studentIds.size() || templates.size() > properties.maxCandidates() || templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
         }
-        return sessionRequest(templates);
+        return templates;
+    }
+
+    private static Map<Long, Long> templateRevisions(List<FaceTemplate> templates) {
+        return templates.stream().collect(Collectors.toUnmodifiableMap(
+                template -> template.getStudent().getId(), FaceTemplate::getRevision));
     }
 
     private static AiFaceModel modelOf(FaceTemplate template) {
@@ -505,5 +570,8 @@ public class FaceRecognitionService {
             case "image/webp" -> MediaType.parseMediaType("image/webp");
             default -> throw new CustomException(ErrorCode.FACE_INVALID_MEDIA);
         };
+    }
+
+    private record CandidateRequestSnapshot(AiFaceSessionRequest request, Map<Long, Long> templateRevisions) {
     }
 }
