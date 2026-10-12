@@ -338,6 +338,21 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
+    @DisplayName("출석 대상 템플릿이 없으면 세션을 만들지 않고 409 FACE_NO_ENROLLED_STUDENTS다")
+    void noEligibleTemplateIsRejected() {
+        given(templateRepository.findAllEligible()).willReturn(List.of());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.FACE_NO_ENROLLED_STUDENTS));
+
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(aiFaceClient, never()).createSession(any(), any());
+    }
+
+    @Test
     @DisplayName("후보 상한을 따로 정하지 않으면 기본 200명이다")
     void defaultMaximumIs200() {
         assertThat(properties.maxCandidates()).isEqualTo(200);
