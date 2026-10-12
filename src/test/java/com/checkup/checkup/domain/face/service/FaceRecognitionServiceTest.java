@@ -87,7 +87,7 @@ class FaceRecognitionServiceTest {
         FaceTemplate otherTemplate = template(OTHER_STUDENT_DB_ID, OTHER_DATAGSM_STUDENT_ID, vectorJson(1));
         given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
         given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
-        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
+        given(templateRepository.findAllEligibleByStudentIdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
                 .willReturn(List.of(refreshedTemplate, otherTemplate));
         service.refreshStudentTemplate(STUDENT_DB_ID);
 
@@ -109,7 +109,7 @@ class FaceRecognitionServiceTest {
         FaceTemplate otherAfter = versionedTemplate(OTHER_STUDENT_DB_ID, OTHER_DATAGSM_STUDENT_ID, 1L, vectorJson(2));
         given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
         given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
-        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
+        given(templateRepository.findAllEligibleByStudentIdIn(Set.of(STUDENT_DB_ID, OTHER_STUDENT_DB_ID)))
                 .willReturn(List.of(target, otherBefore), List.of(target, otherAfter));
 
         service.refreshStudentTemplate(STUDENT_DB_ID);
@@ -128,7 +128,7 @@ class FaceRecognitionServiceTest {
         FaceTemplate refreshedTemplate = template(STUDENT_DB_ID, DATAGSM_STUDENT_ID, vectorJson(0));
         given(sessionStore.findWithStudent(STUDENT_DB_ID)).willReturn(List.of(session));
         given(sessionStore.isOwnedActive(SESSION_ID, ADMIN_ID)).willReturn(true);
-        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID)))
+        given(templateRepository.findAllEligibleByStudentIdIn(Set.of(STUDENT_DB_ID)))
                 .willReturn(List.of(refreshedTemplate));
         willThrow(new IllegalStateException("AI unavailable"))
                 .given(aiFaceClient).createSession(eq(SESSION_ID), any());
@@ -256,7 +256,7 @@ class FaceRecognitionServiceTest {
         given(template.getDimension()).willReturn(256);
         given(template.getNormalization()).willReturn("l2");
         given(template.getVectorsJson()).willReturn(toVectorsJson());
-        given(templateRepository.findAllByStudent_IdIn(Set.of(STUDENT_DB_ID))).willReturn(List.of(template));
+        given(templateRepository.findAllEligibleByStudentIdIn(Set.of(STUDENT_DB_ID))).willReturn(List.of(template));
         given(aiFaceClient.recognize(eq(SESSION_ID), eq("frame-1"), any(), any()))
                 .willAnswer(invocation -> {
                     clock.advance(Duration.ofSeconds(80));
@@ -291,7 +291,7 @@ class FaceRecognitionServiceTest {
         given(template.getDimension()).willReturn(256);
         given(template.getNormalization()).willReturn("l2");
         given(template.getVectorsJson()).willReturn(toVectorsJson());
-        given(templateRepository.findAllByOrderByStudent_IdAsc()).willReturn(List.of(template));
+        given(templateRepository.findAllEligible()).willReturn(List.of(template));
         FaceSessionView pending = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwnedIfPresent(any(), eq(ADMIN_ID))).willReturn(java.util.Optional.of(pending));
         org.mockito.BDDMockito.willThrow(new AiFaceException(503, "session_create", "unavailable"))
@@ -325,7 +325,7 @@ class FaceRecognitionServiceTest {
                 tools.jackson.databind.json.JsonMapper.builder().build(), clock);
         FaceTemplate first = eligibleTemplate(1L);
         FaceTemplate second = eligibleTemplate(2L);
-        given(templateRepository.findAllByOrderByStudent_IdAsc()).willReturn(List.of(first, second));
+        given(templateRepository.findAllEligible()).willReturn(List.of(first, second));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
                 com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
