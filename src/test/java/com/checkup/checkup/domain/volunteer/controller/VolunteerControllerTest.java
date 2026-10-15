@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerDutyRecordResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
@@ -24,7 +25,11 @@ import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.exception.GlobalExceptionHandler;
 import com.checkup.checkup.global.security.SecurityConfig;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,6 +52,7 @@ class VolunteerControllerTest {
 
     private static final Long MEMBER_ID = 1L;
     private static final String BASE = "/api/v1/volunteer";
+    private static final String MISSED_BODY = "{\"delta\":1,\"reason\":\"당일 봉사 미이행\"}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -240,6 +246,12 @@ class VolunteerControllerTest {
         mockMvc.perform(post(BASE + "/200/duty")).andExpect(status().isUnauthorized());
         mockMvc.perform(delete(BASE + "/200/duty")).andExpect(status().isUnauthorized());
         mockMvc.perform(post(BASE + "/200/duty/complete")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(BASE + "/duties")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(BASE + "/duties/summary").param("month", "2026-10")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post(BASE + "/200/duty/missed")
+                .contentType(MediaType.APPLICATION_JSON).content(MISSED_BODY)).andExpect(status().isUnauthorized());
+        mockMvc.perform(patch(BASE + "/duties/2026-10-14/200/missed")
+                .contentType(MediaType.APPLICATION_JSON).content(MISSED_BODY)).andExpect(status().isUnauthorized());
 
         verify(volunteerService, never()).getVolunteers(any(), any(), any(), any(), any());
         verify(volunteerService, never()).increase(any(), any(), any());
@@ -247,6 +259,112 @@ class VolunteerControllerTest {
         verify(volunteerService, never()).assignDuty(any(), any());
         verify(volunteerService, never()).cancelDuty(any(), any());
         verify(volunteerService, never()).completeDuty(any(), any());
+        verify(volunteerService, never()).getDutyRecords(any(), any());
+        verify(volunteerService, never()).getMissedSummary(any(), any());
+        verify(volunteerService, never()).markTodayMissed(any(), any(), any(), anyInt(), any());
+        verify(volunteerService, never()).markMissed(any(), any(), any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("날짜별 기록은 운영일을 서비스로 넘기고 상태·처리 여부·추가 횟수·사유를 배열로 응답한다")
+    void dutyRecordsAreReturned() throws Exception {
+        given(volunteerService.getDutyRecords(MEMBER_ID, LocalDate.of(2026, 10, 14))).willReturn(List.of(
+                new VolunteerDutyRecordResponse(3203L, 3203, "류하준", 302, DutyStatus.MISSED, true, 1, "당일 봉사 미이행"),
+                new VolunteerDutyRecordResponse(3115L, 3115, "서지안", null, DutyStatus.MISSED, false, null, null)));
+
+        mockMvc.perform(get(BASE + "/duties").param("date", "2026-10-14").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].studentId").value(3203))
+                .andExpect(jsonPath("$[0].studentNumber").value(3203))
+                .andExpect(jsonPath("$[0].name").value("류하준"))
+                .andExpect(jsonPath("$[0].dormitoryRoom").value(302))
+                .andExpect(jsonPath("$[0].status").value("MISSED"))
+                .andExpect(jsonPath("$[0].adjusted").value(true))
+                .andExpect(jsonPath("$[0].addedCount").value(1))
+                .andExpect(jsonPath("$[0].reason").value("당일 봉사 미이행"))
+                .andExpect(jsonPath("$[1].dormitoryRoom").isEmpty())
+                .andExpect(jsonPath("$[1].adjusted").value(false))
+                .andExpect(jsonPath("$[1].addedCount").isEmpty());
+    }
+
+    @Test
+    @DisplayName("날짜가 없으면 null로 넘기고, 날짜 형식이 틀리면 400이다")
+    void dutyRecordsDateIsOptionalAndValidated() throws Exception {
+        mockMvc.perform(get(BASE + "/duties").with(loginAs(MEMBER_ID))).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/duties").param("date", "2026-13-01").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+
+        verify(volunteerService).getDutyRecords(MEMBER_ID, null);
+    }
+
+    @Test
+    @DisplayName("월 요약은 yyyy-MM 달을 넘기고 날짜를 키로 한 객체로 응답하며, 달이 없거나 틀리면 400이다")
+    void missedSummaryIsReturnedAsObject() throws Exception {
+        Map<LocalDate, Long> summary = new LinkedHashMap<>();
+        summary.put(LocalDate.of(2026, 10, 13), 1L);
+        summary.put(LocalDate.of(2026, 10, 14), 2L);
+        given(volunteerService.getMissedSummary(MEMBER_ID, YearMonth.of(2026, 10))).willReturn(summary);
+
+        mockMvc.perform(get(BASE + "/duties/summary").param("month", "2026-10").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['2026-10-13']").value(1))
+                .andExpect(jsonPath("$['2026-10-14']").value(2));
+        mockMvc.perform(get(BASE + "/duties/summary").with(loginAs(MEMBER_ID))).andExpect(status().isBadRequest());
+        mockMvc.perform(get(BASE + "/duties/summary").param("month", "2026-1").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("오늘 미이행은 본문의 횟수·사유와 Idempotency-Key를 넘기고 바뀐 항목을 응답한다")
+    void markTodayMissedPassesBody() throws Exception {
+        given(volunteerService.markTodayMissed(MEMBER_ID, 200L, "key-m", 1, "당일 봉사 미이행"))
+                .willReturn(new VolunteerResponse(200L, "학생", 2105, 301, 3, null, DutyStatus.MISSED));
+
+        mockMvc.perform(post(BASE + "/200/duty/missed").header("Idempotency-Key", "key-m")
+                        .contentType(MediaType.APPLICATION_JSON).content(MISSED_BODY).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todayDuty").value("MISSED"))
+                .andExpect(jsonPath("$.volunteerCount").value(3));
+    }
+
+    @Test
+    @DisplayName("날짜별 미이행은 경로의 운영일·학생 id로 처리하고 그날의 기록을 응답한다")
+    void markMissedPassesDateAndStudent() throws Exception {
+        given(volunteerService.markMissed(MEMBER_ID, 200L, LocalDate.of(2026, 10, 14), null, 1, "당일 봉사 미이행"))
+                .willReturn(new VolunteerDutyRecordResponse(200L, 2105, "학생", 301, DutyStatus.MISSED, true, 1, "당일 봉사 미이행"));
+
+        mockMvc.perform(patch(BASE + "/duties/2026-10-14/200/missed")
+                        .contentType(MediaType.APPLICATION_JSON).content(MISSED_BODY).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.adjusted").value(true))
+                .andExpect(jsonPath("$.addedCount").value(1));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"delta\":100}", "{\"delta\":-100}"})
+    @DisplayName("미이행 횟수가 없거나 -99~99를 벗어나면 400이고 서비스를 호출하지 않는다")
+    void missedRejectsInvalidDelta(String body) throws Exception {
+        mockMvc.perform(post(BASE + "/200/duty/missed")
+                        .contentType(MediaType.APPLICATION_JSON).content(body).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(patch(BASE + "/duties/2026-10-14/200/missed")
+                        .contentType(MediaType.APPLICATION_JSON).content(body).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+
+        verify(volunteerService, never()).markTodayMissed(any(), any(), any(), anyInt(), any());
+        verify(volunteerService, never()).markMissed(any(), any(), any(), any(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("횟수를 이미 처리한 미이행은 409 DUTY_ALREADY_ADJUSTED로 응답한다")
+    void markMissedTwiceReturnsConflict() throws Exception {
+        willThrow(new CustomException(ErrorCode.DUTY_ALREADY_ADJUSTED)).given(volunteerService)
+                .markMissed(MEMBER_ID, 200L, LocalDate.of(2026, 10, 14), null, 1, "당일 봉사 미이행");
+
+        mockMvc.perform(patch(BASE + "/duties/2026-10-14/200/missed")
+                        .contentType(MediaType.APPLICATION_JSON).content(MISSED_BODY).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUTY_ALREADY_ADJUSTED"));
     }
 
     private static RequestPostProcessor loginAs(Long memberId) {
