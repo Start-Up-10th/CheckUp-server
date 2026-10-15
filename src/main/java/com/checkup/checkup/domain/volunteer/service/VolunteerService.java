@@ -3,10 +3,12 @@ package com.checkup.checkup.domain.volunteer.service;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerDutyRecordResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import com.checkup.checkup.domain.volunteer.repository.VolunteerAdjustmentRepository;
@@ -24,9 +26,12 @@ import java.util.Comparator;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
@@ -212,7 +217,8 @@ public class VolunteerService {
      * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
      *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
      *                         오늘 지정되지 않았으면 {@link ErrorCode#NOT_ON_DUTY}(404),
-     *                         이미 완료했으면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409)
+     *                         이미 완료했으면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409),
+     *                         미이행으로 처리했으면 {@link ErrorCode#DUTY_MISSED}(409)
      */
     @Transactional
     public VolunteerResponse cancelDuty(Long memberId, Long studentId) {
@@ -220,6 +226,7 @@ public class VolunteerService {
         Student student = findStudent(studentId);
         LocalDate today = operatingDayCalculator.today();
         VolunteerDuty duty = findTodayDuty(student.getId(), today);
+        rejectMissed(duty);
         if (volunteerDutyRepository.cancel(duty.getId()) == 0) {
             throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
         }
@@ -238,6 +245,7 @@ public class VolunteerService {
      *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
      *                         오늘 지정되지 않았으면 {@link ErrorCode#NOT_ON_DUTY}(404),
      *                         이미 완료했으면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409),
+     *                         미이행으로 처리했으면 {@link ErrorCode#DUTY_MISSED}(409),
      *                         그 사이 횟수가 0이 됐으면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409)
      */
     @Transactional
@@ -246,6 +254,7 @@ public class VolunteerService {
         Long id = findStudent(studentId).getId();
         Instant now = clock.instant();
         VolunteerDuty duty = findTodayDuty(id, operatingDayCalculator.today());
+        rejectMissed(duty);
         if (volunteerDutyRepository.complete(duty.getId(), now) == 0) {
             throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
         }
@@ -255,6 +264,194 @@ public class VolunteerService {
             throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
         }
         return reload(id);
+    }
+
+    /**
+     * 한 운영일의 당일 봉사자 기록을 호실·이름·학번순으로 돌려준다(#250). 오늘 운영일도 같은 형태다.
+     * 운영일이 지났는데 아직 지정 상태인 지정은 미이행(횟수 미처리)으로 본다.
+     *
+     * @param memberId     세션의 회원 id
+     * @param operatingDay 조회할 운영일. {@code null}이면 오늘 운영일
+     * @return 그날 지정된 학생들. 지정이 없으면 빈 목록
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
+     */
+    @Transactional(readOnly = true)
+    public List<VolunteerDutyRecordResponse> getDutyRecords(Long memberId, LocalDate operatingDay) {
+        adminVerifier.verify(memberId);
+        LocalDate today = operatingDayCalculator.today();
+        List<VolunteerDuty> duties = volunteerDutyRepository
+                .findAllWithStudentByOperatingDay(operatingDay == null ? today : operatingDay);
+        if (duties.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, VolunteerAdjustment> adjustments = missedAdjustments(duties.stream().map(VolunteerDuty::getId).toList());
+        return duties.stream()
+                .sorted(Comparator.comparing(VolunteerDuty::getStudent, ROOM_ORDER))
+                .map(duty -> VolunteerDutyRecordResponse.of(
+                        duty.getStudent(), recordStatus(duty, today), adjustments.get(duty.getId())))
+                .toList();
+    }
+
+    /**
+     * 한 달에서 미이행이 있는 운영일과 그날의 미이행 인원을 날짜순으로 돌려준다(#250). 달력의 표시에 쓴다.
+     * 횟수를 처리한 미이행과 처리하지 않은 미이행을 함께 센다.
+     *
+     * @param memberId 세션의 회원 id
+     * @param month    조회할 달
+     * @return 운영일 → 미이행 인원. 미이행이 없는 날은 없다
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403)
+     */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getMissedSummary(Long memberId, YearMonth month) {
+        adminVerifier.verify(memberId);
+        return volunteerDutyRepository
+                .countMissedByOperatingDay(month.atDay(1), month.atEndOfMonth(), operatingDayCalculator.today())
+                .stream()
+                .collect(Collectors.toMap(
+                        VolunteerDutyRepository.MissedDay::getOperatingDay,
+                        VolunteerDutyRepository.MissedDay::getMissedCount,
+                        (first, second) -> first,
+                        LinkedHashMap::new));
+    }
+
+    /**
+     * 오늘 당일 봉사를 미이행으로 처리하고 봉사 횟수를 바꾼다(#250). 지정은 지우지 않는다.
+     *
+     * @param memberId   세션의 회원 id
+     * @param studentId  DataGSM 학생 id
+     * @param requestKey 재시도 방지 키(선택). 같은 키로 다시 오면 반영하지 않고 현재 상태만 돌려준다.
+     * @param delta      바꿀 횟수(-99~99). 0이면 횟수는 그대로 두고 미이행만 기록한다
+     * @param reason     사유(선택, 100자 이하)
+     * @return 처리 뒤 학생의 명단 항목
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         오늘 지정되지 않았으면 {@link ErrorCode#NOT_ON_DUTY}(404),
+     *                         그 밖에는 {@link #markMissed}와 같다
+     */
+    @Transactional
+    public VolunteerResponse markTodayMissed(Long memberId, Long studentId, String requestKey, int delta, String reason) {
+        Long id = recordMissed(memberId, studentId, operatingDayCalculator.today(), requestKey, delta, reason,
+                ErrorCode.NOT_ON_DUTY);
+        return reload(id);
+    }
+
+    /**
+     * 한 운영일의 당일 봉사를 미이행으로 처리하고 봉사 횟수를 바꾼다(#250). 달력에서 횟수 미처리 미이행을 처리할 때 쓴다.
+     * 횟수를 이미 처리한 미이행은 다시 처리하지 않는다. 그 뒤의 조정은 일반 횟수 조정을 쓴다.
+     *
+     * @param memberId     세션의 회원 id
+     * @param studentId    DataGSM 학생 id
+     * @param operatingDay 지정의 운영일
+     * @param requestKey   재시도 방지 키(선택). 같은 키로 다시 오면 반영하지 않고 현재 상태만 돌려준다.
+     * @param delta        바꿀 횟수(-99~99). 0이면 횟수는 그대로 두고 미이행만 기록한다. 차감은 남은 횟수까지만 한다
+     * @param reason       사유(선택, 100자 이하)
+     * @return 처리 뒤 그날의 기록
+     * @throws CustomException 관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
+     *                         저장된 학생이 없으면 {@link ErrorCode#STUDENT_NOT_FOUND}(404),
+     *                         그날 지정되지 않았으면 {@link ErrorCode#DUTY_NOT_FOUND}(404),
+     *                         완료한 지정이면 {@link ErrorCode#DUTY_ALREADY_COMPLETED}(409),
+     *                         횟수를 이미 처리했으면 {@link ErrorCode#DUTY_ALREADY_ADJUSTED}(409),
+     *                         차감인데 횟수가 0이면 {@link ErrorCode#VOLUNTEER_COUNT_ZERO}(409),
+     *                         키를 다른 요청에 썼으면 {@link ErrorCode#IDEMPOTENCY_KEY_REUSED}(409),
+     *                         횟수·사유·키가 범위를 벗어나면 {@link ErrorCode#INVALID_REQUEST}(400)
+     */
+    @Transactional
+    public VolunteerDutyRecordResponse markMissed(
+            Long memberId, Long studentId, LocalDate operatingDay, String requestKey, int delta, String reason) {
+        Long id = recordMissed(memberId, studentId, operatingDay, requestKey, delta, reason, ErrorCode.DUTY_NOT_FOUND);
+        VolunteerDuty duty = volunteerDutyRepository.findByStudentIdAndOperatingDay(id, operatingDay)
+                .orElseThrow(() -> new CustomException(ErrorCode.DUTY_NOT_FOUND));
+        return VolunteerDutyRecordResponse.of(duty.getStudent(), recordStatus(duty, operatingDayCalculator.today()),
+                missedAdjustments(List.of(duty.getId())).get(duty.getId()));
+    }
+
+    /**
+     * 지정을 잠가 미이행으로 바꾸고, 횟수를 바꿀 때는 그 지정에 연결한 조정 기록을 먼저 남긴다.
+     * 같은 지정의 요청은 지정 잠금으로 차례로 처리해 같은 키의 재시도가 한 번만 반영된다.
+     *
+     * @return 학생 DB id
+     */
+    private Long recordMissed(Long memberId, Long studentId, LocalDate operatingDay, String requestKey,
+                              int requestedDelta, String reason, ErrorCode notFound) {
+        adminVerifier.verify(memberId);
+        if (Math.abs(requestedDelta) > MAX_ADJUST_AMOUNT) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        String key = normalizeKey(requestKey);
+        String savedReason = normalizeReason(reason);
+        Long id = findStudent(studentId).getId();
+
+        VolunteerDuty duty = volunteerDutyRepository.lockByStudentIdAndOperatingDay(id, operatingDay)
+                .orElseThrow(() -> new CustomException(notFound));
+        if (key != null && isMissedRetry(key, duty.getId(), requestedDelta)) {
+            return id;
+        }
+        if (duty.getStatus() == DutyStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
+        }
+        if (volunteerAdjustmentRepository.existsByDuty_IdAndKind(duty.getId(), VolunteerAdjustmentKind.DUTY_MISSED)) {
+            throw new CustomException(ErrorCode.DUTY_ALREADY_ADJUSTED);
+        }
+        if (requestedDelta != 0) {
+            int count = studentRepository.lockVolunteerCount(id)
+                    .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
+            int delta = requestedDelta > 0 ? requestedDelta : -Math.min(-requestedDelta, count);
+            if (delta == 0) {
+                throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
+            }
+            if (volunteerAdjustmentRepository.insertMissed(
+                    id, duty.getId(), delta, requestedDelta, savedReason, key, clock.instant()) == 0) {
+                throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
+            }
+            studentRepository.changeVolunteerCount(id, delta);
+        }
+        if (volunteerDutyRepository.markMissed(duty.getId()) == 0) {
+            throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
+        }
+        return id;
+    }
+
+    /**
+     * 같은 키의 기록이 이미 있으면 같은 지정·같은 요청 횟수의 미이행 재시도인지 확인한다.
+     * 다른 요청에 쓴 키면 반영되지 않았는데 성공으로 보이지 않도록 {@link ErrorCode#IDEMPOTENCY_KEY_REUSED}(409)다.
+     *
+     * @return 재시도면 {@code true}, 그 키의 기록이 없으면 {@code false}
+     */
+    private boolean isMissedRetry(String key, Long dutyId, int requestedDelta) {
+        return volunteerAdjustmentRepository.findByRequestKey(key)
+                .map(existing -> {
+                    boolean same = existing.getKind() == VolunteerAdjustmentKind.DUTY_MISSED
+                            && existing.getDuty() != null
+                            && existing.getDuty().getId().equals(dutyId)
+                            && existing.getRequestedDelta() == requestedDelta;
+                    if (!same) {
+                        throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
+                    }
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /** 지정 id → 그 지정의 미이행 조정 기록. 횟수를 처리하지 않은 지정은 없다. */
+    private Map<Long, VolunteerAdjustment> missedAdjustments(List<Long> dutyIds) {
+        return volunteerAdjustmentRepository
+                .findAllByDuty_IdInAndKind(dutyIds, VolunteerAdjustmentKind.DUTY_MISSED).stream()
+                .collect(Collectors.toMap(adjustment -> adjustment.getDuty().getId(), Function.identity()));
+    }
+
+    /** 조회할 때 보는 지정 상태. 운영일이 지났는데 아직 지정 상태면 미이행이다. */
+    private static DutyStatus recordStatus(VolunteerDuty duty, LocalDate today) {
+        if (duty.getStatus() == DutyStatus.ASSIGNED && duty.getOperatingDay().isBefore(today)) {
+            return DutyStatus.MISSED;
+        }
+        return duty.getStatus();
+    }
+
+    /** 미이행으로 처리한 지정은 완료·취소할 수 없다. 미이행 기록이 남아야 한다. */
+    private static void rejectMissed(VolunteerDuty duty) {
+        if (duty.getStatus() == DutyStatus.MISSED) {
+            throw new CustomException(ErrorCode.DUTY_MISSED);
+        }
     }
 
     private VolunteerDuty findTodayDuty(Long studentId, LocalDate today) {

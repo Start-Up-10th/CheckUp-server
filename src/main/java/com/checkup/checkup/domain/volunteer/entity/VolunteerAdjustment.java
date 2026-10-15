@@ -53,6 +53,11 @@ public class VolunteerAdjustment {
     @Column(length = 100)
     private String reason;
 
+    /** 미이행 처리({@code DUTY_MISSED})로 생긴 기록의 당일 봉사자 지정. 다른 종류는 {@code null}이다. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "duty_id")
+    private VolunteerDuty duty;
+
     /** 웹이 보낸 재시도 방지 키. 보내지 않았으면 {@code null}이다. */
     @Column(length = 100)
     private String requestKey;

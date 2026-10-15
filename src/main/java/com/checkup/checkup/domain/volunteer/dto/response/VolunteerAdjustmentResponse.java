@@ -19,8 +19,8 @@ public record VolunteerAdjustmentResponse(
         @Schema(description = "조정한 시각") Instant createdAt,
         @Schema(description = "실제로 바뀐 횟수. 양수는 추가, 음수는 차감(당일 봉사 완료 포함)", example = "-2") int delta,
         @Schema(description = "관리자가 요청한 횟수. 차감은 남은 횟수까지만 하므로 delta와 다를 수 있다", example = "-5") int requestedDelta,
-        @Schema(description = "사유. 남기지 않았으면 null. 당일 봉사 완료(DUTY_COMPLETION)는 항상 null", example = "청소 당번 대체") String reason,
-        @Schema(description = "조정 종류. ADMIN(관리자 +/−·여러 회 조정) 또는 DUTY_COMPLETION(당일 봉사 완료로 생긴 -1). 사유가 없으면 화면은 종류별 기본 문구를 활동명으로 쓴다", example = "ADMIN") VolunteerAdjustmentKind kind
+        @Schema(description = "사유. 남기지 않았으면 null. 당일 봉사 완료(DUTY_COMPLETION)는 항상 null, 미이행(DUTY_MISSED)은 처리할 때 남긴 사유", example = "청소 당번 대체") String reason,
+        @Schema(description = "조정 종류. ADMIN(관리자 +/−·여러 회 조정) 또는 DUTY_COMPLETION(당일 봉사 완료로 생긴 -1), DUTY_MISSED(당일 봉사 미이행으로 바꾼 횟수). 사유가 없으면 화면은 종류별 기본 문구를 활동명으로 쓴다", example = "ADMIN") VolunteerAdjustmentKind kind
 ) {
 
     public static VolunteerAdjustmentResponse from(VolunteerAdjustment adjustment) {

@@ -433,9 +433,7 @@ public class FaceRecognitionService {
     }
 
     private List<FaceTemplate> eligibleTemplates() {
-        return faceTemplateRepository.findAllByOrderByStudent_IdAsc().stream()
-                .filter(template -> eligibleStudent(template.getStudent()))
-                .toList();
+        return faceTemplateRepository.findAllEligible();
     }
 
     private AiFaceSessionRequest sessionRequest(List<FaceTemplate> templates) {
@@ -449,11 +447,6 @@ public class FaceRecognitionService {
                     parseVectors(template.getVectorsJson())));
         }
         return new AiFaceSessionRequest(model, candidates);
-    }
-
-    private static boolean eligibleStudent(Student student) {
-        return student.isAttendanceEligible()
-                && student.getDatagsmStudentId() != null && student.getDatagsmStudentId() > 0;
     }
 
     private AiFaceSessionRequest candidateRequest(Set<Long> studentIds) {
@@ -475,9 +468,7 @@ public class FaceRecognitionService {
     }
 
     private List<FaceTemplate> candidateTemplates(Set<Long> studentIds) {
-        List<FaceTemplate> templates = faceTemplateRepository.findAllByStudent_IdIn(studentIds).stream()
-                .filter(template -> eligibleStudent(template.getStudent()))
-                .toList();
+        List<FaceTemplate> templates = faceTemplateRepository.findAllEligibleByStudentIdIn(studentIds);
         if (templates.size() != studentIds.size() || templates.size() > properties.maxCandidates() || templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_SESSION_NOT_FOUND);
         }
