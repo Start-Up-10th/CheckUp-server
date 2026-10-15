@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.volunteer.repository;
 
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
+import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +41,39 @@ public interface VolunteerAdjustmentRepository extends JpaRepository<VolunteerAd
             @Param("requestKey") String requestKey,
             @Param("createdAt") Instant createdAt
     );
+
+    /**
+     * 당일 봉사 미이행 처리로 바꾼 횟수를 그 지정에 연결해 남긴다(#250). 같은 {@code requestKey}가 이미 있으면 예외 없이 무시한다.
+     *
+     * @param dutyId         미이행으로 처리한 지정
+     * @param delta          실제로 바뀐 횟수
+     * @param requestedDelta 관리자가 요청한 횟수
+     * @param reason         사유. 없으면 {@code null}
+     * @return 새로 저장했으면 1, 같은 키가 있어 무시했으면 0
+     */
+    @Modifying
+    @Query(value = """
+            INSERT INTO volunteer_adjustment
+                (student_id, duty_id, delta, requested_delta, reason, kind, request_key, created_at)
+            VALUES (:studentId, :dutyId, :delta, :requestedDelta, CAST(:reason AS VARCHAR), 'DUTY_MISSED',
+                    :requestKey, :createdAt)
+            ON CONFLICT (request_key) DO NOTHING
+            """, nativeQuery = true)
+    int insertMissed(
+            @Param("studentId") Long studentId,
+            @Param("dutyId") Long dutyId,
+            @Param("delta") int delta,
+            @Param("requestedDelta") int requestedDelta,
+            @Param("reason") String reason,
+            @Param("requestKey") String requestKey,
+            @Param("createdAt") Instant createdAt
+    );
+
+    /** 지정들에 연결된 한 종류의 조정 기록. 날짜별 당일 봉사자 기록에서 미이행으로 추가한 횟수·사유를 읽는다. */
+    List<VolunteerAdjustment> findAllByDuty_IdInAndKind(Collection<Long> dutyIds, VolunteerAdjustmentKind kind);
+
+    /** 지정에 그 종류의 조정 기록이 있는지. 미이행 횟수를 이미 처리했는지 확인한다. */
+    boolean existsByDuty_IdAndKind(Long dutyId, VolunteerAdjustmentKind kind);
 
     /**
      * 학생 한 명의 조정 기록을 최신순으로 읽는다. 같은 시각이면 나중에 저장한 기록이 앞이다. 봉사 조정 이력(#140)에 쓴다.

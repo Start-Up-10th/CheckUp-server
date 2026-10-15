@@ -11,6 +11,7 @@ import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerDuty;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,8 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 
 /**
  * 실제 PostgreSQL에서 당일 봉사자 지정이 학생·운영일마다 하나이고,
- * 완료는 한 번만 반영되며 완료한 지정은 취소되지 않는지, 학생의 완료 내역을 최신 운영일부터 읽는지 검증한다.
+ * 완료는 한 번만 반영되며 완료한 지정은 취소되지 않는지, 학생의 완료 내역을 최신 운영일부터 읽는지,
+ * 미이행 처리와 날짜별 기록·월 단위 미이행 요약(#250)을 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -104,5 +106,63 @@ class VolunteerDutyRepositoryTest {
 
         assertThat(dutyRepository.cancel(id)).isEqualTo(1);
         assertThat(dutyRepository.findByStudentIdAndOperatingDay(studentId, DAY)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("미이행은 지정·미이행을 미이행으로 바꾸고 완료한 지정은 바꾸지 않는다")
+    void markMissedSkipsCompleted() {
+        Long assigned = assign(studentId, DAY);
+        Long completed = assign(studentId, DAY.plusDays(1));
+        dutyRepository.complete(completed, T0.plusSeconds(60));
+
+        assertThat(dutyRepository.markMissed(assigned)).isEqualTo(1);
+        assertThat(dutyRepository.markMissed(assigned)).isEqualTo(1);
+        assertThat(dutyRepository.markMissed(completed)).isZero();
+
+        assertThat(dutyRepository.findById(assigned).orElseThrow().getStatus()).isEqualTo(DutyStatus.MISSED);
+        assertThat(dutyRepository.findById(completed).orElseThrow().getStatus()).isEqualTo(DutyStatus.COMPLETED);
+        assertThat(dutyRepository.cancel(assigned)).isZero();
+    }
+
+    @Test
+    @DisplayName("날짜별 기록은 그 운영일의 지정만 학생과 함께 읽고, 잠금 조회는 학생·운영일로 찾는다")
+    void findWithStudentByDay() {
+        assign(studentId, DAY);
+        assign(studentId, DAY.plusDays(1));
+
+        List<VolunteerDuty> duties = dutyRepository.findAllWithStudentByOperatingDay(DAY);
+
+        assertThat(duties).singleElement()
+                .satisfies(duty -> assertThat(duty.getStudent().getName()).isEqualTo("학생"));
+        assertThat(dutyRepository.lockByStudentIdAndOperatingDay(studentId, DAY.plusDays(1))).isPresent();
+        assertThat(dutyRepository.lockByStudentIdAndOperatingDay(studentId, DAY.plusDays(2))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("월 요약은 미이행과 오늘 전 운영일의 지정을 날짜별로 세고, 완료·오늘 지정·기간 밖은 세지 않는다")
+    void countMissedByDay() {
+        Member other = memberRepository.save(Member.create(92_003L, "다른학생", MemberRole.STUDENT));
+        Long otherId = studentRepository.saveAndFlush(Student.create(other, 92_003L, "다른학생", 1, 1, 3, 92_003, 302)).getId();
+        LocalDate today = DAY.plusDays(3);
+        dutyRepository.markMissed(assign(studentId, DAY));
+        assign(otherId, DAY);
+        dutyRepository.complete(assign(studentId, DAY.plusDays(1)), T0);
+        assign(studentId, DAY.plusDays(2));
+        assign(studentId, today);
+        dutyRepository.markMissed(assign(otherId, today));
+        assign(studentId, DAY.minusDays(1));
+
+        List<VolunteerDutyRepository.MissedDay> days =
+                dutyRepository.countMissedByOperatingDay(DAY, DAY.plusDays(30), today);
+
+        assertThat(days).extracting(VolunteerDutyRepository.MissedDay::getOperatingDay)
+                .containsExactly(DAY, DAY.plusDays(2), today);
+        assertThat(days).extracting(VolunteerDutyRepository.MissedDay::getMissedCount)
+                .containsExactly(2L, 1L, 1L);
+    }
+
+    private Long assign(Long student, LocalDate day) {
+        dutyRepository.assign(student, day, T0);
+        return dutyRepository.findByStudentIdAndOperatingDay(student, day).orElseThrow().getId();
     }
 }

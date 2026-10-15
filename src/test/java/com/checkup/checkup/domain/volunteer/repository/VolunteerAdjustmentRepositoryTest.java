@@ -1,6 +1,7 @@
 package com.checkup.checkup.domain.volunteer.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.checkup.checkup.domain.member.entity.Member;
 import com.checkup.checkup.domain.member.entity.MemberRole;
@@ -10,6 +11,7 @@ import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,11 +21,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 
 /**
  * 실제 PostgreSQL에서 봉사 조정 기록의 재시도 키 중복 무시, 마지막 조정 시각 조회,
- * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139), 학생별 최신순 이력 조회(#140), 조정 종류 기록(#176)을 검증한다.
+ * 봉사 횟수 증가와 0 하한 차감, 사유·요청 횟수 기록과 잠금 조회·여러 회 변경(#139), 학생별 최신순 이력 조회(#140), 조정 종류 기록(#176),
+ * 지정에 연결한 미이행 조정 기록(#250)을 검증한다.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -39,6 +43,9 @@ class VolunteerAdjustmentRepositoryTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private VolunteerDutyRepository dutyRepository;
 
     private Long studentId;
     private Long otherStudentId;
@@ -140,5 +147,41 @@ class VolunteerAdjustmentRepositoryTest {
         Long dataGsmId = (long) studentNumber;
         Member member = memberRepository.save(Member.create(dataGsmId, "학생", MemberRole.STUDENT));
         return studentRepository.saveAndFlush(Student.create(member, dataGsmId, "학생", 1, 1, 1, studentNumber, 301));
+    }
+
+    @Test
+    @DisplayName("미이행 조정은 지정에 연결해 종류 DUTY_MISSED로 남고, 같은 키는 한 번만 기록한다")
+    void missedAdjustmentIsLinkedToDuty() {
+        Long dutyId = assignDuty(LocalDate.of(2026, 10, 1));
+        Long otherDutyId = assignDuty(LocalDate.of(2026, 10, 2));
+
+        assertThat(adjustmentRepository.insertMissed(studentId, dutyId, 2, 2, "미이행", "key-m", T0)).isEqualTo(1);
+        assertThat(adjustmentRepository.insertMissed(studentId, otherDutyId, 2, 2, null, "key-m", T0)).isZero();
+
+        assertThat(adjustmentRepository.findAllByDuty_IdInAndKind(List.of(dutyId, otherDutyId), VolunteerAdjustmentKind.DUTY_MISSED))
+                .singleElement()
+                .satisfies(adjustment -> {
+                    assertThat(adjustment.getDuty().getId()).isEqualTo(dutyId);
+                    assertThat(adjustment.getDelta()).isEqualTo((short) 2);
+                    assertThat(adjustment.getReason()).isEqualTo("미이행");
+                    assertThat(adjustment.getKind()).isEqualTo(VolunteerAdjustmentKind.DUTY_MISSED);
+                });
+        assertThat(adjustmentRepository.existsByDuty_IdAndKind(dutyId, VolunteerAdjustmentKind.DUTY_MISSED)).isTrue();
+        assertThat(adjustmentRepository.existsByDuty_IdAndKind(otherDutyId, VolunteerAdjustmentKind.DUTY_MISSED)).isFalse();
+    }
+
+    @Test
+    @DisplayName("한 지정에는 미이행 조정을 두 번 남길 수 없다")
+    void missedAdjustmentIsUniquePerDuty() {
+        Long dutyId = assignDuty(LocalDate.of(2026, 10, 1));
+        adjustmentRepository.insertMissed(studentId, dutyId, 1, 1, null, null, T0);
+
+        assertThatThrownBy(() -> adjustmentRepository.insertMissed(studentId, dutyId, 1, 1, null, null, T0))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private Long assignDuty(LocalDate day) {
+        dutyRepository.assign(studentId, day, T0);
+        return dutyRepository.findByStudentIdAndOperatingDay(studentId, day).orElseThrow().getId();
     }
 }
