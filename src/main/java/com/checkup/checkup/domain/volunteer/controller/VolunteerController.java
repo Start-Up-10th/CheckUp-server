@@ -4,11 +4,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.volunteer.dto.request.VolunteerAdjustRequest;
+import com.checkup.checkup.domain.volunteer.dto.request.VolunteerMissedRequest;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerDutyRecordResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.service.VolunteerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,12 +24,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 관리자 봉사 관리 API(DEC-020). 사감·기숙사 자치위원이 전체 학생 명단을 보고 봉사 횟수를 조정한다.
  */
-@Tag(name = "봉사 관리", description = "사감·기숙사 자치위원의 봉사 관리 명단·횟수 조정·당일 봉사자(REQ-COM-001·002·006, DEC-020·021). 경로의 studentId는 DataGSM 학생 id")
+@Tag(name = "봉사 관리", description = "사감·기숙사 자치위원의 봉사 관리 명단·횟수 조정·당일 봉사자·미이행(REQ-COM-001·002·006, DEC-020·021, #250). 경로의 studentId는 DataGSM 학생 id")
 @RestController
 @RequestMapping("/api/v1/volunteer")
 @RequiredArgsConstructor
@@ -167,5 +173,79 @@ public class VolunteerController {
     @PostMapping("/{studentId}/duty/complete")
     public VolunteerResponse completeDuty(@AuthenticationPrincipal Long memberId, @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId) {
         return volunteerService.completeDuty(memberId, studentId);
+    }
+
+    /**
+     * 오늘 당일 봉사를 미이행으로 처리하고 봉사 횟수를 바꾼다(#250). 지정은 지우지 않고 미이행으로 남긴다.
+     *
+     * @param memberId       세션의 회원 id
+     * @param studentId      DataGSM 학생 id
+     * @param idempotencyKey 재시도 방지 키(선택, 100자 이하)
+     * @param request        바꿀 횟수와 사유
+     * @return 처리 뒤 학생의 명단 항목
+     */
+    @Operation(summary = "당일 봉사 미이행", description = "오늘 지정을 MISSED로 바꾸고 delta만큼 횟수를 바꾸며 사유와 함께 조정 이력(kind=DUTY_MISSED)에 남긴다. delta는 -99~99이고 0이면 횟수는 그대로 두고 미이행만 기록한다. 차감은 남은 횟수까지만 한다. 지정이 없으면 404 NOT_ON_DUTY, 완료했으면 409 DUTY_ALREADY_COMPLETED, 횟수를 이미 처리했으면 409 DUTY_ALREADY_ADJUSTED. Idempotency-Key는 횟수 조정과 같다. 학생 알림은 만들거나 지우지 않는다.")
+    @PostMapping("/{studentId}/duty/missed")
+    public VolunteerResponse markTodayMissed(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
+            @Valid @RequestBody VolunteerMissedRequest request
+    ) {
+        return volunteerService.markTodayMissed(memberId, studentId, idempotencyKey, request.delta(), request.reason());
+    }
+
+    /**
+     * 한 운영일의 당일 봉사자 기록을 호실·이름·학번순으로 돌려준다(#250). 달력에서 날짜를 고를 때 쓴다.
+     *
+     * @param memberId 세션의 회원 id
+     * @param date     운영일(08:00 KST 기준 날짜). 없으면 오늘 운영일
+     * @return 그날 지정된 학생들
+     */
+    @Operation(summary = "날짜별 당일 봉사자 기록", description = "관리자 전용. 그 운영일에 지정된 학생과 상태(ASSIGNED·COMPLETED·MISSED), 미이행 횟수 처리 여부(adjusted)·추가한 횟수(addedCount)·사유(reason)를 호실순으로 돌려준다. 운영일이 지났는데 처리가 없던 지정은 MISSED, adjusted=false다. 오늘 지정은 처리 전이면 ASSIGNED다. 취소한 지정은 지워지므로 나오지 않는다.")
+    @GetMapping("/duties")
+    public List<VolunteerDutyRecordResponse> getDutyRecords(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "운영일(선택, yyyy-MM-dd). 없으면 오늘 운영일", example = "2026-10-14") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return volunteerService.getDutyRecords(memberId, date);
+    }
+
+    /**
+     * 한 달에서 미이행이 있는 운영일과 그날의 미이행 인원을 돌려준다(#250). 달력의 표시에 쓴다.
+     *
+     * @param memberId 세션의 회원 id
+     * @param month    조회할 달
+     * @return 운영일 → 미이행 인원
+     */
+    @Operation(summary = "월 단위 미이행 요약", description = "관리자 전용. {\"2026-10-13\": 1, \"2026-10-14\": 2}처럼 미이행이 있는 운영일만 날짜순으로 담는다. 횟수를 처리한 미이행과 처리하지 않은 미이행을 함께 센다.")
+    @GetMapping("/duties/summary")
+    public Map<LocalDate, Long> getMissedSummary(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "조회할 달(yyyy-MM)", example = "2026-10") @RequestParam @DateTimeFormat(pattern = "yyyy-MM") YearMonth month
+    ) {
+        return volunteerService.getMissedSummary(memberId, month);
+    }
+
+    /**
+     * 한 운영일의 당일 봉사를 미이행으로 처리하고 봉사 횟수를 바꾼다(#250). 달력에서 횟수 미처리 미이행을 처리할 때 쓴다.
+     *
+     * @param memberId       세션의 회원 id
+     * @param date           지정의 운영일
+     * @param studentId      DataGSM 학생 id
+     * @param idempotencyKey 재시도 방지 키(선택, 100자 이하)
+     * @param request        바꿀 횟수와 사유
+     * @return 처리 뒤 그날의 기록
+     */
+    @Operation(summary = "날짜별 미이행 처리", description = "그날의 지정(지정됨 또는 횟수 미처리 미이행)을 MISSED로 바꾸고 횟수·사유를 저장한다. 본문과 Idempotency-Key는 당일 봉사 미이행과 같다. 지정이 없으면 404 DUTY_NOT_FOUND, 완료했으면 409 DUTY_ALREADY_COMPLETED, 횟수를 이미 처리했으면 409 DUTY_ALREADY_ADJUSTED(학생 관리의 횟수 조정을 쓴다).")
+    @PatchMapping("/duties/{date}/{studentId}/missed")
+    public VolunteerDutyRecordResponse markMissed(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "지정의 운영일(yyyy-MM-dd)", example = "2026-10-14") @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "DataGSM 학생 id(명단의 studentId). DB id가 아니다", example = "1") @PathVariable Long studentId,
+            @Parameter(description = "재시도 중복 방지 키(선택, 최대 100자). 같은 키로 다시 보내면 한 번만 반영한다", example = "9f0c1e2a-3b4d-4e5f-8a9b-0c1d2e3f4a5b") @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
+            @Valid @RequestBody VolunteerMissedRequest request
+    ) {
+        return volunteerService.markMissed(memberId, studentId, date, idempotencyKey, request.delta(), request.reason());
     }
 }

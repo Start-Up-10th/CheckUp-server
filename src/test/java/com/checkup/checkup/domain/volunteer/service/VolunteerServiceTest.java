@@ -18,6 +18,7 @@ import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerResponse;
 import com.checkup.checkup.domain.volunteer.dto.response.VolunteerAdjustmentResponse;
+import com.checkup.checkup.domain.volunteer.dto.response.VolunteerDutyRecordResponse;
 import com.checkup.checkup.domain.volunteer.entity.DutyStatus;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustment;
 import com.checkup.checkup.domain.volunteer.entity.VolunteerAdjustmentKind;
@@ -33,8 +34,10 @@ import com.checkup.checkup.global.security.AdminVerifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,7 +50,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 /**
  * 봉사 관리 명단이 관리자에게만 전체 학생을 봉사 횟수와 함께 보여주고,
  * 횟수 조정이 남은 횟수까지만 빼며 사유·요청 횟수를 기록하고 재시도를 한 번만 반영하는지(#139),
- * 조정 이력을 관리자에게 최신순으로 돌려주는지(#140) 검증한다.
+ * 조정 이력을 관리자에게 최신순으로 돌려주는지(#140), 당일 봉사 미이행 처리와 날짜별 기록·월 요약(#250)을 검증한다.
  */
 class VolunteerServiceTest {
 
@@ -578,6 +581,220 @@ class VolunteerServiceTest {
         assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L)).isInstanceOf(CustomException.class);
         verify(volunteerDutyRepository, never()).assign(anyLong(), any(), any());
+        assertThatThrownBy(() -> service.getDutyRecords(MEMBER_ID, TODAY)).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.getMissedSummary(MEMBER_ID, YearMonth.of(2026, 10))).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, null, 1, null)).isInstanceOf(CustomException.class);
+        assertThatThrownBy(() -> service.markMissed(MEMBER_ID, 200L, TODAY, null, 1, null)).isInstanceOf(CustomException.class);
+        verify(volunteerDutyRepository, never()).findAllWithStudentByOperatingDay(any());
+        verify(volunteerDutyRepository, never()).lockByStudentIdAndOperatingDay(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("날짜별 기록은 호실순이고, 지난 운영일의 지정은 미이행(횟수 미처리)으로, 처리한 미이행은 추가 횟수·사유와 함께 보인다")
+    void dutyRecordsShowMissedAndAdjustment() {
+        LocalDate yesterday = TODAY.minusDays(1);
+        Student first = student(1L, "가학생", 2101, 301);
+        Student second = student(2L, "나학생", 2102, 302);
+        Student third = student(3L, "다학생", 2103, 303);
+        VolunteerDuty missed = duty(61L, second, yesterday, DutyStatus.MISSED);
+        VolunteerDuty unprocessed = duty(62L, third, yesterday, DutyStatus.ASSIGNED);
+        VolunteerDuty completed = duty(63L, first, yesterday, DutyStatus.COMPLETED);
+        given(volunteerDutyRepository.findAllWithStudentByOperatingDay(yesterday))
+                .willReturn(List.of(missed, unprocessed, completed));
+        given(volunteerAdjustmentRepository.findAllByDuty_IdInAndKind(List.of(61L, 62L, 63L), VolunteerAdjustmentKind.DUTY_MISSED))
+                .willReturn(List.of(missedAdjustment(missed, 2, "당일 봉사 미이행")));
+
+        assertThat(service.getDutyRecords(MEMBER_ID, yesterday)).containsExactly(
+                new VolunteerDutyRecordResponse(1L, 2101, "가학생", 301, DutyStatus.COMPLETED, false, null, null),
+                new VolunteerDutyRecordResponse(2L, 2102, "나학생", 302, DutyStatus.MISSED, true, 2, "당일 봉사 미이행"),
+                new VolunteerDutyRecordResponse(3L, 2103, "다학생", 303, DutyStatus.MISSED, false, null, null));
+    }
+
+    @Test
+    @DisplayName("날짜가 없으면 오늘 운영일을 보고, 오늘 지정은 아직 지정 상태로 보인다")
+    void dutyRecordsDefaultToTodayAndKeepAssigned() {
+        Student student = student(1L, "학생", 2101, 301);
+        given(volunteerDutyRepository.findAllWithStudentByOperatingDay(TODAY))
+                .willReturn(List.of(duty(61L, student, TODAY, DutyStatus.ASSIGNED)));
+
+        assertThat(service.getDutyRecords(MEMBER_ID, null))
+                .extracting(VolunteerDutyRecordResponse::status)
+                .containsExactly(DutyStatus.ASSIGNED);
+    }
+
+    @Test
+    @DisplayName("그날 지정이 없으면 빈 목록이고 조정 기록을 읽지 않는다")
+    void dutyRecordsOfEmptyDay() {
+        assertThat(service.getDutyRecords(MEMBER_ID, TODAY.minusDays(3))).isEmpty();
+        verify(volunteerAdjustmentRepository, never()).findAllByDuty_IdInAndKind(any(), any());
+    }
+
+    @Test
+    @DisplayName("월 요약은 그 달의 첫날~말일과 오늘 운영일로 세어 날짜순으로 돌려준다")
+    void missedSummaryOfMonth() {
+        given(volunteerDutyRepository.countMissedByOperatingDay(
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), TODAY))
+                .willReturn(List.of(missedDay(LocalDate.of(2026, 9, 13), 1), missedDay(LocalDate.of(2026, 9, 14), 2)));
+
+        Map<LocalDate, Long> summary = service.getMissedSummary(MEMBER_ID, YearMonth.of(2026, 9));
+
+        assertThat(summary).containsExactly(
+                Map.entry(LocalDate.of(2026, 9, 13), 1L), Map.entry(LocalDate.of(2026, 9, 14), 2L));
+    }
+
+    @Test
+    @DisplayName("오늘 미이행은 지정에 연결한 조정을 남기고 횟수를 늘린 뒤 지정을 미이행으로 바꾼다")
+    void markTodayMissedAddsCount() {
+        givenAdjustable(1);
+        givenLockedDuty(TODAY, DutyStatus.ASSIGNED);
+        given(volunteerAdjustmentRepository.insertMissed(10L, 50L, 1, 1, "당일 봉사 미이행", "key-m", NOW)).willReturn(1);
+        given(volunteerDutyRepository.markMissed(50L)).willReturn(1);
+
+        service.markTodayMissed(MEMBER_ID, 200L, "key-m", 1, "  당일 봉사 미이행 ");
+
+        verify(studentRepository).changeVolunteerCount(10L, 1);
+        verify(volunteerDutyRepository).markMissed(50L);
+        verify(notificationService, never()).delete(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("횟수 0으로 처리하면 조정 기록·횟수 변경 없이 미이행만 남긴다")
+    void markMissedWithZeroOnlyRecordsMissed() {
+        Student student = givenAdjustable(1);
+        VolunteerDuty duty = givenLockedDuty(TODAY.minusDays(1), DutyStatus.ASSIGNED);
+        ReflectionTestUtils.setField(duty, "student", student);
+        given(volunteerDutyRepository.markMissed(50L)).willReturn(1);
+        given(volunteerDutyRepository.findByStudentIdAndOperatingDay(10L, TODAY.minusDays(1))).willReturn(Optional.of(duty));
+
+        assertThat(service.markMissed(MEMBER_ID, 200L, TODAY.minusDays(1), null, 0, null).adjusted()).isFalse();
+
+        verify(volunteerAdjustmentRepository, never()).insertMissed(anyLong(), anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
+        verify(volunteerDutyRepository).markMissed(50L);
+    }
+
+    @Test
+    @DisplayName("지난 날의 횟수 미처리 미이행을 처리하면 그날의 기록을 횟수 처리됨으로 돌려준다")
+    void markMissedReturnsAdjustedRecord() {
+        LocalDate yesterday = TODAY.minusDays(1);
+        Student student = givenAdjustable(1);
+        VolunteerDuty duty = givenLockedDuty(yesterday, DutyStatus.MISSED);
+        ReflectionTestUtils.setField(duty, "student", student);
+        given(volunteerAdjustmentRepository.insertMissed(10L, 50L, 2, 2, null, null, NOW)).willReturn(1);
+        given(volunteerDutyRepository.markMissed(50L)).willReturn(1);
+        given(volunteerDutyRepository.findByStudentIdAndOperatingDay(10L, yesterday)).willReturn(Optional.of(duty));
+        given(volunteerAdjustmentRepository.findAllByDuty_IdInAndKind(List.of(50L), VolunteerAdjustmentKind.DUTY_MISSED))
+                .willReturn(List.of(missedAdjustment(duty, 2, null)));
+
+        VolunteerDutyRecordResponse record = service.markMissed(MEMBER_ID, 200L, yesterday, null, 2, null);
+
+        assertThat(record).isEqualTo(
+                new VolunteerDutyRecordResponse(200L, 2105, "학생", 301, DutyStatus.MISSED, true, 2, null));
+        verify(studentRepository).changeVolunteerCount(10L, 2);
+    }
+
+    @Test
+    @DisplayName("차감으로 처리하면 남은 횟수까지만 빼고, 남은 횟수가 0이면 409 VOLUNTEER_COUNT_ZERO다")
+    void markMissedClampsDecrease() {
+        givenAdjustable(1);
+        givenLockedDuty(TODAY, DutyStatus.ASSIGNED);
+        given(volunteerAdjustmentRepository.insertMissed(10L, 50L, -1, -3, null, null, NOW)).willReturn(1);
+        given(volunteerDutyRepository.markMissed(50L)).willReturn(1);
+
+        service.markTodayMissed(MEMBER_ID, 200L, null, -3, null);
+
+        verify(studentRepository).changeVolunteerCount(10L, -1);
+
+        given(studentRepository.lockVolunteerCount(10L)).willReturn(Optional.of(0));
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, null, -1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.VOLUNTEER_COUNT_ZERO));
+    }
+
+    @Test
+    @DisplayName("완료한 지정은 409 DUTY_ALREADY_COMPLETED로 미이행 처리할 수 없다")
+    void markMissedOfCompletedIsRejected() {
+        givenAdjustable(1);
+        givenLockedDuty(TODAY, DutyStatus.COMPLETED);
+
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, null, 1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_ALREADY_COMPLETED));
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
+        verify(volunteerDutyRepository, never()).markMissed(anyLong());
+    }
+
+    @Test
+    @DisplayName("횟수를 이미 처리한 미이행은 409 DUTY_ALREADY_ADJUSTED로 다시 처리하지 않는다")
+    void markMissedTwiceIsRejected() {
+        givenAdjustable(2);
+        givenLockedDuty(TODAY.minusDays(1), DutyStatus.MISSED);
+        given(volunteerAdjustmentRepository.existsByDuty_IdAndKind(50L, VolunteerAdjustmentKind.DUTY_MISSED)).willReturn(true);
+
+        assertThatThrownBy(() -> service.markMissed(MEMBER_ID, 200L, TODAY.minusDays(1), null, 1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_ALREADY_ADJUSTED));
+        verify(studentRepository, never()).changeVolunteerCount(anyLong(), anyInt());
+    }
+
+    @Test
+    @DisplayName("같은 키로 다시 오면 반영하지 않고 현재 상태를 돌려주고, 다른 요청에 쓴 키는 409 IDEMPOTENCY_KEY_REUSED다")
+    void markMissedRetryWithSameKey() {
+        givenAdjustable(2);
+        VolunteerDuty duty = givenLockedDuty(TODAY, DutyStatus.MISSED);
+        given(volunteerAdjustmentRepository.findByRequestKey("key-m")).willReturn(Optional.of(missedAdjustment(duty, 1, null)));
+
+        service.markTodayMissed(MEMBER_ID, 200L, "key-m", 1, null);
+
+        verify(volunteerAdjustmentRepository, never()).insertMissed(anyLong(), anyLong(), anyInt(), anyInt(), any(), any(), any());
+        verify(volunteerDutyRepository, never()).markMissed(anyLong());
+
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, "key-m", 2, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
+        given(volunteerAdjustmentRepository.findByRequestKey("key-a")).willReturn(Optional.of(adjustment(10L, 1)));
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, "key-a", 1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REUSED));
+    }
+
+    @Test
+    @DisplayName("지정이 없으면 오늘 처리는 404 NOT_ON_DUTY, 날짜 처리는 404 DUTY_NOT_FOUND다")
+    void markMissedWithoutDutyIsRejected() {
+        givenAdjustable(1);
+
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, null, 1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_ON_DUTY));
+        assertThatThrownBy(() -> service.markMissed(MEMBER_ID, 200L, TODAY.minusDays(1), null, 1, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_NOT_FOUND));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-100, 100})
+    @DisplayName("미이행 횟수가 -99~99를 벗어나면 400 INVALID_REQUEST이고 지정을 읽지 않는다")
+    void markMissedRejectsInvalidDelta(int delta) {
+        assertThatThrownBy(() -> service.markTodayMissed(MEMBER_ID, 200L, null, delta, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REQUEST));
+        verify(volunteerDutyRepository, never()).lockByStudentIdAndOperatingDay(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("미이행으로 처리한 지정은 409 DUTY_MISSED로 완료·취소할 수 없다")
+    void missedDutyCannotBeCompletedOrCancelled() {
+        givenAdjustable(2);
+        givenTodayDuty(DutyStatus.MISSED);
+
+        assertThatThrownBy(() -> service.completeDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_MISSED));
+        assertThatThrownBy(() -> service.cancelDuty(MEMBER_ID, 200L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.DUTY_MISSED));
+        verify(volunteerDutyRepository, never()).complete(anyLong(), any());
+        verify(volunteerDutyRepository, never()).cancel(anyLong());
     }
 
     private void givenStudents(Student... students) {
@@ -638,5 +855,47 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(adjustment, "delta", (short) delta);
         ReflectionTestUtils.setField(adjustment, "requestedDelta", (short) requestedDelta);
         return adjustment;
+    }
+
+    private VolunteerDuty givenLockedDuty(LocalDate day, DutyStatus status) {
+        VolunteerDuty duty = BeanUtils.instantiateClass(VolunteerDuty.class);
+        ReflectionTestUtils.setField(duty, "id", 50L);
+        ReflectionTestUtils.setField(duty, "operatingDay", day);
+        ReflectionTestUtils.setField(duty, "status", status);
+        given(volunteerDutyRepository.lockByStudentIdAndOperatingDay(10L, day)).willReturn(Optional.of(duty));
+        return duty;
+    }
+
+    private static VolunteerDuty duty(Long id, Student student, LocalDate day, DutyStatus status) {
+        VolunteerDuty duty = BeanUtils.instantiateClass(VolunteerDuty.class);
+        ReflectionTestUtils.setField(duty, "id", id);
+        ReflectionTestUtils.setField(duty, "student", student);
+        ReflectionTestUtils.setField(duty, "operatingDay", day);
+        ReflectionTestUtils.setField(duty, "status", status);
+        return duty;
+    }
+
+    private static VolunteerAdjustment missedAdjustment(VolunteerDuty duty, int delta, String reason) {
+        VolunteerAdjustment adjustment = BeanUtils.instantiateClass(VolunteerAdjustment.class);
+        ReflectionTestUtils.setField(adjustment, "duty", duty);
+        ReflectionTestUtils.setField(adjustment, "delta", (short) delta);
+        ReflectionTestUtils.setField(adjustment, "requestedDelta", (short) delta);
+        ReflectionTestUtils.setField(adjustment, "reason", reason);
+        ReflectionTestUtils.setField(adjustment, "kind", VolunteerAdjustmentKind.DUTY_MISSED);
+        return adjustment;
+    }
+
+    private static VolunteerDutyRepository.MissedDay missedDay(LocalDate day, long count) {
+        return new VolunteerDutyRepository.MissedDay() {
+            @Override
+            public LocalDate getOperatingDay() {
+                return day;
+            }
+
+            @Override
+            public long getMissedCount() {
+                return count;
+            }
+        };
     }
 }

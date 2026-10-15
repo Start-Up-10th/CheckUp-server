@@ -48,6 +48,9 @@ public enum ErrorCode {
     ALREADY_ON_DUTY(HttpStatus.CONFLICT, "이미 오늘 봉사자로 지정된 학생입니다."),
     NOT_ON_DUTY(HttpStatus.NOT_FOUND, "오늘 봉사자로 지정되지 않은 학생입니다."),
     DUTY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 봉사를 완료했습니다."),
+    DUTY_NOT_FOUND(HttpStatus.NOT_FOUND, "그날 봉사자로 지정되지 않은 학생입니다."),
+    DUTY_MISSED(HttpStatus.CONFLICT, "미이행으로 처리한 봉사입니다."),
+    DUTY_ALREADY_ADJUSTED(HttpStatus.CONFLICT, "이미 횟수를 처리한 미이행입니다. 학생 관리에서 횟수를 조정해 주세요."),
 
     // QR
     QR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "QR 세션이 없거나 종료되었습니다."),
