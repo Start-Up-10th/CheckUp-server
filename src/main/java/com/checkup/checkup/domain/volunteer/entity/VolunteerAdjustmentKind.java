@@ -5,8 +5,10 @@ package com.checkup.checkup.domain.volunteer.entity;
  *
  * - {@code ADMIN}: 관리자의 {@code +}/{@code −}·여러 회 조정.
  * - {@code DUTY_COMPLETION}: 자치위원이 당일 봉사 완료를 확인해 생긴 차감(-1).
+ * - {@code DUTY_MISSED}: 당일 봉사 미이행으로 처리하며 바꾼 횟수(#250). 그 지정에 연결된다.
  */
 public enum VolunteerAdjustmentKind {
     ADMIN,
-    DUTY_COMPLETION
+    DUTY_COMPLETION,
+    DUTY_MISSED
 }
