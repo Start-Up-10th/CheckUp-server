@@ -516,6 +516,25 @@ class FaceRecognitionServiceTest {
         verifyNoInteractions(attendanceService, logService);
     }
 
+    @Test
+    @DisplayName("층 도입 전에 만든 세션은 층을 따지지 않고 KNOWN으로 출석 처리한다")
+    void sessionWithoutFloorIgnoresStudentFloor() {
+        FaceSessionView legacy = new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, null,
+                NOW.minusSeconds(2), true, Set.of(STUDENT_DB_ID));
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(legacy);
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.RECORDED);
+
+        var recognition = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst().recognition();
+
+        assertThat(recognition.status()).isEqualTo("KNOWN");
+        assertThat(recognition.attendance()).isEqualTo("RECORDED");
+    }
+
     /** 현재 세션 후보가 학생 한 명이고, 프레임을 보내면 AI가 주어진 결과를 돌려주게 한다. */
     private FaceSessionView givenFrame(AiFaceFrameResponse frame) {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
