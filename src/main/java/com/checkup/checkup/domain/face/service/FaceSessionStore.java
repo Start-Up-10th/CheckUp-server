@@ -33,10 +33,10 @@ public class FaceSessionStore {
      * @throws CustomException 후보 학생 중 저장되지 않은 학생이 있으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}
      */
     @Transactional
-    public void create(UUID sessionId, Long adminMemberId, AttendancePurpose purpose, List<Long> studentIds,
-                       Instant createdAt, Instant initialLastActivityAt) {
-        sessionRepository.save(
-                FaceRecognitionSession.create(sessionId, adminMemberId, purpose, createdAt, initialLastActivityAt));
+    public void create(UUID sessionId, Long adminMemberId, AttendancePurpose purpose, Integer floor,
+                       List<Long> studentIds, Instant createdAt, Instant initialLastActivityAt) {
+        sessionRepository.save(FaceRecognitionSession.create(
+                sessionId, adminMemberId, purpose, floor, createdAt, initialLastActivityAt));
         // 후보 수만큼 insert하지 않고 한 문장으로 저장한다. 저장되지 않은 학생이 있으면 개수가 모자라 트랜잭션째 취소된다.
         if (candidateRepository.insertAll(sessionId, studentIds) != studentIds.size()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
@@ -56,7 +56,7 @@ public class FaceSessionStore {
                 .map(candidate -> candidate.getStudent().getId())
                 .collect(Collectors.toUnmodifiableSet());
         return new FaceSessionView(session.getId(), session.getAdminMemberId(), session.getPurpose(),
-                session.getLastActivityAt(), session.isActive(), candidateIds);
+                session.getFloor(), session.getLastActivityAt(), session.isActive(), candidateIds);
     }
 
     /**
@@ -169,6 +169,6 @@ public class FaceSessionStore {
         Set<Long> ids = candidates.stream().map(candidate -> candidate.getStudent().getId())
                 .collect(Collectors.toUnmodifiableSet());
         return new FaceSessionView(session.getId(), session.getAdminMemberId(), session.getPurpose(),
-                session.getLastActivityAt(), session.isActive(), ids);
+                session.getFloor(), session.getLastActivityAt(), session.isActive(), ids);
     }
 }
