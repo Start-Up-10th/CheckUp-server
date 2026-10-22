@@ -353,6 +353,20 @@ class FaceRecognitionServiceTest {
         verify(aiFaceClient, never()).createSession(any(), any());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullSource
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 2, 6})
+    @DisplayName("층이 없거나 3·4·5가 아니면 세션을 만들지 않고 400 INVALID_FLOOR다")
+    void invalidFloorIsRejected(Integer floor) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
+                AttendancePurpose.DORMITORY, floor))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.INVALID_FLOOR));
+
+        verifyNoInteractions(templateRepository, sessionStore, aiFaceClient);
+    }
+
     @Test
     @DisplayName("후보 상한을 따로 정하지 않으면 기본 200명이다")
     void defaultMaximumIs200() {
