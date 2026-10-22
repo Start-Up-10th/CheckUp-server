@@ -140,6 +140,7 @@ public class FaceRecognitionService {
     /**
      * 카메라 프레임 한 장에서 얼굴을 인식하고, 현재 세션 후보로 확인된 학생을 출석 처리한다.
      * AI가 후보 밖의 학생을 지목하면 출석으로 인정하지 않고 {@code UNKNOWN}으로 낮춘다. 결과는 최근 인식 기록에도 남긴다(#143).
+     * 세션 층이 아닌 학생은 이름·학번·출석 없이 {@code OTHER_FLOOR}로 알린다(#253).
      * 프레임 이미지는 처리 뒤 메모리에서 지우고 저장하지 않는다.
      *
      * @param frameIdHeader 프레임 id(선택, 최대 128자). 없으면 새로 만든다
@@ -338,13 +339,20 @@ public class FaceRecognitionService {
         String studentName = null;
         Integer studentNumber = null;
         String attendance = null;
+        boolean qrRecommended = face.qrRecommended();
         if ("KNOWN".equals(status)) {
             Long dataGsmStudentId = canonicalStudentId(face.recognition().studentId());
             var student = dataGsmStudentId == null ? java.util.Optional.<Student>empty()
                     : studentRepository.findByDatagsmStudentId(dataGsmStudentId);
-            if (student.isPresent()
+            boolean candidate = student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
-                    && student.get().isAttendanceEligible()) {
+                    && student.get().isAttendanceEligible();
+            if (candidate && isOtherFloor(session, student.get())) {
+                // 다른 층 학생은 이 카메라 화면에 신원을 보이지 않고 출석·최근 인식에도 남기지 않는다(#253).
+                // 층을 잘못 찾은 학생에게 QR 안내는 도움이 안 되므로 띄우지 않는다.
+                status = "OTHER_FLOOR";
+                qrRecommended = false;
+            } else if (candidate) {
                 studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttendedFor(
@@ -364,7 +372,7 @@ public class FaceRecognitionService {
                 status = "UNKNOWN";
             }
         }
-        if (attendance == null && face.qrRecommended()) {
+        if (attendance == null && qrRecommended) {
             // 못 알아본 얼굴은 AI가 QR을 안내할 때만 한 줄 남기고, 다른 학생의 이름을 만들지 않는다.
             recordQuietly(session, face.trackId(), FaceRecognitionResult.FAILED, null, verifiedAt);
         }
@@ -373,7 +381,12 @@ public class FaceRecognitionService {
         return new FaceFrameResponse.Face(face.trackId(), face.bbox(), face.landmarks(),
                 new FaceFrameResponse.Quality(quality.brightness(), quality.sharpness(), quality.issues()),
                 new FaceFrameResponse.Recognition(status, studentName, studentNumber, attendance),
-                face.attempts(), face.qrRecommended());
+                face.attempts(), qrRecommended);
+    }
+
+    /** 층 도입 전에 만든 세션(층 null)은 층을 따지지 않는다. */
+    private static boolean isOtherFloor(FaceSessionView session, Student student) {
+        return session.floor() != null && !session.floor().equals(student.getDormitoryFloor());
     }
 
     /**
