@@ -495,6 +495,27 @@ class FaceRecognitionServiceTest {
         assertThat(response.faces().getFirst().recognition().attendance()).isEqualTo("RECORDED");
     }
 
+    @Test
+    @DisplayName("세션 층이 아닌 학생은 이름·학번·출석 없이 OTHER_FLOOR이고 QR 안내와 최근 인식을 남기지 않는다")
+    void otherFloorStudentIsReportedWithoutIdentity() {
+        givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
+                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
+                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 0, true))));
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+
+        var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst();
+
+        assertThat(face.recognition().status()).isEqualTo("OTHER_FLOOR");
+        assertThat(face.recognition().studentName()).isNull();
+        assertThat(face.recognition().studentNumber()).isNull();
+        assertThat(face.recognition().attendance()).isNull();
+        assertThat(face.qrRecommended()).isFalse();
+        verifyNoInteractions(attendanceService, logService);
+    }
+
     /** 현재 세션 후보가 학생 한 명이고, 프레임을 보내면 AI가 주어진 결과를 돌려주게 한다. */
     private FaceSessionView givenFrame(AiFaceFrameResponse frame) {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
