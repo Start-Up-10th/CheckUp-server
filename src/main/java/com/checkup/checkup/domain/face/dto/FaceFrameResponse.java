@@ -22,7 +22,7 @@ public record FaceFrameResponse(
             Recognition recognition,
             @Schema(description = "이 얼굴 트랙의 연속 인식 시도 횟수(DEC-004)", example = "1")
             int attempts,
-            @Schema(description = "true면 QR 출석 안내를 띄운다(3회 초과 실패, DEC-004)")
+            @Schema(description = "true면 QR 출석 안내를 띄운다(3회 초과 실패, DEC-004). OTHER_FLOOR면 항상 false")
             boolean qrRecommended
     ) {
     }
@@ -35,7 +35,8 @@ public record FaceFrameResponse(
     }
 
     public record Recognition(
-            @Schema(description = "KNOWN, UNKNOWN, NOT_ATTEMPTED 중 하나")
+            @Schema(description = "KNOWN, UNKNOWN, NOT_ATTEMPTED, OTHER_FLOOR 중 하나. OTHER_FLOOR는 세션 층이 아닌 학생이고 이름·학번·출석이 없다",
+                    allowableValues = {"KNOWN", "UNKNOWN", "NOT_ATTEMPTED", "OTHER_FLOOR"})
             String status,
             @Schema(description = "학생 이름. status가 KNOWN일 때만 있다")
             String studentName,

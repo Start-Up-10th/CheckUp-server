@@ -119,7 +119,7 @@ class FaceRecognitionLogServiceTest {
     }
 
     private static FaceSessionView session() {
-        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, BEFORE_BOUNDARY, true, Set.of(40L));
+        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, 4, BEFORE_BOUNDARY, true, Set.of(40L));
     }
 
     private static FaceRecognitionLog log(FaceRecognitionResult result, Student student) {

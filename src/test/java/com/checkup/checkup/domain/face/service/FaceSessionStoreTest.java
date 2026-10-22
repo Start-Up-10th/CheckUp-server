@@ -78,11 +78,12 @@ class FaceSessionStoreTest {
     void savesAllCandidates() {
         UUID sessionId = UUID.randomUUID();
 
-        sessionStore.create(sessionId, adminMemberId, AttendancePurpose.DORMITORY, studentIds,
+        sessionStore.create(sessionId, adminMemberId, AttendancePurpose.DORMITORY, 4, studentIds,
                 Instant.now(), Instant.now());
 
-        assertThat(sessionStore.findOwned(sessionId, adminMemberId).candidateStudentIds())
-                .containsExactlyInAnyOrderElementsOf(studentIds);
+        FaceSessionView saved = sessionStore.findOwned(sessionId, adminMemberId);
+        assertThat(saved.candidateStudentIds()).containsExactlyInAnyOrderElementsOf(studentIds);
+        assertThat(saved.floor()).isEqualTo(4);
         assertThat(sessionStore.isOwnedActive(sessionId, adminMemberId)).isTrue();
     }
 
@@ -93,7 +94,7 @@ class FaceSessionStoreTest {
         List<Long> withMissing = new ArrayList<>(studentIds);
         withMissing.add(-1L);
 
-        assertThatThrownBy(() -> sessionStore.create(sessionId, adminMemberId, AttendancePurpose.DORMITORY,
+        assertThatThrownBy(() -> sessionStore.create(sessionId, adminMemberId, AttendancePurpose.DORMITORY, 4,
                 withMissing, Instant.now(), Instant.now()))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FACE_NO_ENROLLED_STUDENTS));
