@@ -368,6 +368,20 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
+    @DisplayName("세션을 만들면 요청한 층을 저장하고 응답에 돌려준다")
+    void createdSessionKeepsFloor() throws Exception {
+        FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
+        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+
+        var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, 4);
+
+        assertThat(response.floor()).isEqualTo(4);
+        assertThat(response.status()).isEqualTo("ACTIVE");
+        verify(sessionStore).create(eq(response.sessionId()), eq(ADMIN_ID), eq(AttendancePurpose.DORMITORY), eq(4),
+                eq(List.of(STUDENT_DB_ID)), any(), any());
+    }
+
+    @Test
     @DisplayName("후보 상한을 따로 정하지 않으면 기본 200명이다")
     void defaultMaximumIs200() {
         assertThat(properties.maxCandidates()).isEqualTo(200);
