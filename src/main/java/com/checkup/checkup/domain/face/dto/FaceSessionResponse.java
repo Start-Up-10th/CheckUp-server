@@ -9,6 +9,7 @@ import java.util.UUID;
 public record FaceSessionResponse(
         @Schema(description = "얼굴 인식 세션 id. 프레임 전송·종료 경로에 쓴다") UUID sessionId,
         @Schema(description = "출석 용도. DORMITORY 또는 STUDY_ROOM") AttendancePurpose purpose,
+        @Schema(description = "카메라가 맡은 층. 3, 4, 5 중 하나", example = "4") int floor,
         @Schema(description = "AI 준비 확인과 세션 생성이 성공하면 ACTIVE") String status
 ) {
 }
