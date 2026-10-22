@@ -158,6 +158,7 @@ class FaceRecognitionServiceTest {
         given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
+        given(student.getDormitoryFloor()).willReturn(3);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(attendanceService.markAttendedFor(student, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
@@ -300,12 +301,12 @@ class FaceRecognitionServiceTest {
                 .given(aiFaceClient).deleteSession(any());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOf(AiFaceException.class);
 
         var order = inOrder(sessionStore, aiFaceClient);
         order.verify(sessionStore).create(any(), eq(ADMIN_ID),
-                eq(com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY),
+                eq(com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY), eq(3),
                 eq(List.of(STUDENT_DB_ID)), any(), any());
         order.verify(aiFaceClient).createSession(any(), any());
         verify(sessionStore).markInactive(any(), eq(ADMIN_ID));
@@ -328,12 +329,12 @@ class FaceRecognitionServiceTest {
         given(templateRepository.findAllEligible()).willReturn(List.of(first, second));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(
                                 com.checkup.checkup.global.exception.ErrorCode.FACE_TOO_MANY_CANDIDATES));
 
-        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(aiFaceClient, never()).createSession(any(), any());
     }
 
@@ -343,13 +344,41 @@ class FaceRecognitionServiceTest {
         given(templateRepository.findAllEligible()).willReturn(List.of());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(
                                 com.checkup.checkup.global.exception.ErrorCode.FACE_NO_ENROLLED_STUDENTS));
 
-        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(aiFaceClient, never()).createSession(any(), any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullSource
+    @org.junit.jupiter.params.provider.ValueSource(ints = {0, 2, 6})
+    @DisplayName("층이 없거나 3·4·5가 아니면 세션을 만들지 않고 400 INVALID_FLOOR다")
+    void invalidFloorIsRejected(Integer floor) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
+                AttendancePurpose.DORMITORY, floor))
+                .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(
+                                com.checkup.checkup.global.exception.ErrorCode.INVALID_FLOOR));
+
+        verifyNoInteractions(templateRepository, sessionStore, aiFaceClient);
+    }
+
+    @Test
+    @DisplayName("세션을 만들면 요청한 층을 저장하고 응답에 돌려준다")
+    void createdSessionKeepsFloor() throws Exception {
+        FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
+        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+
+        var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, 4);
+
+        assertThat(response.floor()).isEqualTo(4);
+        assertThat(response.status()).isEqualTo("ACTIVE");
+        verify(sessionStore).create(eq(response.sessionId()), eq(ADMIN_ID), eq(AttendancePurpose.DORMITORY), eq(4),
+                eq(List.of(STUDENT_DB_ID)), any(), any());
     }
 
     @Test
@@ -494,6 +523,46 @@ class FaceRecognitionServiceTest {
         assertThat(response.faces().getFirst().recognition().attendance()).isEqualTo("RECORDED");
     }
 
+    @Test
+    @DisplayName("세션 층이 아닌 학생은 이름·학번·출석 없이 OTHER_FLOOR이고 QR 안내와 최근 인식을 남기지 않는다")
+    void otherFloorStudentIsReportedWithoutIdentity() {
+        givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
+                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
+                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 0, true))));
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+
+        var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst();
+
+        assertThat(face.recognition().status()).isEqualTo("OTHER_FLOOR");
+        assertThat(face.recognition().studentName()).isNull();
+        assertThat(face.recognition().studentNumber()).isNull();
+        assertThat(face.recognition().attendance()).isNull();
+        assertThat(face.qrRecommended()).isFalse();
+        verifyNoInteractions(attendanceService, logService);
+    }
+
+    @Test
+    @DisplayName("층 도입 전에 만든 세션은 층을 따지지 않고 KNOWN으로 출석 처리한다")
+    void sessionWithoutFloorIgnoresStudentFloor() {
+        FaceSessionView legacy = new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, null,
+                NOW.minusSeconds(2), true, Set.of(STUDENT_DB_ID));
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
+        given(sessionStore.findOwned(SESSION_ID, ADMIN_ID)).willReturn(legacy);
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+        given(attendanceService.markAttendedFor(eligibleStudent, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
+                .willReturn(AttendanceRecordResult.RECORDED);
+
+        var recognition = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst().recognition();
+
+        assertThat(recognition.status()).isEqualTo("KNOWN");
+        assertThat(recognition.attendance()).isEqualTo("RECORDED");
+    }
+
     /** 현재 세션 후보가 학생 한 명이고, 프레임을 보내면 AI가 주어진 결과를 돌려주게 한다. */
     private FaceSessionView givenFrame(AiFaceFrameResponse frame) {
         FaceSessionView session = session(Set.of(STUDENT_DB_ID));
@@ -511,6 +580,7 @@ class FaceRecognitionServiceTest {
         given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
+        given(student.getDormitoryFloor()).willReturn(3);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
     }
 
@@ -521,7 +591,7 @@ class FaceRecognitionServiceTest {
     }
 
     private static FaceSessionView session(Set<Long> candidates) {
-        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY,
+        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, 3,
                 NOW.minusSeconds(2), true, candidates);
     }
 

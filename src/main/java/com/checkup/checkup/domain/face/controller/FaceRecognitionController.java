@@ -32,14 +32,14 @@ public class FaceRecognitionController {
     private final FaceRecognitionService faceRecognitionService;
 
     /** 관리자 카메라 페이지마다 새 얼굴 인식 세션을 만든다. */
-    @Operation(summary = "얼굴 인식 세션 생성", description = "카메라 페이지마다 새 세션을 만든다. 성공 201.")
+    @Operation(summary = "얼굴 인식 세션 생성", description = "카메라 페이지·층마다 새 세션을 만든다. floor는 3, 4, 5 중 하나이고 다른 값이면 400 INVALID_FLOOR다. 성공 201.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public FaceSessionResponse create(
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody FaceSessionCreateRequest request
     ) {
-        return faceRecognitionService.create(memberId, request.purpose());
+        return faceRecognitionService.create(memberId, request.purpose(), request.floor());
     }
 
     /** 카메라 프레임 한 장의 얼굴을 인식하고 출석을 처리한다. 받은 이미지는 모든 응답 경로에서 0으로 덮어쓴다. */

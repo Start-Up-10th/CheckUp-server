@@ -61,6 +61,7 @@ public enum ErrorCode {
     FACE_ENROLLMENT_NOT_ELIGIBLE(HttpStatus.FORBIDDEN, "현재 얼굴 등록 대상이 아닙니다."),
     FACE_ENROLLMENT_MULTIPLE_IDENTITIES(HttpStatus.UNPROCESSABLE_ENTITY, "영상에 얼굴이 여러 명 포함되어 있습니다. 본인만 촬영해 주세요."),
     FACE_ENROLLMENT_LOW_LIGHT(HttpStatus.UNPROCESSABLE_ENTITY, "영상이 어둡습니다. 밝은 곳에서 다시 촬영해 주세요."),
+    INVALID_FLOOR(HttpStatus.BAD_REQUEST, "얼굴 인식 층은 3, 4, 5층 중 하나여야 합니다."),
     FACE_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "얼굴 인식 세션이 없거나 종료되었습니다."),
     FACE_NO_ENROLLED_STUDENTS(HttpStatus.CONFLICT, "현재 인식할 수 있는 등록 학생이 없습니다."),
     FACE_TOO_MANY_CANDIDATES(HttpStatus.UNPROCESSABLE_ENTITY, "인식 대상 학생이 허용 인원을 초과했습니다."),

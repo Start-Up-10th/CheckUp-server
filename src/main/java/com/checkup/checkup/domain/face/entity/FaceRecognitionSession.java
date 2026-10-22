@@ -31,6 +31,10 @@ public class FaceRecognitionSession {
     @Column(nullable = false, length = 20)
     private AttendancePurpose purpose;
 
+    /** 이 카메라가 맡은 층(3·4·5). 층 도입 전에 만든 세션은 null이다. */
+    @Column
+    private Integer floor;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -50,6 +54,7 @@ public class FaceRecognitionSession {
             UUID id,
             Long adminMemberId,
             AttendancePurpose purpose,
+            Integer floor,
             Instant createdAt,
             Instant lastActivityAt
     ) {
@@ -57,6 +62,7 @@ public class FaceRecognitionSession {
         session.id = id;
         session.adminMemberId = adminMemberId;
         session.purpose = purpose;
+        session.floor = floor;
         session.createdAt = createdAt;
         session.lastActivityAt = lastActivityAt;
         session.active = true;
