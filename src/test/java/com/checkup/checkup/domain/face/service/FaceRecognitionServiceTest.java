@@ -158,6 +158,7 @@ class FaceRecognitionServiceTest {
         given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
+        given(student.getDormitoryFloor()).willReturn(3);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
         given(studentRepository.countByIdInAndDormitoryRoomIsNotNull(Set.of(STUDENT_DB_ID))).willReturn(1L);
         given(attendanceService.markAttendedFor(student, AttendancePurpose.DORMITORY, NOW, AttendanceMethod.FACE))
@@ -300,12 +301,12 @@ class FaceRecognitionServiceTest {
                 .given(aiFaceClient).deleteSession(any());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOf(AiFaceException.class);
 
         var order = inOrder(sessionStore, aiFaceClient);
         order.verify(sessionStore).create(any(), eq(ADMIN_ID),
-                eq(com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY),
+                eq(com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY), eq(3),
                 eq(List.of(STUDENT_DB_ID)), any(), any());
         order.verify(aiFaceClient).createSession(any(), any());
         verify(sessionStore).markInactive(any(), eq(ADMIN_ID));
@@ -328,12 +329,12 @@ class FaceRecognitionServiceTest {
         given(templateRepository.findAllEligible()).willReturn(List.of(first, second));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(
                                 com.checkup.checkup.global.exception.ErrorCode.FACE_TOO_MANY_CANDIDATES));
 
-        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(aiFaceClient, never()).createSession(any(), any());
     }
 
@@ -343,12 +344,12 @@ class FaceRecognitionServiceTest {
         given(templateRepository.findAllEligible()).willReturn(List.of());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
-                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY))
+                com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
                 .isInstanceOfSatisfying(com.checkup.checkup.global.exception.CustomException.class,
                         error -> assertThat(error.getErrorCode()).isEqualTo(
                                 com.checkup.checkup.global.exception.ErrorCode.FACE_NO_ENROLLED_STUDENTS));
 
-        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any());
+        verify(sessionStore, never()).create(any(), any(), any(), any(), any(), any(), any());
         verify(aiFaceClient, never()).createSession(any(), any());
     }
 
@@ -511,6 +512,7 @@ class FaceRecognitionServiceTest {
         given(student.isAttendanceEligible()).willReturn(true);
         given(student.getName()).willReturn("Student Name");
         given(student.getStudentNumber()).willReturn(15);
+        given(student.getDormitoryFloor()).willReturn(3);
         given(studentRepository.findByDatagsmStudentId(DATAGSM_STUDENT_ID)).willReturn(Optional.of(student));
     }
 
@@ -521,7 +523,7 @@ class FaceRecognitionServiceTest {
     }
 
     private static FaceSessionView session(Set<Long> candidates) {
-        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY,
+        return new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, 3,
                 NOW.minusSeconds(2), true, candidates);
     }
 
