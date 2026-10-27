@@ -540,24 +540,20 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    @DisplayName("세션 층이 아닌 학생은 이름·학번·출석 없이 OTHER_FLOOR이고 QR 안내와 최근 인식을 남기지 않는다")
-    void otherFloorStudentIsReportedWithoutIdentity() {
-        givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
-                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
-                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
-                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 0, true))));
+    @DisplayName("세션 뒤 다른 층으로 옮긴 학생은 이름·학번·출석 없이 UNKNOWN이고 출석 처리하지 않는다")
+    void studentMovedToOtherFloorIsUnknown() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
         given(eligibleStudent.getDormitoryFloor()).willReturn(5);
 
         var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
                 .faces().getFirst();
 
-        assertThat(face.recognition().status()).isEqualTo("OTHER_FLOOR");
+        assertThat(face.recognition().status()).isEqualTo("UNKNOWN");
         assertThat(face.recognition().studentName()).isNull();
         assertThat(face.recognition().studentNumber()).isNull();
         assertThat(face.recognition().attendance()).isNull();
-        assertThat(face.qrRecommended()).isFalse();
-        verifyNoInteractions(attendanceService, logService);
+        verifyNoInteractions(attendanceService);
     }
 
     @Test
