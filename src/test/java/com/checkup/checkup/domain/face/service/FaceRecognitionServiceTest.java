@@ -381,6 +381,23 @@ class FaceRecognitionServiceTest {
                 eq(List.of(STUDENT_DB_ID)), any(), any());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"3, 300, 399", "4, 400, 499", "5, 500, 599"})
+    @DisplayName("세션 후보는 고른 층 호실 학생의 템플릿만 읽어 AI에 보낸다")
+    void candidatesAreLimitedToChosenFloor(int floor, int firstRoom, int lastRoom) throws Exception {
+        FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
+        given(templateRepository.findAllEligibleInRooms(firstRoom, lastRoom)).willReturn(List.of(template));
+
+        var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, floor);
+
+        verify(templateRepository).findAllEligibleInRooms(firstRoom, lastRoom);
+        verify(templateRepository, never()).findAllEligible();
+        ArgumentCaptor<AiFaceSessionRequest> request = ArgumentCaptor.forClass(AiFaceSessionRequest.class);
+        verify(aiFaceClient).createSession(eq(response.sessionId()), request.capture());
+        assertThat(request.getValue().candidates()).extracting(AiFaceCandidate::studentId)
+                .containsExactly(DATAGSM_STUDENT_ID.toString());
+    }
+
     @Test
     @DisplayName("후보 상한을 따로 정하지 않으면 기본 200명이다")
     void defaultMaximumIs200() {
