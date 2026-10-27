@@ -2,6 +2,7 @@ package com.checkup.checkup.domain.face.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -672,5 +673,22 @@ class FaceRecognitionServiceTest {
         return new AiFaceFrameResponse.FaceResult("track-1", List.of(0.1, 0.2, 0.3, 0.4),
                 List.of(List.of(0.2, 0.3)), new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
                 new AiFaceFrameResponse.Recognition(status, studentId, 0.91, 0.12), 0, false);
+    }
+
+    @Test
+    @DisplayName("유휴 시간 안에 활동한 세션만 찾도록 기준 시각을 넘긴다")
+    void acceptingUsesIdleCutoff() {
+        given(sessionStore.existsActiveOnFloor(AttendancePurpose.DORMITORY, 3, NOW.minus(Duration.ofMinutes(5))))
+                .willReturn(true);
+
+        assertThat(service.isAccepting(AttendancePurpose.DORMITORY, 3)).isTrue();
+    }
+
+    @Test
+    @DisplayName("호실이 없어 층이 없으면 얼굴 출석을 받지 않는다")
+    void notAcceptingWithoutFloor() {
+        assertThat(service.isAccepting(AttendancePurpose.DORMITORY, null)).isFalse();
+
+        verify(sessionStore, never()).existsActiveOnFloor(any(), anyInt(), any());
     }
 }

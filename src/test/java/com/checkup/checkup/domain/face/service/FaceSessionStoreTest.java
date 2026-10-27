@@ -27,7 +27,7 @@ import com.checkup.checkup.global.exception.ErrorCode;
 
 /**
  * 실제 PostgreSQL에서 얼굴 인식 세션 저장이 후보 학생을 한 번에 저장하고,
- * 저장되지 않은 학생이 섞이면 세션째 취소되는지 검증한다(#216).
+ * 저장되지 않은 학생이 섞이면 세션째 취소되는지, 용도·층별 활성 세션을 찾는지 검증한다(#216, #260).
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -105,5 +105,34 @@ class FaceSessionStoreTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM face_recognition_session_candidate WHERE session_id = ?",
                 Integer.class, sessionId)).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 용도·층의 활성 세션만 찾고 층 없는 세션은 모든 층으로 센다")
+    void findsActiveSessionByPurposeAndFloor() {
+        Instant recent = Instant.parse("2100-01-01T00:10:00Z");
+        Instant cutoff = Instant.parse("2100-01-01T00:05:00Z");
+        sessionStore.create(UUID.randomUUID(), adminMemberId, AttendancePurpose.DORMITORY, 3, studentIds, recent, recent);
+
+        assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.DORMITORY, 3, cutoff)).isTrue();
+        assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.DORMITORY, 4, cutoff)).isFalse();
+        assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.STUDY_ROOM, 3, cutoff)).isFalse();
+
+        sessionStore.create(UUID.randomUUID(), adminMemberId, AttendancePurpose.STUDY_ROOM, null, studentIds, recent, recent);
+
+        assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.STUDY_ROOM, 5, cutoff)).isTrue();
+    }
+
+    @Test
+    @DisplayName("유휴 시간이 지났거나 닫힌 세션은 찾지 않는다")
+    void ignoresIdleOrClosedSession() {
+        Instant cutoff = Instant.parse("2100-01-01T00:05:00Z");
+        sessionStore.create(UUID.randomUUID(), adminMemberId, AttendancePurpose.DORMITORY, 3, studentIds, cutoff, cutoff);
+        UUID closed = UUID.randomUUID();
+        Instant recent = Instant.parse("2100-01-01T00:10:00Z");
+        sessionStore.create(closed, adminMemberId, AttendancePurpose.DORMITORY, 3, studentIds, recent, recent);
+        sessionStore.markInactive(closed, adminMemberId);
+
+        assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.DORMITORY, 3, cutoff)).isFalse();
     }
 }
