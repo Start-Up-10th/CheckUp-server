@@ -316,6 +316,20 @@ public class FaceRecognitionService {
     }
 
     /**
+     * 그 층 학생을 지금 얼굴로 출석 받는 세션이 있는지 확인한다. 유휴 시간이 지난 세션은 정리 전이어도 세지 않는다.
+     * 층이 없는(호실 미배정) 학생은 어느 카메라의 후보도 아니므로 false다.
+     *
+     * @param floor 학생 호실의 층. 호실이 없으면 null
+     */
+    public boolean isAccepting(AttendancePurpose purpose, Integer floor) {
+        if (floor == null) {
+            return false;
+        }
+        Instant cutoff = clock.instant().minus(properties.sessionIdleTimeout());
+        return faceSessionStore.existsActiveOnFloor(purpose, floor, cutoff);
+    }
+
+    /**
      * 유휴 시간이 지났고 처리 중인 프레임이 없는 세션을 닫는다. 정리 작업이 주기적으로 부른다.
      * AI 쪽 삭제가 실패해 비활성 상태로 남은 세션도 여기서 다시 정리한다.
      */

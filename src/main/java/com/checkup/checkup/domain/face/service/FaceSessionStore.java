@@ -44,6 +44,16 @@ public class FaceSessionStore {
     }
 
     /**
+     * 그 용도·층을 맡은 활성 세션이 하나라도 있는지 확인한다. 층 도입 전에 만든 층 없는 세션은 모든 층으로 센다.
+     *
+     * @param cutoff 이 시각 이후에 활동이 있어야 살아 있는 세션으로 본다
+     */
+    @Transactional(readOnly = true)
+    public boolean existsActiveOnFloor(AttendancePurpose purpose, int floor, Instant cutoff) {
+        return sessionRepository.existsActiveOnFloor(purpose, floor, cutoff);
+    }
+
+    /**
      * 관리자 본인의 활성 세션을 후보 학생 id와 함께 읽는다.
      *
      * @throws CustomException 세션이 없거나, 다른 관리자의 세션이거나, 이미 닫혔으면 {@link ErrorCode#FACE_SESSION_NOT_FOUND}(404)
