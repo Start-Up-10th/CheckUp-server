@@ -557,6 +557,25 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
+    @DisplayName("다른 층 학생도 실패가 쌓여 AI가 QR을 안내하면 QR 안내를 그대로 띄우고 실패로 남긴다")
+    void otherFloorStudentKeepsQrRecommendation() {
+        FaceSessionView session = givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
+                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
+                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 3, true))));
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+
+        var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst();
+
+        assertThat(face.recognition().status()).isEqualTo("UNKNOWN");
+        assertThat(face.qrRecommended()).isTrue();
+        verify(logService).record(session, "track-1", FaceRecognitionResult.FAILED, null, NOW);
+        verifyNoInteractions(attendanceService);
+    }
+
+    @Test
     @DisplayName("층 도입 전에 만든 세션은 층을 따지지 않고 KNOWN으로 출석 처리한다")
     void sessionWithoutFloorIgnoresStudentFloor() {
         FaceSessionView legacy = new FaceSessionView(SESSION_ID, ADMIN_ID, AttendancePurpose.DORMITORY, null,
