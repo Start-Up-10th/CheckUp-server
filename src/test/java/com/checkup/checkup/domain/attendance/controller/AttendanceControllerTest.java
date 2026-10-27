@@ -7,7 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.checkup.checkup.domain.attendance.dto.response.AttendanceActiveResponse;
 import com.checkup.checkup.domain.attendance.dto.response.MyAttendanceResponse;
+import com.checkup.checkup.domain.attendance.service.AttendanceActiveService;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
@@ -28,7 +30,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * 본인 출석 조회 API가 로그인한 회원 id로 서비스를 부르고, 용도별 출석 상태를 JSON 필드로 응답하며
- * 미로그인·학생 아님 오류를 공통 형식으로 돌려주는지 검증한다.
+ * 미로그인·학생 아님 오류를 공통 형식으로 돌려주는지 검증한다. 지금 출석을 받는 중인지 조회도 함께 검증한다(#260).
  */
 @WebMvcTest(AttendanceController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
@@ -36,12 +38,16 @@ class AttendanceControllerTest {
 
     private static final Long MEMBER_ID = 1L;
     private static final String ME = "/api/v1/attendance/me";
+    private static final String ACTIVE = "/api/v1/attendance/active";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
     private AttendanceService attendanceService;
+
+    @MockitoBean
+    private AttendanceActiveService attendanceActiveService;
 
     @Test
     @DisplayName("본인의 오늘 출석 상태를 운영일과 용도별 상태로 반환한다")
@@ -78,6 +84,38 @@ class AttendanceControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(attendanceService);
+    }
+
+    @Test
+    @DisplayName("용도별로 지금 출석을 받는 중인지만 반환한다")
+    void returnsActiveByPurpose() throws Exception {
+        given(attendanceActiveService.getActive(MEMBER_ID)).willReturn(new AttendanceActiveResponse(true, false));
+
+        mockMvc.perform(get(ACTIVE).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dormitory").value(true))
+                .andExpect(jsonPath("$.studyRoom").value(false))
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("학생이 아니면 출석 접수 여부 조회도 403 MISSING_STUDENT_INFO를 반환한다")
+    void activeForNonStudentReturnsForbidden() throws Exception {
+        given(attendanceActiveService.getActive(MEMBER_ID))
+                .willThrow(new CustomException(ErrorCode.MISSING_STUDENT_INFO));
+
+        mockMvc.perform(get(ACTIVE).with(loginAs(MEMBER_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MISSING_STUDENT_INFO"));
+    }
+
+    @Test
+    @DisplayName("미인증 요청은 출석 접수 여부를 조회하지 않고 401을 반환한다")
+    void activeWithoutLoginReturnsUnauthorized() throws Exception {
+        mockMvc.perform(get(ACTIVE))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(attendanceActiveService);
     }
 
     private static RequestPostProcessor loginAs(Long memberId) {
