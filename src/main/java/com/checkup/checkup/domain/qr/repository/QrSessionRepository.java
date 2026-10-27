@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
  * - {@code qr:session:{id}}: 세션 해시
  * - {@code qr:token:{token}}: 토큰 해시(세션 ID, 만료 시각)
  * - {@code qr:admin:{adminId}}: 관리자가 만든 세션 ID 집합
+ * - {@code qr:purpose:{purpose}}: 용도별 세션 ID와 lease 만료 시각(epoch ms)의 정렬 집합. 학생에게 지금 출석을 받는지 알려 줄 때 쓴다
  *
  * 키가 TTL보다 먼저 사라지면 세션은 종료된 것으로, 토큰은 발급하지 않은 것으로 판정되므로
  * Redis는 메모리 축출이 없는 {@code maxmemory-policy noeviction}으로 운영한다.
@@ -37,17 +38,21 @@ public class QrSessionRepository {
     private static final String SESSION_KEY = "qr:session:";
     private static final String TOKEN_KEY = "qr:token:";
     private static final String ADMIN_KEY = "qr:admin:";
+    private static final String PURPOSE_KEY = "qr:purpose:";
 
     private static final RedisScript<Long> SAVE_IF_PRESENT = new DefaultRedisScript<>("""
             if redis.call('EXISTS', KEYS[1]) == 0 then
                 return 0
             end
-            for i = 3, #ARGV, 2 do
+            for i = 4, #ARGV, 2 do
                 redis.call('HSET', KEYS[1], ARGV[i], ARGV[i + 1])
             end
             redis.call('PEXPIRE', KEYS[1], ARGV[1])
             redis.call('SADD', KEYS[2], ARGV[2])
             redis.call('PEXPIRE', KEYS[2], ARGV[1])
+            redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', '(' .. (tonumber(ARGV[3]) - tonumber(ARGV[1])))
+            redis.call('ZADD', KEYS[3], ARGV[3], ARGV[2])
+            redis.call('PEXPIRE', KEYS[3], ARGV[1])
             return 1
             """, Long.class);
 
@@ -90,6 +95,10 @@ public class QrSessionRepository {
         String adminKey = ADMIN_KEY + session.adminId();
         redisTemplate.opsForSet().add(adminKey, session.id());
         redisTemplate.expire(adminKey, ttl);
+
+        String purposeKey = PURPOSE_KEY + session.purpose();
+        redisTemplate.opsForZSet().add(purposeKey, session.id(), session.leaseExpiresAt().toEpochMilli());
+        redisTemplate.expire(purposeKey, ttl);
     }
 
     /**
@@ -104,13 +113,14 @@ public class QrSessionRepository {
         List<String> args = new ArrayList<>();
         args.add(String.valueOf(ttl.toMillis()));
         args.add(session.id());
+        args.add(String.valueOf(session.leaseExpiresAt().toEpochMilli()));
         fields.forEach((field, value) -> {
             args.add(field);
             args.add(value);
         });
         Long saved = redisTemplate.execute(
                 SAVE_IF_PRESENT,
-                List.of(SESSION_KEY + session.id(), ADMIN_KEY + session.adminId()),
+                List.of(SESSION_KEY + session.id(), ADMIN_KEY + session.adminId(), PURPOSE_KEY + session.purpose()),
                 args.toArray()
         );
         return Long.valueOf(1).equals(saved);
@@ -155,6 +165,17 @@ public class QrSessionRepository {
     public void delete(QrSession session) {
         redisTemplate.delete(SESSION_KEY + session.id());
         redisTemplate.opsForSet().remove(ADMIN_KEY + session.adminId(), session.id());
+        redisTemplate.opsForZSet().remove(PURPOSE_KEY + session.purpose(), session.id());
+    }
+
+    /**
+     * 주어진 시각에 lease가 남은 그 용도의 세션이 하나라도 있는지 확인한다.
+     * 어느 관리자의 세션인지는 보지 않는다. 종료한 세션은 집합에서 빠지고, lease가 지난 세션은 점수로 걸러진다.
+     */
+    public boolean existsActiveByPurpose(AttendancePurpose purpose, Instant now) {
+        Long count = redisTemplate.opsForZSet().count(
+                PURPOSE_KEY + purpose, now.toEpochMilli() + 1, Double.POSITIVE_INFINITY);
+        return count != null && count > 0;
     }
 
     /**

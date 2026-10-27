@@ -98,6 +98,13 @@ public class QrSessionService {
                 .forEach(sessionId -> close(adminId, sessionId));
     }
 
+    /**
+     * 그 용도의 QR 세션이 하나라도 살아 있는지 확인한다. 어느 관리자의 세션인지는 묻지 않는다.
+     */
+    public boolean isAccepting(AttendancePurpose purpose) {
+        return qrSessionRepository.existsActiveByPurpose(purpose, clock.instant());
+    }
+
     private boolean needsRotation(QrSession session, Instant now) {
         if (!session.operatingDay().equals(operatingDayCalculator.today())) {
             return true;
