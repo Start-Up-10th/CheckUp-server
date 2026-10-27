@@ -292,7 +292,7 @@ class FaceRecognitionServiceTest {
         given(template.getDimension()).willReturn(256);
         given(template.getNormalization()).willReturn("l2");
         given(template.getVectorsJson()).willReturn(toVectorsJson());
-        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of(template));
         FaceSessionView pending = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwnedIfPresent(any(), eq(ADMIN_ID))).willReturn(java.util.Optional.of(pending));
         org.mockito.BDDMockito.willThrow(new AiFaceException(503, "session_create", "unavailable"))
@@ -326,7 +326,7 @@ class FaceRecognitionServiceTest {
                 tools.jackson.databind.json.JsonMapper.builder().build(), clock);
         FaceTemplate first = eligibleTemplate(1L);
         FaceTemplate second = eligibleTemplate(2L);
-        given(templateRepository.findAllEligible()).willReturn(List.of(first, second));
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of(first, second));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
                 com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
@@ -341,7 +341,7 @@ class FaceRecognitionServiceTest {
     @Test
     @DisplayName("출석 대상 템플릿이 없으면 세션을 만들지 않고 409 FACE_NO_ENROLLED_STUDENTS다")
     void noEligibleTemplateIsRejected() {
-        given(templateRepository.findAllEligible()).willReturn(List.of());
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
                 com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
@@ -371,7 +371,7 @@ class FaceRecognitionServiceTest {
     @DisplayName("세션을 만들면 요청한 층을 저장하고 응답에 돌려준다")
     void createdSessionKeepsFloor() throws Exception {
         FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
-        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+        given(templateRepository.findAllEligibleInRooms(400, 499)).willReturn(List.of(template));
 
         var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, 4);
 
@@ -379,6 +379,22 @@ class FaceRecognitionServiceTest {
         assertThat(response.status()).isEqualTo("ACTIVE");
         verify(sessionStore).create(eq(response.sessionId()), eq(ADMIN_ID), eq(AttendancePurpose.DORMITORY), eq(4),
                 eq(List.of(STUDENT_DB_ID)), any(), any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"3, 300, 399", "4, 400, 499", "5, 500, 599"})
+    @DisplayName("세션 후보는 고른 층 호실 학생의 템플릿만 읽어 AI에 보낸다")
+    void candidatesAreLimitedToChosenFloor(int floor, int firstRoom, int lastRoom) throws Exception {
+        FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
+        given(templateRepository.findAllEligibleInRooms(firstRoom, lastRoom)).willReturn(List.of(template));
+
+        var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, floor);
+
+        verify(templateRepository).findAllEligibleInRooms(firstRoom, lastRoom);
+        ArgumentCaptor<AiFaceSessionRequest> request = ArgumentCaptor.forClass(AiFaceSessionRequest.class);
+        verify(aiFaceClient).createSession(eq(response.sessionId()), request.capture());
+        assertThat(request.getValue().candidates()).extracting(AiFaceCandidate::studentId)
+                .containsExactly(DATAGSM_STUDENT_ID.toString());
     }
 
     @Test
@@ -524,24 +540,39 @@ class FaceRecognitionServiceTest {
     }
 
     @Test
-    @DisplayName("세션 층이 아닌 학생은 이름·학번·출석 없이 OTHER_FLOOR이고 QR 안내와 최근 인식을 남기지 않는다")
-    void otherFloorStudentIsReportedWithoutIdentity() {
-        givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
-                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
-                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
-                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 0, true))));
+    @DisplayName("세션 뒤 다른 층으로 옮긴 학생은 이름·학번·출석 없이 UNKNOWN이고 출석 처리하지 않는다")
+    void studentMovedToOtherFloorIsUnknown() {
+        givenFrame(frame("KNOWN", DATAGSM_STUDENT_ID.toString()));
         givenEligibleStudent();
         given(eligibleStudent.getDormitoryFloor()).willReturn(5);
 
         var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
                 .faces().getFirst();
 
-        assertThat(face.recognition().status()).isEqualTo("OTHER_FLOOR");
+        assertThat(face.recognition().status()).isEqualTo("UNKNOWN");
         assertThat(face.recognition().studentName()).isNull();
         assertThat(face.recognition().studentNumber()).isNull();
         assertThat(face.recognition().attendance()).isNull();
-        assertThat(face.qrRecommended()).isFalse();
-        verifyNoInteractions(attendanceService, logService);
+        verifyNoInteractions(attendanceService);
+    }
+
+    @Test
+    @DisplayName("다른 층 학생도 실패가 쌓여 AI가 QR을 안내하면 QR 안내를 그대로 띄우고 실패로 남긴다")
+    void otherFloorStudentKeepsQrRecommendation() {
+        FaceSessionView session = givenFrame(new AiFaceFrameResponse("frame-1", List.of(new AiFaceFrameResponse.FaceResult(
+                "track-1", List.of(0.1, 0.2, 0.3, 0.4), List.of(List.of(0.2, 0.3)),
+                new AiFaceFrameResponse.Quality(0.8, 0.7, List.of()),
+                new AiFaceFrameResponse.Recognition("KNOWN", DATAGSM_STUDENT_ID.toString(), 0.91, 0.12), 3, true))));
+        givenEligibleStudent();
+        given(eligibleStudent.getDormitoryFloor()).willReturn(5);
+
+        var face = service.recognize(ADMIN_ID, SESSION_ID, "frame-1", "image/jpeg", new byte[]{1, 2})
+                .faces().getFirst();
+
+        assertThat(face.recognition().status()).isEqualTo("UNKNOWN");
+        assertThat(face.qrRecommended()).isTrue();
+        verify(logService).record(session, "track-1", FaceRecognitionResult.FAILED, null, NOW);
+        verifyNoInteractions(attendanceService);
     }
 
     @Test
