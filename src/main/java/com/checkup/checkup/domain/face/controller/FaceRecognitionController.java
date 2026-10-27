@@ -32,7 +32,7 @@ public class FaceRecognitionController {
     private final FaceRecognitionService faceRecognitionService;
 
     /** 관리자 카메라 페이지마다 새 얼굴 인식 세션을 만든다. */
-    @Operation(summary = "얼굴 인식 세션 생성", description = "카메라 페이지·층마다 새 세션을 만든다. floor는 3, 4, 5 중 하나이고 다른 값이면 400 INVALID_FLOOR다. 성공 201.")
+    @Operation(summary = "얼굴 인식 세션 생성", description = "카메라 페이지·층마다 새 세션을 만든다. floor는 3, 4, 5 중 하나이고 다른 값이면 400 INVALID_FLOOR다. 후보는 그 층 호실의 출석 대상 학생뿐이라 다른 층 학생은 UNKNOWN으로 인식 실패다. 그 층에 얼굴을 등록한 출석 대상 학생이 없으면 409 FACE_NO_ENROLLED_STUDENTS다. 성공 201.")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public FaceSessionResponse create(
