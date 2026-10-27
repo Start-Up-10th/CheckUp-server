@@ -73,6 +73,23 @@ class FaceTemplateRepositoryTest {
     }
 
     @Test
+    @DisplayName("호실 범위로 읽으면 그 범위 층의 출석 대상 학생 템플릿만 읽는다")
+    void findAllEligibleInRoomsReturnsOnlyStudentsOnFloor() {
+        Long fourthFloorId = saveWithTemplate(eligible(94_008L, 401));
+        Long fifthFloorId = saveWithTemplate(eligible(94_009L, 501));
+
+        assertThat(repository.findAllEligibleInRooms(300, 399))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(eligibleId, otherEligibleId);
+        assertThat(repository.findAllEligibleInRooms(400, 499))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(fourthFloorId);
+        assertThat(repository.findAllEligibleInRooms(500, 599))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(fifthFloorId);
+    }
+
+    @Test
     @DisplayName("주어진 학생 중에서도 출석 대상이 아닌 학생의 템플릿은 빠진다")
     void findAllEligibleByStudentIdInSkipsIneligibleStudents() {
         List<Long> requested = List.of(eligibleId, noConsentId, noFaceConsentId, noPrivacyConsentId,
