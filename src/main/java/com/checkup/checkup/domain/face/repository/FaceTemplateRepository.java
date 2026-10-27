@@ -37,6 +37,19 @@ public interface FaceTemplateRepository extends JpaRepository<FaceTemplate, Long
     List<FaceTemplate> findAllEligible();
 
     /**
+     * 호실 번호가 {@code firstRoom}~{@code lastRoom}인 출석 대상 학생의 템플릿만 학생 id 순으로 읽는다.
+     * 얼굴 인식 세션을 만들 때 고른 층 학생만 후보로 쓰려고 부른다(#256). 출석 대상 조건은 {@link #findAllEligible()}와 같다.
+     */
+    @Query("""
+        SELECT template FROM FaceTemplate template JOIN FETCH template.student student
+        WHERE student.dormitoryRoom BETWEEN :firstRoom AND :lastRoom
+          AND student.privacyAgreedAt IS NOT NULL AND student.faceAgreedAt IS NOT NULL
+          AND student.datagsmStudentId > 0
+        ORDER BY student.id
+        """)
+    List<FaceTemplate> findAllEligibleInRooms(@Param("firstRoom") int firstRoom, @Param("lastRoom") int lastRoom);
+
+    /**
      * 주어진 학생 중 출석 대상인 학생의 템플릿만 읽는다. AI 세션을 다시 만들 때 쓴다.
      * 조건은 {@link #findAllEligible()}와 같다.
      */
