@@ -48,6 +48,7 @@ public class FaceRecognitionService {
     private static final int VECTOR_DIMENSION = 256;
     private static final int MAX_TEMPLATE_REFRESH_ATTEMPTS = 3;
     private static final Set<Integer> CAMERA_FLOORS = Set.of(3, 4, 5);
+    private static final int ROOMS_PER_FLOOR = 100;
 
     private final FaceTemplateRepository faceTemplateRepository;
     private final FaceSessionStore faceSessionStore;
@@ -87,8 +88,8 @@ public class FaceRecognitionService {
     }
 
     /**
-     * 관리자 카메라 페이지의 얼굴 인식 세션을 만든다. 출석 대상(필수 동의·호실)이고 얼굴을 등록한 학생이 후보다.
-     * 후보는 층과 상관없이 전체 출석 대상이다. 다른 층 학생을 이 층 학생으로 잘못 맞히지 않고 {@code OTHER_FLOOR}로 알리기 위해서다(#253).
+     * 관리자 카메라 페이지의 얼굴 인식 세션을 만든다. 고른 층의 출석 대상(필수 동의·호실)이고 얼굴을 등록한 학생이 후보다.
+     * 층 학생만 비교해 인식을 빠르게 한다. 다른 층 학생은 후보에 없으므로 인식 실패로 처리된다(#256).
      * 같은 관리자의 다른 세션과 겹쳐도 거부하지 않는다. 층을 바꾸면 웹이 이전 세션을 닫고 새로 만든다.
      *
      * @param adminMemberId 세션의 관리자 회원 id
@@ -97,8 +98,8 @@ public class FaceRecognitionService {
      * @return 새 세션 id와 용도·층
      * @throws CustomException 층이 없거나 3·4·5가 아니면 {@link ErrorCode#INVALID_FLOOR}(400),
      *                         관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
-     *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
-     *                         후보가 설정된 최대(기본 200명)를 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
+     *                         그 층에 후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
+     *                         층 후보가 설정된 최대(기본 200명)를 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
      *                         저장된 템플릿의 모델이 서로 다르거나 벡터가 깨졌으면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
      *                         AI 서버 오류는 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
      *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_AI_UNAVAILABLE}(503),
@@ -109,7 +110,7 @@ public class FaceRecognitionService {
         if (floor == null || !CAMERA_FLOORS.contains(floor)) {
             throw new CustomException(ErrorCode.INVALID_FLOOR);
         }
-        List<FaceTemplate> templates = eligibleTemplates();
+        List<FaceTemplate> templates = eligibleTemplates(floor);
         if (templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
@@ -140,7 +141,7 @@ public class FaceRecognitionService {
     /**
      * 카메라 프레임 한 장에서 얼굴을 인식하고, 현재 세션 후보로 확인된 학생을 출석 처리한다.
      * AI가 후보 밖의 학생을 지목하면 출석으로 인정하지 않고 {@code UNKNOWN}으로 낮춘다. 결과는 최근 인식 기록에도 남긴다(#143).
-     * 세션 층이 아닌 학생은 이름·학번·출석 없이 {@code OTHER_FLOOR}로 알린다(#253).
+     * 세션을 만든 뒤 다른 층으로 옮긴 학생도 후보 밖과 같이 {@code UNKNOWN}으로 처리한다(#256).
      * 프레임 이미지는 처리 뒤 메모리에서 지우고 저장하지 않는다.
      *
      * @param frameIdHeader 프레임 id(선택, 최대 128자). 없으면 새로 만든다
@@ -346,13 +347,9 @@ public class FaceRecognitionService {
                     : studentRepository.findByDatagsmStudentId(dataGsmStudentId);
             boolean candidate = student.isPresent()
                     && session.candidateStudentIds().contains(student.get().getId())
-                    && student.get().isAttendanceEligible();
-            if (candidate && isOtherFloor(session, student.get())) {
-                // 다른 층 학생은 이 카메라 화면에 신원을 보이지 않고 출석·최근 인식에도 남기지 않는다(#253).
-                // 층을 잘못 찾은 학생에게 QR 안내는 도움이 안 되므로 띄우지 않는다.
-                status = "OTHER_FLOOR";
-                qrRecommended = false;
-            } else if (candidate) {
+                    && student.get().isAttendanceEligible()
+                    && onSessionFloor(session, student.get());
+            if (candidate) {
                 studentName = student.get().getName();
                 studentNumber = student.get().getStudentNumber();
                 AttendanceRecordResult recorded = attendanceService.markAttendedFor(
@@ -368,7 +365,7 @@ public class FaceRecognitionService {
                     }
                 }
             } else {
-                // Spring이 관리하는 현재 세션 후보 목록 밖의 학생을 AI가 지목해도 절대 출석으로 인정하지 않는다.
+                // Spring이 관리하는 현재 세션 후보 목록 밖이거나 다른 층 학생을 AI가 지목해도 절대 출석으로 인정하지 않는다.
                 status = "UNKNOWN";
             }
         }
@@ -385,8 +382,8 @@ public class FaceRecognitionService {
     }
 
     /** 층 도입 전에 만든 세션(층 null)은 층을 따지지 않는다. */
-    private static boolean isOtherFloor(FaceSessionView session, Student student) {
-        return session.floor() != null && !session.floor().equals(student.getDormitoryFloor());
+    private static boolean onSessionFloor(FaceSessionView session, Student student) {
+        return session.floor() == null || session.floor().equals(student.getDormitoryFloor());
     }
 
     /**
@@ -453,8 +450,9 @@ public class FaceRecognitionService {
         }
     }
 
-    private List<FaceTemplate> eligibleTemplates() {
-        return faceTemplateRepository.findAllEligible();
+    private List<FaceTemplate> eligibleTemplates(int floor) {
+        return faceTemplateRepository.findAllEligibleInRooms(floor * ROOMS_PER_FLOOR,
+                floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1);
     }
 
     private AiFaceSessionRequest sessionRequest(List<FaceTemplate> templates) {

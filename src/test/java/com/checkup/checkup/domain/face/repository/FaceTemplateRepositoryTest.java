@@ -65,11 +65,28 @@ class FaceTemplateRepositoryTest {
 
     @Test
     @DisplayName("동의 2종·호실·DataGSM 학생 id가 모두 있는 학생의 템플릿만 학생 id 순으로 읽는다")
-    void findAllEligibleReturnsOnlyAttendanceEligibleStudents() {
-        List<FaceTemplate> templates = repository.findAllEligible();
+    void findAllEligibleInRoomsReturnsOnlyAttendanceEligibleStudents() {
+        List<FaceTemplate> templates = repository.findAllEligibleInRooms(300, 399);
 
         assertThat(templates).extracting(template -> template.getStudent().getId())
                 .containsExactly(eligibleId, otherEligibleId);
+    }
+
+    @Test
+    @DisplayName("호실 범위로 읽으면 그 범위 층의 출석 대상 학생 템플릿만 읽는다")
+    void findAllEligibleInRoomsReturnsOnlyStudentsOnFloor() {
+        Long fourthFloorId = saveWithTemplate(eligible(94_008L, 401));
+        Long fifthFloorId = saveWithTemplate(eligible(94_009L, 501));
+
+        assertThat(repository.findAllEligibleInRooms(300, 399))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(eligibleId, otherEligibleId);
+        assertThat(repository.findAllEligibleInRooms(400, 499))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(fourthFloorId);
+        assertThat(repository.findAllEligibleInRooms(500, 599))
+                .extracting(template -> template.getStudent().getId())
+                .containsExactly(fifthFloorId);
     }
 
     @Test
@@ -87,7 +104,7 @@ class FaceTemplateRepositoryTest {
     @Test
     @DisplayName("쿼리 결과는 Student.isAttendanceEligible()과 같은 판단이다")
     void queryMatchesEntityRule() {
-        List<FaceTemplate> templates = repository.findAllEligible();
+        List<FaceTemplate> templates = repository.findAllEligibleInRooms(300, 399);
 
         assertThat(templates).allSatisfy(template -> {
             assertThat(template.getStudent().isAttendanceEligible()).isTrue();
