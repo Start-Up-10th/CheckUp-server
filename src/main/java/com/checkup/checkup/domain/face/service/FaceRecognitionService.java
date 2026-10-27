@@ -48,6 +48,7 @@ public class FaceRecognitionService {
     private static final int VECTOR_DIMENSION = 256;
     private static final int MAX_TEMPLATE_REFRESH_ATTEMPTS = 3;
     private static final Set<Integer> CAMERA_FLOORS = Set.of(3, 4, 5);
+    private static final int ROOMS_PER_FLOOR = 100;
 
     private final FaceTemplateRepository faceTemplateRepository;
     private final FaceSessionStore faceSessionStore;
@@ -87,8 +88,8 @@ public class FaceRecognitionService {
     }
 
     /**
-     * 관리자 카메라 페이지의 얼굴 인식 세션을 만든다. 출석 대상(필수 동의·호실)이고 얼굴을 등록한 학생이 후보다.
-     * 후보는 층과 상관없이 전체 출석 대상이다. 다른 층 학생을 이 층 학생으로 잘못 맞히지 않고 {@code OTHER_FLOOR}로 알리기 위해서다(#253).
+     * 관리자 카메라 페이지의 얼굴 인식 세션을 만든다. 고른 층의 출석 대상(필수 동의·호실)이고 얼굴을 등록한 학생이 후보다.
+     * 층 학생만 비교해 인식을 빠르게 한다. 다른 층 학생은 후보에 없으므로 인식 실패로 처리된다(#256).
      * 같은 관리자의 다른 세션과 겹쳐도 거부하지 않는다. 층을 바꾸면 웹이 이전 세션을 닫고 새로 만든다.
      *
      * @param adminMemberId 세션의 관리자 회원 id
@@ -97,8 +98,8 @@ public class FaceRecognitionService {
      * @return 새 세션 id와 용도·층
      * @throws CustomException 층이 없거나 3·4·5가 아니면 {@link ErrorCode#INVALID_FLOOR}(400),
      *                         관리자가 아니면 {@link ErrorCode#ADMIN_ONLY}(403),
-     *                         후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
-     *                         후보가 설정된 최대(기본 200명)를 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
+     *                         그 층에 후보 학생이 없으면 {@link ErrorCode#FACE_NO_ENROLLED_STUDENTS}(409),
+     *                         층 후보가 설정된 최대(기본 200명)를 넘으면 {@link ErrorCode#FACE_TOO_MANY_CANDIDATES}(422),
      *                         저장된 템플릿의 모델이 서로 다르거나 벡터가 깨졌으면 {@link ErrorCode#FACE_AI_BAD_GATEWAY}(502).
      *                         AI 서버 오류는 {@link com.checkup.checkup.domain.face.ai.AiFaceException}으로 던지고
      *                         {@code GlobalExceptionHandler}가 {@link ErrorCode#FACE_AI_UNAVAILABLE}(503),
@@ -109,7 +110,7 @@ public class FaceRecognitionService {
         if (floor == null || !CAMERA_FLOORS.contains(floor)) {
             throw new CustomException(ErrorCode.INVALID_FLOOR);
         }
-        List<FaceTemplate> templates = eligibleTemplates();
+        List<FaceTemplate> templates = eligibleTemplates(floor);
         if (templates.isEmpty()) {
             throw new CustomException(ErrorCode.FACE_NO_ENROLLED_STUDENTS);
         }
@@ -453,8 +454,9 @@ public class FaceRecognitionService {
         }
     }
 
-    private List<FaceTemplate> eligibleTemplates() {
-        return faceTemplateRepository.findAllEligible();
+    private List<FaceTemplate> eligibleTemplates(int floor) {
+        return faceTemplateRepository.findAllEligibleInRooms(floor * ROOMS_PER_FLOOR,
+                floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1);
     }
 
     private AiFaceSessionRequest sessionRequest(List<FaceTemplate> templates) {

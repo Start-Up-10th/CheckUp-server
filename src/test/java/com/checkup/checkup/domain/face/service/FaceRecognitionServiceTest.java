@@ -292,7 +292,7 @@ class FaceRecognitionServiceTest {
         given(template.getDimension()).willReturn(256);
         given(template.getNormalization()).willReturn("l2");
         given(template.getVectorsJson()).willReturn(toVectorsJson());
-        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of(template));
         FaceSessionView pending = session(Set.of(STUDENT_DB_ID));
         given(sessionStore.findOwnedIfPresent(any(), eq(ADMIN_ID))).willReturn(java.util.Optional.of(pending));
         org.mockito.BDDMockito.willThrow(new AiFaceException(503, "session_create", "unavailable"))
@@ -326,7 +326,7 @@ class FaceRecognitionServiceTest {
                 tools.jackson.databind.json.JsonMapper.builder().build(), clock);
         FaceTemplate first = eligibleTemplate(1L);
         FaceTemplate second = eligibleTemplate(2L);
-        given(templateRepository.findAllEligible()).willReturn(List.of(first, second));
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of(first, second));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> limitedService.create(ADMIN_ID,
                 com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
@@ -341,7 +341,7 @@ class FaceRecognitionServiceTest {
     @Test
     @DisplayName("출석 대상 템플릿이 없으면 세션을 만들지 않고 409 FACE_NO_ENROLLED_STUDENTS다")
     void noEligibleTemplateIsRejected() {
-        given(templateRepository.findAllEligible()).willReturn(List.of());
+        given(templateRepository.findAllEligibleInRooms(300, 399)).willReturn(List.of());
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.create(ADMIN_ID,
                 com.checkup.checkup.domain.attendance.entity.AttendancePurpose.DORMITORY, 3))
@@ -371,7 +371,7 @@ class FaceRecognitionServiceTest {
     @DisplayName("세션을 만들면 요청한 층을 저장하고 응답에 돌려준다")
     void createdSessionKeepsFloor() throws Exception {
         FaceTemplate template = versionedTemplate(STUDENT_DB_ID, DATAGSM_STUDENT_ID, 0L, vectorJson(0));
-        given(templateRepository.findAllEligible()).willReturn(List.of(template));
+        given(templateRepository.findAllEligibleInRooms(400, 499)).willReturn(List.of(template));
 
         var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, 4);
 
