@@ -391,7 +391,6 @@ class FaceRecognitionServiceTest {
         var response = service.create(ADMIN_ID, AttendancePurpose.DORMITORY, floor);
 
         verify(templateRepository).findAllEligibleInRooms(firstRoom, lastRoom);
-        verify(templateRepository, never()).findAllEligible();
         ArgumentCaptor<AiFaceSessionRequest> request = ArgumentCaptor.forClass(AiFaceSessionRequest.class);
         verify(aiFaceClient).createSession(eq(response.sessionId()), request.capture());
         assertThat(request.getValue().candidates()).extracting(AiFaceCandidate::studentId)

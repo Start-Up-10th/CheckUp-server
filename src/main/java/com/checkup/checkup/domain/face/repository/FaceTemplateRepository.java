@@ -24,21 +24,10 @@ public interface FaceTemplateRepository extends JpaRepository<FaceTemplate, Long
     void deleteByStudent_Id(Long studentId);
 
     /**
-     * 출석 대상 학생의 템플릿만 학생 id 순으로 읽는다. 얼굴 인식 세션을 만들 때 쓴다.
+     * 호실 번호가 {@code firstRoom}~{@code lastRoom}인 출석 대상 학생의 템플릿만 학생 id 순으로 읽는다.
+     * 얼굴 인식 세션을 만들 때 고른 층 학생만 후보로 쓰려고 부른다(#256).
      * 조건은 {@link com.checkup.checkup.domain.member.entity.Student#isAttendanceEligible()}(동의 2종, 호실)과
      * DataGSM 학생 id가 있는 것이다. 출석 대상 규칙이 바뀌면 이 쿼리와 {@link #findAllEligibleByStudentIdIn}도 같이 바꾼다.
-     */
-    @Query("""
-        SELECT template FROM FaceTemplate template JOIN FETCH template.student student
-        WHERE student.privacyAgreedAt IS NOT NULL AND student.faceAgreedAt IS NOT NULL
-          AND student.dormitoryRoom IS NOT NULL AND student.datagsmStudentId > 0
-        ORDER BY student.id
-        """)
-    List<FaceTemplate> findAllEligible();
-
-    /**
-     * 호실 번호가 {@code firstRoom}~{@code lastRoom}인 출석 대상 학생의 템플릿만 학생 id 순으로 읽는다.
-     * 얼굴 인식 세션을 만들 때 고른 층 학생만 후보로 쓰려고 부른다(#256). 출석 대상 조건은 {@link #findAllEligible()}와 같다.
      */
     @Query("""
         SELECT template FROM FaceTemplate template JOIN FETCH template.student student
@@ -51,7 +40,7 @@ public interface FaceTemplateRepository extends JpaRepository<FaceTemplate, Long
 
     /**
      * 주어진 학생 중 출석 대상인 학생의 템플릿만 읽는다. AI 세션을 다시 만들 때 쓴다.
-     * 조건은 {@link #findAllEligible()}와 같다.
+     * 조건은 {@link #findAllEligibleInRooms}와 같다.
      */
     @Query("""
         SELECT template FROM FaceTemplate template JOIN FETCH template.student student
