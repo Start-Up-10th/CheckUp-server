@@ -123,7 +123,7 @@ public class FaceRecognitionService {
         // AI를 부르기 전에 세션 소유 정보를 먼저 저장한다. 그래야 AI 쪽 정리가 실패해도 다시 시도할 수 있다.
         faceSessionStore.create(sessionId, adminMemberId, purpose, floor,
                 templates.stream().map(template -> template.getStudent().getId()).toList(),
-                now, now.minus(properties.minFrameInterval()));
+                now, now);
         try {
             aiFaceClient.createSession(sessionId, request);
         } catch (RuntimeException e) {
