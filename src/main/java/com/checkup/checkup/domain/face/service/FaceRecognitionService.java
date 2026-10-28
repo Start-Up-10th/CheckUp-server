@@ -123,7 +123,7 @@ public class FaceRecognitionService {
         // AI를 부르기 전에 세션 소유 정보를 먼저 저장한다. 그래야 AI 쪽 정리가 실패해도 다시 시도할 수 있다.
         faceSessionStore.create(sessionId, adminMemberId, purpose, floor,
                 templates.stream().map(template -> template.getStudent().getId()).toList(),
-                now, now.minus(properties.minFrameInterval()));
+                now, now);
         try {
             aiFaceClient.createSession(sessionId, request);
         } catch (RuntimeException e) {
@@ -313,6 +313,20 @@ public class FaceRecognitionService {
             }
         }
         throw new IllegalStateException("Face template changed repeatedly during session refresh");
+    }
+
+    /**
+     * 그 층 학생을 지금 얼굴로 출석 받는 세션이 있는지 확인한다. 유휴 시간이 지난 세션은 정리 전이어도 세지 않는다.
+     * 층이 없는(호실 미배정) 학생은 어느 카메라의 후보도 아니므로 false다.
+     *
+     * @param floor 학생 호실의 층. 호실이 없으면 null
+     */
+    public boolean isAccepting(AttendancePurpose purpose, Integer floor) {
+        if (floor == null) {
+            return false;
+        }
+        Instant cutoff = clock.instant().minus(properties.sessionIdleTimeout());
+        return faceSessionStore.existsActiveOnFloor(purpose, floor, cutoff);
     }
 
     /**

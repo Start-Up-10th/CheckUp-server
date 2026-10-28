@@ -41,6 +41,10 @@ public class FaceRecognitionSession {
     @Column(name = "last_activity_at", nullable = false)
     private Instant lastActivityAt;
 
+    /** 마지막 프레임 처리를 시작한 시각. 프레임 최소 간격을 이 시각부터 센다(#262). 아직 프레임이 없으면 null이다. */
+    @Column(name = "last_frame_started_at")
+    private Instant lastFrameStartedAt;
+
     @Column(nullable = false)
     private boolean active;
 

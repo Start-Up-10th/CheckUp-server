@@ -258,4 +258,27 @@ class QrSessionServiceTest {
                 .atZone(OperatingDayCalculator.ZONE)
                 .toInstant();
     }
+
+    @Test
+    @DisplayName("세션이 열려 있는 동안만 그 용도의 출석을 받는 중이다")
+    void acceptingWhileSessionIsOpen() {
+        String sessionId = qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY).sessionId();
+
+        assertThat(qrSessionService.isAccepting(AttendancePurpose.DORMITORY)).isTrue();
+        assertThat(qrSessionService.isAccepting(AttendancePurpose.STUDY_ROOM)).isFalse();
+
+        qrSessionService.close(ADMIN_A, sessionId);
+
+        assertThat(qrSessionService.isAccepting(AttendancePurpose.DORMITORY)).isFalse();
+    }
+
+    @Test
+    @DisplayName("heartbeat 없이 lease가 지나면 출석을 받지 않는다")
+    void notAcceptingAfterLeaseExpires() {
+        qrSessionService.create(ADMIN_A, AttendancePurpose.DORMITORY);
+
+        clock.setInstant(clock.instant().plus(Duration.ofSeconds(60)));
+
+        assertThat(qrSessionService.isAccepting(AttendancePurpose.DORMITORY)).isFalse();
+    }
 }

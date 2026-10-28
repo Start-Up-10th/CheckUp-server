@@ -1,5 +1,6 @@
 package com.checkup.checkup.domain.face.repository;
 
+import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.face.entity.FaceRecognitionSession;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -23,11 +24,17 @@ public interface FaceRecognitionSessionRepository extends JpaRepository<FaceReco
 
     List<FaceRecognitionSession> findAllByIdIn(List<UUID> ids);
 
+    @Query("SELECT COUNT(s) > 0 FROM FaceRecognitionSession s WHERE s.active = true " +
+            "AND s.purpose = :purpose AND s.lastActivityAt > :cutoff " +
+            "AND (s.floor IS NULL OR s.floor = :floor)")
+    boolean existsActiveOnFloor(@Param("purpose") AttendancePurpose purpose, @Param("floor") Integer floor,
+                                @Param("cutoff") Instant cutoff);
+
     @Modifying
-    @Query("UPDATE FaceRecognitionSession s SET s.lastActivityAt = :now, " +
+    @Query("UPDATE FaceRecognitionSession s SET s.lastActivityAt = :now, s.lastFrameStartedAt = :now, " +
             "s.frameLockToken = :token, s.frameLockUntil = :lockUntil " +
             "WHERE s.id = :id AND s.adminMemberId = :adminId AND s.active = true " +
-            "AND s.lastActivityAt <= :cutoff " +
+            "AND (s.lastFrameStartedAt IS NULL OR s.lastFrameStartedAt <= :cutoff) " +
             "AND (s.frameLockToken IS NULL OR s.frameLockUntil <= :now)")
     int claimFrame(
             @Param("id") UUID id,

@@ -44,6 +44,16 @@ public class FaceSessionStore {
     }
 
     /**
+     * 그 용도·층을 맡은 활성 세션이 하나라도 있는지 확인한다. 층 도입 전에 만든 층 없는 세션은 모든 층으로 센다.
+     *
+     * @param cutoff 이 시각 이후에 활동이 있어야 살아 있는 세션으로 본다
+     */
+    @Transactional(readOnly = true)
+    public boolean existsActiveOnFloor(AttendancePurpose purpose, int floor, Instant cutoff) {
+        return sessionRepository.existsActiveOnFloor(purpose, floor, cutoff);
+    }
+
+    /**
      * 관리자 본인의 활성 세션을 후보 학생 id와 함께 읽는다.
      *
      * @throws CustomException 세션이 없거나, 다른 관리자의 세션이거나, 이미 닫혔으면 {@link ErrorCode#FACE_SESSION_NOT_FOUND}(404)
@@ -81,8 +91,9 @@ public class FaceSessionStore {
 
     /**
      * 프레임 처리 잠금을 잡는다. 최소 프레임 간격이 지났고 다른 프레임이 처리 중이 아닐 때만 잡힌다.
+     * 간격은 이전 프레임을 시작한 시각부터 센다. 처리가 간격보다 오래 걸렸으면 끝난 뒤 바로 다음 프레임을 받는다(#262).
      *
-     * @param cutoff    이 시각 이전에 마지막으로 활동했어야 한다(프레임 간격 제한)
+     * @param cutoff    이전 프레임을 이 시각 이전에 시작했어야 한다(프레임 간격 제한). 첫 프레임은 바로 받는다
      * @param token     이 프레임의 잠금 토큰
      * @param lockUntil AI 응답이 오지 않아도 잠금이 저절로 풀리는 시각
      * @return 잠금을 잡았으면 {@code true}
