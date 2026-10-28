@@ -129,6 +129,7 @@ checkup:
     response-timeout: ${FACE_AI_RESPONSE_TIMEOUT:30s}
     max-upload-bytes: ${FACE_MAX_UPLOAD_BYTES:20971520} # 얼굴 등록 영상 한도 20MB. 웹이 지키는 값과 같다
     max-frame-bytes: ${FACE_MAX_FRAME_BYTES:2097152}
+    # 세션마다 이전 프레임을 시작한 시각부터 센다. 처리가 더 오래 걸리면 끝난 뒤 바로 다음 프레임을 받는다
     min-frame-interval: ${FACE_MIN_FRAME_INTERVAL:200ms}
     max-concurrent-frames: ${FACE_MAX_CONCURRENT_FRAMES:4}
     # 얼굴 등록 영상을 동시에 받아 처리하는 수. 영상 본문이 메모리에 올라가므로 서버 메모리에 맞춰 정한다
