@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.face.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,13 +28,17 @@ import com.checkup.checkup.global.exception.ErrorCode;
 
 /**
  * 실제 PostgreSQL에서 얼굴 인식 세션 저장이 후보 학생을 한 번에 저장하고,
- * 저장되지 않은 학생이 섞이면 세션째 취소되는지, 용도·층별 활성 세션을 찾는지 검증한다(#216, #260).
+ * 저장되지 않은 학생이 섞이면 세션째 취소되는지, 용도·층별 활성 세션을 찾는지,
+ * 프레임 최소 간격을 이전 프레임 시작부터 세는지 검증한다(#216, #260, #262).
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import(FaceSessionStore.class)
 class FaceSessionStoreTest {
+
+    private static final Instant T0 = Instant.parse("2100-01-01T00:00:00Z");
+    private static final Duration INTERVAL = Duration.ofMillis(200);
 
     @Autowired
     private FaceSessionStore sessionStore;
@@ -121,6 +126,59 @@ class FaceSessionStoreTest {
         sessionStore.create(UUID.randomUUID(), adminMemberId, AttendancePurpose.STUDY_ROOM, null, studentIds, recent, recent);
 
         assertThat(sessionStore.existsActiveOnFloor(AttendancePurpose.STUDY_ROOM, 5, cutoff)).isTrue();
+    }
+
+    @Test
+    @DisplayName("새 세션의 첫 프레임은 바로 받는다")
+    void firstFrameIsClaimedImmediately() {
+        UUID sessionId = newSession(T0);
+
+        assertThat(claim(sessionId, T0)).isTrue();
+    }
+
+    @Test
+    @DisplayName("프레임 간격은 이전 프레임 시작부터 세어 199ms는 거절하고 200ms는 받는다")
+    void intervalCountsFromPreviousFrameStart() {
+        UUID sessionId = newSession(T0);
+        UUID first = UUID.randomUUID();
+        assertThat(sessionStore.claimFrame(sessionId, adminMemberId, T0, T0.minus(INTERVAL), first,
+                T0.plusSeconds(60))).isTrue();
+        sessionStore.releaseFrame(sessionId, adminMemberId, first, T0.plusMillis(150));
+
+        assertThat(claim(sessionId, T0.plusMillis(199))).isFalse();
+        assertThat(claim(sessionId, T0.plusMillis(200))).isTrue();
+    }
+
+    @Test
+    @DisplayName("처리가 간격보다 오래 걸렸으면 끝난 뒤 바로 다음 프레임을 받는다")
+    void slowFrameAllowsNextFrameRightAfterRelease() {
+        UUID sessionId = newSession(T0);
+        UUID first = UUID.randomUUID();
+        assertThat(sessionStore.claimFrame(sessionId, adminMemberId, T0, T0.minus(INTERVAL), first,
+                T0.plusSeconds(60))).isTrue();
+        sessionStore.releaseFrame(sessionId, adminMemberId, first, T0.plusMillis(300));
+
+        assertThat(claim(sessionId, T0.plusMillis(300))).isTrue();
+    }
+
+    @Test
+    @DisplayName("이전 프레임이 아직 처리 중이면 간격이 지나도 거절한다")
+    void inFlightFrameBlocksNextFrame() {
+        UUID sessionId = newSession(T0);
+        assertThat(claim(sessionId, T0)).isTrue();
+
+        assertThat(claim(sessionId, T0.plusMillis(250))).isFalse();
+    }
+
+    private UUID newSession(Instant createdAt) {
+        UUID sessionId = UUID.randomUUID();
+        sessionStore.create(sessionId, adminMemberId, AttendancePurpose.DORMITORY, 3, studentIds, createdAt, createdAt);
+        return sessionId;
+    }
+
+    private boolean claim(UUID sessionId, Instant now) {
+        return sessionStore.claimFrame(sessionId, adminMemberId, now, now.minus(INTERVAL), UUID.randomUUID(),
+                now.plusSeconds(60));
     }
 
     @Test
