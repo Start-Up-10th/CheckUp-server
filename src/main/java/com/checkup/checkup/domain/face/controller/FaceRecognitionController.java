@@ -43,7 +43,7 @@ public class FaceRecognitionController {
     }
 
     /** 카메라 프레임 한 장의 얼굴을 인식하고 출석을 처리한다. 받은 이미지는 모든 응답 경로에서 0으로 덮어쓴다. */
-    @Operation(summary = "프레임 얼굴 인식", description = "본문은 image/jpeg 또는 image/webp 원본 바이트다. X-Frame-Id 헤더는 선택이다. 받은 이미지는 처리 뒤 메모리에서 지운다. 세션마다 한 번에 한 프레임만 처리하고, 이전 프레임을 시작한 지 최소 간격(기본 200ms)이 지나야 다음 프레임을 받는다. 처리 중이거나 간격 전이면 429 FACE_FRAME_RATE_LIMITED, 서버 전체 동시 처리 한도를 넘으면 429 FACE_SERVICE_BUSY다. 429는 그 요청만 거절하고 세션은 유지한다.")
+    @Operation(summary = "프레임 얼굴 인식", description = "본문은 image/jpeg 또는 image/webp 원본 바이트다. X-Frame-Id 헤더는 선택이다. 받은 이미지는 처리 뒤 메모리에서 지운다. 세션마다 한 번에 한 프레임만 처리하고, 이전 프레임을 시작한 지 최소 간격(기본 1ms, FACE_MIN_FRAME_INTERVAL로 설정)이 지나야 다음 프레임을 받는다. 처리 중이거나 간격 전이면 429 FACE_FRAME_RATE_LIMITED, 서버 전체 동시 처리 한도를 넘으면 429 FACE_SERVICE_BUSY다. 429는 그 요청만 거절하고 세션은 유지한다.")
     @PostMapping(value = "/{sessionId}/frames", consumes = {"image/jpeg", "image/webp"})
     public FaceFrameResponse recognize(
             @AuthenticationPrincipal Long memberId,
