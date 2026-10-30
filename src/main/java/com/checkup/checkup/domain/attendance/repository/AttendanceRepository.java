@@ -143,6 +143,28 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     );
 
     /**
+     * 한 층의 학생 이름과 해당 용도·운영일의 현재 출석 여부를 단일 쿼리로 읽는다.
+     * 호실 상세처럼 DataGSM 학생 id가 있는 학생만 포함하고, 로그인 계정 유무는 제한하지 않는다.
+     * 출석 행이 없거나 수동 미출석이면 false다. 이름 정렬은 DB collation 대신 호출부에서 한다.
+     */
+    @Query("""
+            SELECT new com.checkup.checkup.domain.attendance.repository.FloorStudentAttendance(
+                s.id, s.dormitoryRoom, s.datagsmStudentId, s.name, s.classNumber,
+                s.studentNumber, COALESCE(a.attended, FALSE))
+            FROM Student s
+            LEFT JOIN Attendance a
+              ON a.student = s AND a.purpose = :purpose AND a.operatingDay = :operatingDay
+            WHERE s.dormitoryRoom BETWEEN :firstRoom AND :lastRoom
+              AND s.datagsmStudentId IS NOT NULL
+            """)
+    List<FloorStudentAttendance> findFloorStudents(
+            @Param("firstRoom") int firstRoom,
+            @Param("lastRoom") int lastRoom,
+            @Param("purpose") AttendancePurpose purpose,
+            @Param("operatingDay") LocalDate operatingDay
+    );
+
+    /**
      * 학생·용도·운영일의 현재 출석 여부만 DB에서 읽는다. 영속성 컨텍스트에 캐시된 엔티티를 거치지 않는다.
      */
     @Query("""

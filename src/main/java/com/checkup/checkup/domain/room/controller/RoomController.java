@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
+import com.checkup.checkup.domain.room.dto.response.RoomFloorStudentsResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.domain.room.service.RoomService;
 import jakarta.validation.Valid;
@@ -64,6 +65,16 @@ public class RoomController {
             @Parameter(description = "층(호실 번호를 100으로 나눈 값)", example = "3") @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
             @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
         return roomService.getFloor(memberId, floor, purpose);
+    }
+
+    /** 관리자가 한 층의 호실별 학생 명단과 요청 용도의 오늘 운영일 출석 여부를 한 번에 조회한다. */
+    @Operation(summary = "층 단위 학생 출석 명단", description = "관리자만 조회할 수 있다. 층 전체를 한 쿼리로 읽어 호실 번호순으로 묶고, 학생은 호실 상세와 같은 이름·학번·내부 id 순으로 준다. 학생 필드는 room/attendance와 같으며 student_id는 DataGSM 학생 id다. DataGSM 학생 id가 없는 학생은 제외한다. attended는 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 상태다. 학생이 없는 층은 rooms가 빈 배열이다.")
+    @GetMapping("/floor/students")
+    public RoomFloorStudentsResponse getFloorStudents(
+            @AuthenticationPrincipal Long memberId,
+            @Parameter(description = "층(호실 번호를 100으로 나눈 값)", example = "3") @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
+        return roomService.getFloorStudents(memberId, floor, purpose);
     }
 
     /**
