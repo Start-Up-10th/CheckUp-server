@@ -2,18 +2,24 @@ package com.checkup.checkup.domain.room.service;
 
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
+import com.checkup.checkup.domain.attendance.repository.FloorStudentAttendance;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
+import com.checkup.checkup.domain.room.dto.response.RoomAttendanceStudentResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
+import com.checkup.checkup.domain.room.dto.response.RoomFloorStudentsResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +90,31 @@ public class RoomService {
         return RoomFloorResponse.of(floor, purpose, attendanceRepository.countByRoom(
                 floor * ROOMS_PER_FLOOR, floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1,
                 purpose, operatingDayCalculator.today()));
+    }
+
+    /**
+     * 관리자에게 한 층의 호실별 학생 이름과 요청 용도의 오늘 출석 여부를 제공한다.
+     * 호실 번호순, 각 호실은 호실 상세와 같은 이름·학번·내부 id 순이다.
+     * 권한 확인 뒤 층 전체를 한 번에 읽어 호실 수에 따라 쿼리가 늘어나지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public RoomFloorStudentsResponse getFloorStudents(Long memberId, int floor, AttendancePurpose purpose) {
+        adminVerifier.verify(memberId);
+        List<FloorStudentAttendance> students = attendanceRepository.findFloorStudents(
+                floor * ROOMS_PER_FLOOR, floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1,
+                purpose, operatingDayCalculator.today());
+        Map<Integer, List<RoomAttendanceStudentResponse>> rooms = new LinkedHashMap<>();
+        students.stream()
+                .sorted(Comparator.comparingInt(FloorStudentAttendance::dormitoryRoom)
+                        .thenComparing(FloorStudentAttendance::studentName)
+                        .thenComparingInt(FloorStudentAttendance::studentNumber)
+                        .thenComparing(FloorStudentAttendance::studentId))
+                .forEach(student -> rooms.computeIfAbsent(student.dormitoryRoom(), ignored -> new ArrayList<>())
+                        .add(new RoomAttendanceStudentResponse(student.datagsmStudentId(), student.studentName(),
+                                student.studentClass(), student.studentNumber(), student.attended())));
+        return new RoomFloorStudentsResponse(floor, purpose, rooms.entrySet().stream()
+                .map(room -> new RoomFloorStudentsResponse.Room(room.getKey(), List.copyOf(room.getValue())))
+                .toList());
     }
 
     /**
