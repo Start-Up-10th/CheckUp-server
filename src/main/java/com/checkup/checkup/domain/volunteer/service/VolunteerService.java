@@ -88,9 +88,9 @@ public class VolunteerService {
                 .collect(Collectors.toMap(
                         VolunteerAdjustmentRepository.LastActivity::getStudentId,
                         VolunteerAdjustmentRepository.LastActivity::getLastActivityAt));
-        Map<Long, DutyStatus> todayDuties = volunteerDutyRepository
+        Map<Long, VolunteerDuty> todayDuties = volunteerDutyRepository
                 .findAllByOperatingDay(operatingDayCalculator.today()).stream()
-                .collect(Collectors.toMap(duty -> duty.getStudent().getId(), VolunteerDuty::getStatus));
+                .collect(Collectors.toMap(duty -> duty.getStudent().getId(), Function.identity()));
         return studentRepository.findAllByDatagsmStudentIdIsNotNull()
                 .stream()
                 .filter(student -> floor == null || Objects.equals(student.getDormitoryFloor(), floor))
@@ -99,7 +99,9 @@ public class VolunteerService {
                 .filter(student -> rank.applyAsInt(student) != KoreanNameMatcher.NO_MATCH)
                 .sorted(Comparator.comparingInt(rank).thenComparing(ROOM_ORDER))
                 .map(student -> VolunteerResponse.of(
-                        student, lastActivities.get(student.getId()), todayDuties.get(student.getId())))
+                        student, lastActivities.get(student.getId()),
+                        todayDuties.containsKey(student.getId()) ? todayDuties.get(student.getId()).getStatus() : null,
+                        todayDuties.containsKey(student.getId()) && todayDuties.get(student.getId()).isConsecutive()))
                 .toList();
     }
 
@@ -259,8 +261,10 @@ public class VolunteerService {
             throw new CustomException(ErrorCode.DUTY_ALREADY_COMPLETED);
         }
         volunteerAdjustmentRepository.insertIfAbsent(
-                id, -1, -1, null, VolunteerAdjustmentKind.DUTY_COMPLETION.name(), null, now);
-        if (studentRepository.decreaseVolunteerCount(id) == 0) {
+                id, -1, -1, null, (duty.isConsecutive() ? VolunteerAdjustmentKind.CONSECUTIVE_COMPLETION
+                        : VolunteerAdjustmentKind.DUTY_COMPLETION).name(), null, now);
+        if ((duty.isConsecutive() ? studentRepository.decreaseConsecutiveVolunteerCount(id)
+                : studentRepository.decreaseVolunteerCount(id)) == 0) {
             throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
         }
         return reload(id);
@@ -288,7 +292,7 @@ public class VolunteerService {
         return duties.stream()
                 .sorted(Comparator.comparing(VolunteerDuty::getStudent, ROOM_ORDER))
                 .map(duty -> VolunteerDutyRecordResponse.of(
-                        duty.getStudent(), recordStatus(duty, today), adjustments.get(duty.getId())))
+                        duty.getStudent(), recordStatus(duty, today), adjustments.get(duty.getId()), duty.isConsecutive()))
                 .toList();
     }
 
@@ -362,7 +366,7 @@ public class VolunteerService {
         VolunteerDuty duty = volunteerDutyRepository.findByStudentIdAndOperatingDay(id, operatingDay)
                 .orElseThrow(() -> new CustomException(ErrorCode.DUTY_NOT_FOUND));
         return VolunteerDutyRecordResponse.of(duty.getStudent(), recordStatus(duty, operatingDayCalculator.today()),
-                missedAdjustments(List.of(duty.getId())).get(duty.getId()));
+                missedAdjustments(List.of(duty.getId())).get(duty.getId()), duty.isConsecutive());
     }
 
     /**
@@ -472,12 +476,18 @@ public class VolunteerService {
      */
     private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int requestedDelta,
                                      String reason) {
+        return adjust(memberId, studentId, requestKey, requestedDelta, reason, false);
+    }
+
+    private VolunteerResponse adjust(Long memberId, Long studentId, String requestKey, int requestedDelta,
+                                     String reason, boolean consecutive) {
         adminVerifier.verify(memberId);
         Long id = findStudent(studentId).getId();
         String key = normalizeKey(requestKey);
         String savedReason = normalizeReason(reason);
 
-        int count = studentRepository.lockVolunteerCount(id)
+        int count = (consecutive ? studentRepository.lockConsecutiveVolunteerCount(id)
+                : studentRepository.lockVolunteerCount(id))
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
         int delta = requestedDelta > 0 ? requestedDelta : -Math.min(-requestedDelta, count);
 
@@ -485,13 +495,18 @@ public class VolunteerService {
             if (key == null || volunteerAdjustmentRepository.findByRequestKey(key).isEmpty()) {
                 throw new CustomException(ErrorCode.VOLUNTEER_COUNT_ZERO);
             }
-            verifySameRequest(key, id, requestedDelta);
+            verifySameRequest(key, id, requestedDelta, consecutive);
         } else if (volunteerAdjustmentRepository.insertIfAbsent(
-                id, delta, requestedDelta, savedReason, VolunteerAdjustmentKind.ADMIN.name(), key,
+                id, delta, requestedDelta, savedReason,
+                (consecutive ? VolunteerAdjustmentKind.CONSECUTIVE_ADMIN : VolunteerAdjustmentKind.ADMIN).name(), key,
                 clock.instant()) == 1) {
-            studentRepository.changeVolunteerCount(id, delta);
+            if (consecutive) {
+                studentRepository.changeConsecutiveVolunteerCount(id, delta);
+            } else {
+                studentRepository.changeVolunteerCount(id, delta);
+            }
         } else {
-            verifySameRequest(key, id, requestedDelta);
+            verifySameRequest(key, id, requestedDelta, consecutive);
         }
 
         return reload(id);
@@ -501,10 +516,11 @@ public class VolunteerService {
      * 키가 겹쳐 기록되지 않았을 때, 기존 기록이 같은 학생·같은 요청 횟수의 재시도인지 확인한다.
      * 웹이 키를 다른 요청에 다시 쓰면 반영되지 않았는데 성공으로 보이지 않도록 409로 알린다.
      */
-    private void verifySameRequest(String key, Long studentId, int requestedDelta) {
+    private void verifySameRequest(String key, Long studentId, int requestedDelta, boolean consecutive) {
         boolean same = volunteerAdjustmentRepository.findByRequestKey(key)
                 .map(existing -> existing.getStudent().getId().equals(studentId)
-                        && existing.getRequestedDelta() == requestedDelta)
+                        && existing.getRequestedDelta() == requestedDelta
+                        && existing.getKind() == (consecutive ? VolunteerAdjustmentKind.CONSECUTIVE_ADMIN : VolunteerAdjustmentKind.ADMIN))
                 .orElse(false);
         if (!same) {
             throw new CustomException(ErrorCode.IDEMPOTENCY_KEY_REUSED);
@@ -525,12 +541,12 @@ public class VolunteerService {
 
     /** 학생 한 명의 명단 항목을 최근 활동·오늘 지정 상태와 함께 만든다. */
     private VolunteerResponse toResponse(Student student) {
-        DutyStatus todayDuty = volunteerDutyRepository
+        VolunteerDuty todayDuty = volunteerDutyRepository
                 .findByStudentIdAndOperatingDay(student.getId(), operatingDayCalculator.today())
-                .map(VolunteerDuty::getStatus)
                 .orElse(null);
         return VolunteerResponse.of(
-                student, volunteerAdjustmentRepository.findLastActivityAt(student.getId()), todayDuty);
+                student, volunteerAdjustmentRepository.findLastActivityAt(student.getId()),
+                todayDuty == null ? null : todayDuty.getStatus(), todayDuty != null && todayDuty.isConsecutive());
     }
 
     /** 사유의 앞뒤 공백을 지운다. 비어 있으면 {@code null}, 100자를 넘으면 {@link ErrorCode#INVALID_REQUEST}(400)다. */
@@ -571,5 +587,14 @@ public class VolunteerService {
                     : KoreanNameMatcher.NO_MATCH;
         }
         return student -> KoreanNameMatcher.rank(student.getName(), keyword);
+    }
+
+    /** 연속 봉사 잔여 횟수를 일반 횟수와 독립적으로 조정한다. 출석 전에는 당일 지정을 만들지 않는다. */
+    @Transactional
+    public VolunteerResponse adjustConsecutiveCount(Long memberId, Long studentId, String key, int delta, String reason) {
+        if (delta == 0 || delta < -MAX_ADJUST_AMOUNT || delta > MAX_ADJUST_AMOUNT) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        return adjust(memberId, studentId, key, delta, reason, true);
     }
 }

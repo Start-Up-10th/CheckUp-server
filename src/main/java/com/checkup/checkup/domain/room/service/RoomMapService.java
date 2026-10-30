@@ -2,6 +2,8 @@ package com.checkup.checkup.domain.room.service;
 
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
+import com.checkup.checkup.domain.attendance.repository.FloorStudentAttendance;
+import com.checkup.checkup.domain.attendance.service.AttendanceHistoryService;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -11,6 +13,8 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +36,7 @@ public class RoomMapService {
     private final AttendanceRepository attendanceRepository;
     private final AttendanceService attendanceService;
     private final OperatingDayCalculator operatingDayCalculator;
+    private final AttendanceHistoryService attendanceHistoryService;
 
     /**
      * 한 호실의 학생과 오늘 운영일 기숙사 출석 여부를 이름 가나다순(학번·id 순)으로 돌려준다.
@@ -76,6 +81,29 @@ public class RoomMapService {
 
         attendanceService.saveManually(Map.of(student.getId(), attended), AttendancePurpose.DORMITORY);
         return new ManualRoomAttendanceResponse(dataGsmStudentId, attended);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoomAttendanceStudentResponse> getRoomAttendance(Long memberId, Integer room, LocalDate date) {
+        adminVerifier.verify(memberId);
+        LocalDate day = attendanceHistoryService.resolveDate(date);
+        if (day.equals(operatingDayCalculator.today())) {
+            return getRoomAttendance(memberId, room);
+        }
+        return attendanceHistoryService.findStudents(room, room, AttendancePurpose.DORMITORY, day).stream()
+                .sorted(Comparator.comparing(FloorStudentAttendance::studentName)
+                        .thenComparingInt(FloorStudentAttendance::studentNumber)
+                        .thenComparing(FloorStudentAttendance::studentId))
+                .map(student -> new RoomAttendanceStudentResponse(student.datagsmStudentId(), student.studentName(),
+                        student.studentClass(), student.studentNumber(), student.attended()))
+                .toList();
+    }
+
+    @Transactional
+    public ManualRoomAttendanceResponse setManualAttendance(Long memberId, Long studentId, boolean attended, LocalDate date) {
+        adminVerifier.verify(memberId);
+        attendanceHistoryService.verifyWritableDate(date);
+        return setManualAttendance(memberId, studentId, attended);
     }
 
     private Set<Long> findAttendedIds(List<Student> students) {

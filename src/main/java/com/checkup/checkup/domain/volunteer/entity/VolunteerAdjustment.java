@@ -46,7 +46,7 @@ public class VolunteerAdjustment {
 
     /** 조정 종류. 관리자 조정인지 당일 봉사 완료의 차감인지 구분한다. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 32)
     private VolunteerAdjustmentKind kind;
 
     /** 관리자가 남긴 사유. 남기지 않았으면 {@code null}이다. 로그에 남기지 않는다. */

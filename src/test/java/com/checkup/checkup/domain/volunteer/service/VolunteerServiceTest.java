@@ -854,6 +854,7 @@ class VolunteerServiceTest {
         ReflectionTestUtils.setField(adjustment, "student", student);
         ReflectionTestUtils.setField(adjustment, "delta", (short) delta);
         ReflectionTestUtils.setField(adjustment, "requestedDelta", (short) requestedDelta);
+        ReflectionTestUtils.setField(adjustment, "kind", VolunteerAdjustmentKind.ADMIN);
         return adjustment;
     }
 

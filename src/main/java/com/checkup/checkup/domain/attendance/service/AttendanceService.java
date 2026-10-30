@@ -16,6 +16,7 @@ import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.entity.AttendanceRecordResult;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
 import com.checkup.checkup.domain.member.entity.Student;
+import com.checkup.checkup.domain.volunteer.service.ConsecutiveVolunteerService;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
 import com.checkup.checkup.domain.member.service.StudentIdCache;
 import com.checkup.checkup.domain.notification.entity.NotificationType;
@@ -42,6 +43,8 @@ public class AttendanceService {
     private final NotificationService notificationService;
     private final StudentRepository studentRepository;
     private final StudentIdCache studentIdCache;
+    private final AttendanceHistoryService attendanceHistoryService;
+    private final ConsecutiveVolunteerService consecutiveVolunteerService;
 
     /**
      * 자동 인증 성공을 출석으로 기록한다. 동시에 여러 요청이 와도 한 번만 기록된다.
@@ -118,14 +121,19 @@ public class AttendanceService {
         int changed = attendanceRepository.markAttended(
                 studentId, purpose.name(), operatingDay, recordedAt, method.name());
         if (changed == 1) {
+            attendanceHistoryService.capture(studentId, purpose, operatingDay);
             notificationService.create(
                     studentId,
                     NotificationType.ATTENDANCE,
                     purpose.name() + ":" + operatingDay,
                     attendanceMessage(purpose));
+            consecutiveVolunteerService.onAttendance(studentId, purpose, method, operatingDay, now);
             return AttendanceRecordResult.RECORDED;
         }
         boolean attended = attendanceRepository.findAttendedStatus(studentId, purpose, operatingDay).orElse(false);
+        if (attended) {
+            consecutiveVolunteerService.onAttendance(studentId, purpose, method, operatingDay, now);
+        }
         return attended ? AttendanceRecordResult.ALREADY_ATTENDED : AttendanceRecordResult.SUPERSEDED_BY_MANUAL;
     }
 
@@ -160,12 +168,14 @@ public class AttendanceService {
         new TreeMap<>(attendedByStudentId).forEach((studentId, attended) -> {
             if (!attended) {
                 if (attendanceRepository.markManuallyAbsent(studentId, purpose.name(), operatingDay, now) == 1) {
+                    attendanceHistoryService.capture(studentId, purpose, operatingDay);
                     notificationService.delete(studentId, NotificationType.ATTENDANCE, sourceKey);
                 }
                 return;
             }
             int changed = attendanceRepository.markManuallyAttended(studentId, purpose.name(), operatingDay, now);
             if (changed == 1) {
+                attendanceHistoryService.capture(studentId, purpose, operatingDay);
                 notificationService.create(
                         studentId,
                         NotificationType.ATTENDANCE,
@@ -209,6 +219,7 @@ public class AttendanceService {
     @Transactional
     public int deleteExpired() {
         LocalDate today = operatingDayCalculator.today();
+        attendanceHistoryService.archiveAndPrune(today);
         return attendanceRepository.deleteByOperatingDayBefore(today);
     }
 }

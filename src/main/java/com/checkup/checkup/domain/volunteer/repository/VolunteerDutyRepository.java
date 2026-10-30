@@ -124,4 +124,15 @@ public interface VolunteerDutyRepository extends JpaRepository<VolunteerDuty, Lo
 
         long getMissedCount();
     }
+
+    /** 같은 날의 기존 일반·연속 지정과 완료·미이행 상태는 그대로 유지한다. */
+    @Modifying
+    @Query(value = """
+            INSERT INTO volunteer_duty (student_id, operating_day, status, created_at, consecutive)
+            SELECT id, :operatingDay, 'ASSIGNED', :createdAt, TRUE
+            FROM student WHERE id = :studentId AND consecutive_volunteer_count > 0
+            ON CONFLICT (student_id, operating_day) DO NOTHING
+            """, nativeQuery = true)
+    int assignConsecutive(@Param("studentId") Long studentId, @Param("operatingDay") LocalDate operatingDay,
+                          @Param("createdAt") Instant createdAt);
 }
