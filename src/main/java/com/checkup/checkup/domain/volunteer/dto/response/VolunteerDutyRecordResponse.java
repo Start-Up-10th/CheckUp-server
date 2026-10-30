@@ -25,7 +25,9 @@ public record VolunteerDutyRecordResponse(
         @Schema(description = "그날 지정 상태. ASSIGNED(오늘 지정, 처리 전), COMPLETED(완료), MISSED(미이행). 운영일이 지났는데 처리가 없던 지정은 MISSED", example = "MISSED") DutyStatus status,
         @Schema(description = "미이행으로 횟수를 처리했는지", example = "true") boolean adjusted,
         @Schema(description = "미이행으로 실제로 바꾼 횟수. 처리 전이면 null, 음수일 수 있다", example = "1") Integer addedCount,
-        @Schema(description = "미이행 처리 사유. 없으면 null", example = "당일 봉사 미이행") String reason
+        @Schema(description = "미이행 처리 사유. 없으면 null", example = "당일 봉사 미이행") String reason,
+        @Schema(description = "연속 봉사 자동 지정인지") boolean consecutiveDuty,
+        @Schema(description = "현재 남은 연속 봉사 횟수") int consecutiveVolunteerCount
 ) {
 
     /**
@@ -34,6 +36,10 @@ public record VolunteerDutyRecordResponse(
      * @param adjustment 그 지정의 미이행 조정 기록. 횟수를 처리하지 않았으면 {@code null}
      */
     public static VolunteerDutyRecordResponse of(Student student, DutyStatus status, VolunteerAdjustment adjustment) {
+        return of(student, status, adjustment, false);
+    }
+
+    public static VolunteerDutyRecordResponse of(Student student, DutyStatus status, VolunteerAdjustment adjustment, boolean consecutiveDuty) {
         return new VolunteerDutyRecordResponse(
                 student.getDatagsmStudentId(),
                 student.getStudentNumber(),
@@ -42,6 +48,11 @@ public record VolunteerDutyRecordResponse(
                 status,
                 adjustment != null,
                 adjustment == null ? null : (int) adjustment.getDelta(),
-                adjustment == null ? null : adjustment.getReason());
+                adjustment == null ? null : adjustment.getReason(), consecutiveDuty, student.getConsecutiveVolunteerCount());
+    }
+
+    public VolunteerDutyRecordResponse(Long studentId, int studentNumber, String name, Integer dormitoryRoom,
+                                      DutyStatus status, boolean adjusted, Integer addedCount, String reason) {
+        this(studentId, studentNumber, name, dormitoryRoom, status, adjusted, addedCount, reason, false, 0);
     }
 }

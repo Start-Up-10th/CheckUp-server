@@ -135,4 +135,15 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE Student s SET s.volunteerCount = s.volunteerCount - 1 WHERE s.id = :id AND s.volunteerCount > 0")
     int decreaseVolunteerCount(@Param("id") Long id);
+
+    @Query(value = "SELECT consecutive_volunteer_count FROM student WHERE id = :id FOR UPDATE", nativeQuery = true)
+    Optional<Integer> lockConsecutiveVolunteerCount(@Param("id") Long id);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.consecutiveVolunteerCount = s.consecutiveVolunteerCount + :delta WHERE s.id = :id")
+    int changeConsecutiveVolunteerCount(@Param("id") Long id, @Param("delta") int delta);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Student s SET s.consecutiveVolunteerCount = s.consecutiveVolunteerCount - 1 WHERE s.id = :id AND s.consecutiveVolunteerCount > 0")
+    int decreaseConsecutiveVolunteerCount(@Param("id") Long id);
 }

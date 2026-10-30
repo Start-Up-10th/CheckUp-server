@@ -13,6 +13,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -58,13 +60,15 @@ public class RoomController {
      * @param purpose 출석 용도. 없으면 기숙사 입소(DORMITORY)다
      * @return 층 전체 출석·미출석 인원과 호실별 현황
      */
-    @Operation(summary = "층 단위 출석 현황", description = "관리자만 조회할 수 있다. 한 층의 호실마다 배정 인원(assigned)과 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 인원(attended)을 호실 번호 오름차순으로 준다. 층 전체 출석·미출석 인원도 함께 준다. 배정된 학생이 없는 층은 rooms가 빈 배열이다.")
+    @Operation(summary = "층 단위 출석 현황", description = "관리자만 조회할 수 있다. date로 지난 30개 운영일의 요약을 조회할 수 있다. 과거는 수정 불가. 한 층의 호실마다 배정 인원(assigned)과 purpose(기본 DORMITORY)의 오늘 운영일(08:00 KST 기준) 출석 인원(attended)을 호실 번호 오름차순으로 준다. 층 전체 출석·미출석 인원도 함께 준다. 배정된 학생이 없는 층은 rooms가 빈 배열이다.")
     @GetMapping("/floor")
     public RoomFloorResponse getFloor(
             @AuthenticationPrincipal Long memberId,
             @Parameter(description = "층(호실 번호를 100으로 나눈 값)", example = "3") @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
-            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
-        return roomService.getFloor(memberId, floor, purpose);
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
+            @Parameter(description = "운영일(yyyy-MM-dd). 기본 오늘. 지난 30일 조회만 가능") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null ? roomService.getFloor(memberId, floor, purpose)
+                : roomService.getFloor(memberId, floor, purpose, date);
     }
 
     /** 관리자가 한 층의 호실별 학생 명단과 요청 용도의 오늘 운영일 출석 여부를 한 번에 조회한다. */
@@ -73,8 +77,10 @@ public class RoomController {
     public RoomFloorStudentsResponse getFloorStudents(
             @AuthenticationPrincipal Long memberId,
             @Parameter(description = "층(호실 번호를 100으로 나눈 값)", example = "3") @RequestParam(name = "floor") @Positive @Max(99) Integer floor,
-            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose) {
-        return roomService.getFloorStudents(memberId, floor, purpose);
+            @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
+            @Parameter(description = "운영일(yyyy-MM-dd). 기본 오늘. 지난 30일 조회만 가능") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null ? roomService.getFloorStudents(memberId, floor, purpose)
+                : roomService.getFloorStudents(memberId, floor, purpose, date);
     }
 
     /**
@@ -92,8 +98,13 @@ public class RoomController {
             @AuthenticationPrincipal Long memberId,
             @Parameter(description = "출석을 저장할 호실 번호", example = "301") @PathVariable @Positive Integer dormitoryRoom,
             @Parameter(description = "출석 용도. DORMITORY(기숙사 입소) 또는 STUDY_ROOM(자습실)", example = "DORMITORY") @RequestParam(name = "purpose", defaultValue = "DORMITORY") AttendancePurpose purpose,
-            @Valid @RequestBody RoomAttendanceRequest request) {
-        roomService.saveAttendance(memberId, dormitoryRoom, purpose, request);
+            @Valid @RequestBody RoomAttendanceRequest request,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        if (date == null) {
+            roomService.saveAttendance(memberId, dormitoryRoom, purpose, request);
+        } else {
+            roomService.saveAttendance(memberId, dormitoryRoom, purpose, request, date);
+        }
         return ResponseEntity.noContent().build();
     }
 }

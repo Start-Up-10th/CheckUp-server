@@ -34,7 +34,7 @@ public class UserVolunteerService {
 
         Student student = studentRepository.findByDatagsmStudentId(studentId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDENT_NOT_FOUND));
-        return new UserVolunteerResponse(studentId, student.getVolunteerCount());
+        return new UserVolunteerResponse(studentId, student.getVolunteerCount(), student.getConsecutiveVolunteerCount());
     }
 
     /**

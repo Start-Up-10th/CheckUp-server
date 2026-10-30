@@ -70,7 +70,7 @@ class RoomServiceTest {
     void setUp() {
         roomService = new RoomService(
                 studentRepository, attendanceRepository, operatingDayCalculator, adminVerifier,
-                attendanceService);
+                attendanceService, org.mockito.Mockito.mock(com.checkup.checkup.domain.attendance.service.AttendanceHistoryService.class));
     }
 
     @Test

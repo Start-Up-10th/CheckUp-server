@@ -115,7 +115,7 @@ class RoomFloorStudentsServiceTest {
     private RoomService serviceAt(String instant) {
         return new RoomService(studentRepository, attendanceRepository,
                 new OperatingDayCalculator(Clock.fixed(Instant.parse(instant), ZoneOffset.UTC)),
-                adminVerifier, attendanceService);
+                adminVerifier, attendanceService, org.mockito.Mockito.mock(com.checkup.checkup.domain.attendance.service.AttendanceHistoryService.class));
     }
 
     private static FloorStudentAttendance row(long id, int room, String name, int number, boolean attended) {

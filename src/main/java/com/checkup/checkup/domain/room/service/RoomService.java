@@ -3,6 +3,7 @@ package com.checkup.checkup.domain.room.service;
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.attendance.repository.AttendanceRepository;
 import com.checkup.checkup.domain.attendance.repository.FloorStudentAttendance;
+import com.checkup.checkup.domain.attendance.service.AttendanceHistoryService;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.member.entity.Student;
 import com.checkup.checkup.domain.member.repository.StudentRepository;
@@ -15,6 +16,7 @@ import com.checkup.checkup.global.exception.CustomException;
 import com.checkup.checkup.global.exception.ErrorCode;
 import com.checkup.checkup.global.security.AdminVerifier;
 import com.checkup.checkup.global.time.OperatingDayCalculator;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +41,7 @@ public class RoomService {
     private final OperatingDayCalculator operatingDayCalculator;
     private final AdminVerifier adminVerifier;
     private final AttendanceService attendanceService;
+    private final AttendanceHistoryService attendanceHistoryService;
 
     /**
      * 현재 회원의 권한을 확인한 뒤 해당 호실의 학생 명단과 오늘 운영일의 출석 여부를 조회한다.
@@ -103,6 +106,17 @@ public class RoomService {
         List<FloorStudentAttendance> students = attendanceRepository.findFloorStudents(
                 floor * ROOMS_PER_FLOOR, floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1,
                 purpose, operatingDayCalculator.today());
+        return groupFloorStudents(floor, purpose, students);
+    }
+
+    @Transactional
+    public void saveAttendance(Long memberId, Integer room, AttendancePurpose purpose, RoomAttendanceRequest request, LocalDate date) {
+        adminVerifier.verify(memberId);
+        attendanceHistoryService.verifyWritableDate(date);
+        saveAttendance(memberId, room, purpose, request);
+    }
+
+    private RoomFloorStudentsResponse groupFloorStudents(int floor, AttendancePurpose purpose, List<FloorStudentAttendance> students) {
         Map<Integer, List<RoomAttendanceStudentResponse>> rooms = new LinkedHashMap<>();
         students.stream()
                 .sorted(Comparator.comparingInt(FloorStudentAttendance::dormitoryRoom)
@@ -115,6 +129,34 @@ public class RoomService {
         return new RoomFloorStudentsResponse(floor, purpose, rooms.entrySet().stream()
                 .map(room -> new RoomFloorStudentsResponse.Room(room.getKey(), List.copyOf(room.getValue())))
                 .toList());
+    }
+
+    /** 지난 날짜는 출입 시각 없는 요약만 조회한다. 미래·보관 범위 밖 날짜는 거부한다. */
+    @Transactional(readOnly = true)
+    public RoomFloorStudentsResponse getFloorStudents(Long memberId, int floor, AttendancePurpose purpose, LocalDate date) {
+        adminVerifier.verify(memberId);
+        LocalDate day = attendanceHistoryService.resolveDate(date);
+        if (day.equals(operatingDayCalculator.today())) {
+            return getFloorStudents(memberId, floor, purpose);
+        }
+        return groupFloorStudents(floor, purpose, attendanceHistoryService.findStudents(
+                floor * ROOMS_PER_FLOOR, floor * ROOMS_PER_FLOOR + ROOMS_PER_FLOOR - 1, purpose, day));
+    }
+
+    @Transactional(readOnly = true)
+    public RoomFloorResponse getFloor(Long memberId, int floor, AttendancePurpose purpose, LocalDate date) {
+        adminVerifier.verify(memberId);
+        LocalDate day = attendanceHistoryService.resolveDate(date);
+        if (day.equals(operatingDayCalculator.today())) {
+            return getFloor(memberId, floor, purpose);
+        }
+        List<RoomFloorResponse.Room> rooms = getFloorStudents(memberId, floor, purpose, day).rooms().stream()
+                .map(room -> new RoomFloorResponse.Room(room.dormitoryRoom(),
+                        room.students().stream().filter(RoomAttendanceStudentResponse::attended).count(), room.students().size()))
+                .toList();
+        long attended = rooms.stream().mapToLong(RoomFloorResponse.Room::attended).sum();
+        long assigned = rooms.stream().mapToLong(RoomFloorResponse.Room::assigned).sum();
+        return new RoomFloorResponse(floor, purpose, attended, assigned - attended, rooms);
     }
 
     /**

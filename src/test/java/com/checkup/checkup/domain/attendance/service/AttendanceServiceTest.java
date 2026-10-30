@@ -53,7 +53,9 @@ import com.checkup.checkup.domain.notification.service.NotificationService;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({AttendanceService.class, NotificationService.class, StudentIdCache.class, OperatingDayCalculator.class,
+@Import({AttendanceService.class, AttendanceHistoryService.class,
+        com.checkup.checkup.domain.volunteer.service.ConsecutiveVolunteerService.class,
+        NotificationService.class, StudentIdCache.class, OperatingDayCalculator.class,
         AttendanceServiceTest.ClockTestConfig.class})
 class AttendanceServiceTest {
 
@@ -86,6 +88,60 @@ class AttendanceServiceTest {
 
     private Long memberId;
     private Long studentId;
+
+    @Autowired
+    private AttendanceHistoryService attendanceHistoryService;
+
+    @Test
+    @DisplayName("08시에는 원본을 폐기하고 최종 출석 요약·미출석 명단만 남기며 지난 인증은 요약도 바꾸지 않는다")
+    void cleanupRetainsOnlyFinalSummaryAndRejectsStaleAuthentication() {
+        jdbcTemplate.update("UPDATE student SET datagsm_student_id = ? WHERE id = ?", memberId + 1_000_000_000L, studentId);
+        clock.setInstant(PURGE_AT);
+        LocalDate day = LocalDate.of(2000, 1, 1);
+        attendanceService.deleteExpired();
+        mark(AttendancePurpose.DORMITORY, PURGE_AT, AttendanceMethod.QR);
+        clock.setInstant(PURGE_AT.plusSeconds(1));
+        attendanceService.saveManually(Map.of(studentId, false), AttendancePurpose.DORMITORY);
+        clock.setInstant(PURGE_NEXT_DAY);
+        attendanceService.deleteExpired();
+
+        assertThat(attendanceCount()).isZero();
+        assertThat(attendanceHistoryService.findStudents(101, 101, AttendancePurpose.DORMITORY, day))
+                .filteredOn(row -> row.studentId().equals(studentId)).singleElement()
+                .satisfies(row -> assertThat(row.attended()).isFalse());
+        assertThat(attendanceHistoryService.findStudents(101, 101, AttendancePurpose.STUDY_ROOM, day))
+                .filteredOn(row -> row.studentId().equals(studentId)).singleElement()
+                .satisfies(row -> assertThat(row.attended()).isFalse());
+        assertThat(mark(AttendancePurpose.DORMITORY, PURGE_AT, AttendanceMethod.QR)).isEqualTo(AttendanceRecordResult.STALE);
+        assertThat(jdbcTemplate.queryForObject("SELECT attended FROM attendance_summary WHERE student_id = ? AND purpose = 'DORMITORY' AND operating_day = ?", Boolean.class, studentId, day)).isFalse();
+        assertThat(jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_name = 'attendance_summary'", String.class))
+                .containsExactlyInAnyOrder("student_id", "operating_day", "purpose", "dormitory_room", "attended");
+        // 학생이 이동해도 당시 호실로 묶는다.
+        jdbcTemplate.update("UPDATE student SET dormitory_room = 201 WHERE id = ?", studentId);
+        assertThat(attendanceHistoryService.findStudents(101, 101, AttendancePurpose.DORMITORY, day))
+                .anyMatch(row -> row.studentId().equals(studentId));
+    }
+
+    @Test
+    @DisplayName("요약은 지난 30개 운영일까지만 남기고 재정리와 학생 삭제 후에도 되살아나지 않는다")
+    void summaryRetentionBoundaryAndStudentDeletionAreEnforced() {
+        jdbcTemplate.update("UPDATE student SET datagsm_student_id = ? WHERE id = ?", memberId + 1_000_000_000L, studentId);
+        clock.setInstant(PURGE_NEXT_DAY);
+        LocalDate today = LocalDate.of(2000, 1, 2);
+        for (LocalDate day : List.of(today.minusDays(30), today.minusDays(31))) {
+            jdbcTemplate.update("INSERT INTO attendance_summary (student_id, operating_day, purpose, dormitory_room, attended) VALUES (?, ?, 'DORMITORY', 101, TRUE)", studentId, day);
+        }
+        attendanceService.deleteExpired();
+        attendanceService.deleteExpired();
+        assertThat(jdbcTemplate.queryForList("SELECT operating_day FROM attendance_summary WHERE student_id = ? AND purpose = 'DORMITORY' ORDER BY operating_day", LocalDate.class, studentId))
+                .containsExactly(today.minusDays(30), today);
+        assertThat(attendanceHistoryService.resolveDate(today.minusDays(30))).isEqualTo(today.minusDays(30));
+        for (LocalDate invalid : List.of(today.minusDays(31), today.plusDays(1))) {
+            assertThatThrownBy(() -> attendanceHistoryService.resolveDate(invalid)).isInstanceOf(CustomException.class);
+        }
+        jdbcTemplate.update("DELETE FROM student WHERE id = ?", studentId);
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM attendance_summary WHERE student_id = ?", Integer.class, studentId)).isZero();
+    }
 
     @BeforeEach
     void setUp() {

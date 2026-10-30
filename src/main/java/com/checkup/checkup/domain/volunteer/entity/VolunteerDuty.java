@@ -49,4 +49,8 @@ public class VolunteerDuty {
 
     /** 봉사 완료를 확인한 시각. 완료 전이면 {@code null}이다. */
     private Instant completedAt;
+
+    /** 얼굴·QR 출석으로 자동 지정된 연속 봉사인지. 기존 일반 지정은 바꾸지 않는다. */
+    @Column(nullable = false)
+    private boolean consecutive;
 }
