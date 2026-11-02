@@ -168,7 +168,7 @@ src/main/java/com/checkup/checkup
 | `SHUTDOWN_GRACE_PERIOD` | `45s` | docker가 컨테이너를 강제 종료하기까지의 시간 |
 | `SERVER_JAVA_OPTS` | `-XX:+ExitOnOutOfMemoryError` | 서버 JVM 옵션 |
 | `QUERY_LOG_ENABLED` | `false` | 요청별 DB 쿼리 수·걸린 시간 로그 ([개발 도구](#개발-도구)) |
-| `METRICS_ENABLED` | `false` | Prometheus 지표 내보내기. 로컬 전용 ([개발 도구](#개발-도구)) |
+| `METRICS_ENABLED`, `METRICS_TOKEN` | `false`, 없음 | Prometheus 지표 내보내기와 지표를 읽을 때 쓰는 토큰. 켜면 토큰이 필수입니다 ([지표 대시보드](#지표-대시보드)) |
 
 얼굴 AI 관련 값은 [얼굴 AI 서비스 연결](#얼굴-ai-서비스-연결)을 보세요.
 
@@ -188,7 +188,7 @@ src/main/java/com/checkup/checkup
 | --- | --- | --- |
 | [쿼리 수 로그](#쿼리-수-로그) | `QUERY_LOG_ENABLED=true` | 요청 하나의 DB 쿼리 수와 걸린 시간 |
 | [부하 기준값 측정](#부하-기준값-측정-로컬-전용) | `LOADTEST=true` | 동시 호출 시 응답 시간과 호출당 쿼리 수 |
-| [지표 대시보드](#지표-대시보드-로컬-전용) | `METRICS_ENABLED=true` | 시간에 따른 응답 시간·쿼리 수·연결 풀·메모리 |
+| [지표 대시보드](#지표-대시보드) | `METRICS_ENABLED=true` | 시간에 따른 응답 시간·쿼리 수·연결 풀·메모리 |
 
 ### 쿼리 수 로그
 
@@ -217,13 +217,13 @@ LOADTEST=true ./gradlew test --rerun --tests "*ServiceLoadTest"
 - HTTP·로그인·직렬화와 DataGSM·얼굴 AI 호출은 포함하지 않습니다. 절대값이 아니라 변경 전후 비교와 호출당 쿼리 수를 보는 용도입니다.
 - 실행마다 20% 안팎 흔들리니 같은 조건에서 두세 번 돌려 비교하세요.
 
-### 지표 대시보드 (로컬 전용)
+### 지표 대시보드
 
-API별 응답 시간, DB 쿼리 수, DB 연결 풀, JVM 메모리를 Grafana로 볼 수 있습니다. 운영에는 적용하지 않았습니다.
+API별 응답 시간, DB 쿼리 수, DB 연결 풀, JVM 메모리를 Grafana로 볼 수 있습니다.
 
 ```bash
 docker compose --profile metrics up -d
-METRICS_ENABLED=true ./gradlew bootRun
+METRICS_ENABLED=true METRICS_TOKEN=local-metrics-token ./gradlew bootRun
 ```
 
 | 주소 | 용도 |
@@ -231,10 +231,24 @@ METRICS_ENABLED=true ./gradlew bootRun
 | http://localhost:3001 | Grafana. 로그인 없이 보기 전용이며 `CheckUp 서버` 대시보드가 바로 열립니다 |
 | http://localhost:9090 | Prometheus. `Status > Target health`에서 서버가 `UP`인지 확인합니다 |
 
-- `METRICS_ENABLED=true`이면 `/actuator/prometheus`가 로그인 없이 열립니다. 기본은 꺼져 있고 그때는 경로 자체가 없습니다.
+- `METRICS_ENABLED=true`이면 `/actuator/prometheus`가 열리고 `Authorization: Bearer <METRICS_TOKEN>` 요청만 읽을 수 있습니다. 토큰이 비어 있으면 서버가 시작하지 않습니다. 기본은 꺼져 있고 그때는 경로 자체가 없습니다.
 - `docker compose up -d`만 실행하면 Prometheus와 Grafana는 뜨지 않습니다.
 - 대시보드는 `monitoring/grafana/dashboards/checkup-server.json`, 수집 설정은 `monitoring/prometheus.yml`입니다.
 - 끌 때는 `docker compose --profile metrics stop prometheus grafana`입니다.
+
+운영에서는 `.env`에 아래 값을 넣고 평소처럼 `compose.prod.yaml`로 배포합니다. 넣지 않으면 두 컨테이너는 뜨지 않고 지표도 꺼져 있습니다.
+
+| 값 | 설명 |
+| --- | --- |
+| `COMPOSE_PROFILES=metrics` | Prometheus·Grafana 컨테이너를 띄웁니다 |
+| `METRICS_ENABLED=true` | 서버가 지표를 내보냅니다 |
+| `METRICS_TOKEN` | Prometheus가 지표를 읽을 때 쓰는 비밀값입니다 |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana admin 비밀번호입니다. 첫 실행 때만 적용됩니다 |
+| `GRAFANA_PUBLISH` | Grafana를 여는 주소:포트입니다. 기본은 `127.0.0.1:3001`이라 서버 안에서만 열립니다 |
+
+- 운영 Grafana는 익명 접속과 가입이 꺼져 있어 로그인해야 합니다. 팀원 계정은 admin이 만듭니다.
+- Prometheus는 인증이 없어 포트를 열지 않습니다.
+- 컨테이너마다 메모리는 512MB로 제한하고, 지표는 15일 또는 1GB까지만 보관합니다.
 
 ## 얼굴 AI 서비스 연결
 
