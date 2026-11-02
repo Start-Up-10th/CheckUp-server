@@ -109,9 +109,10 @@ checkup:
     excluded-datagsm-ids: ${CHECKUP_EXCLUDED_DATAGSM_STUDENT_IDS:}   # 실제 학생이 아닌 DataGSM 학생 id, 쉼표 구분(DEC-034)
   web:
     base-url: ${PUBLIC_ORIGIN}
-  # Prometheus가 긁어 갈 지표를 /actuator/prometheus로 내보낸다. 켜면 로그인 없이 열리므로 로컬에서만 켠다.
+  # Prometheus가 긁어 갈 지표를 /actuator/prometheus로 내보낸다. 켜면 token이 필수이고, Bearer 토큰이 같은 요청만 읽을 수 있다.
   metrics:
     enabled: ${METRICS_ENABLED:false}
+    token: ${METRICS_TOKEN:}
   # 요청마다 DB 쿼리 수와 걸린 시간을 로그로 남긴다. 느린 API를 찾을 때만 켠다.
   query-log:
     enabled: ${QUERY_LOG_ENABLED:false}
