@@ -33,7 +33,7 @@ services:
       retries: 10
 
   # 지표 수집·대시보드. 평소 `docker compose up -d`에는 뜨지 않고 `--profile metrics`를 줄 때만 뜬다.
-  # 호스트에서 METRICS_ENABLED=true로 실행한 Spring 서버를 긁어 온다. 로컬 전용이며 운영 compose에는 없다.
+  # 호스트에서 METRICS_ENABLED=true, METRICS_TOKEN=local-metrics-token으로 실행한 Spring 서버를 긁어 온다. 운영 설정은 compose.prod.yaml에 따로 있다.
   prometheus:
     image: prom/prometheus:v3.15.0
     profiles: ["metrics"]
