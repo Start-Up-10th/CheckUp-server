@@ -248,4 +248,14 @@ public class VolunteerController {
     ) {
         return volunteerService.markMissed(memberId, studentId, date, idempotencyKey, request.delta(), request.reason());
     }
+
+    @Operation(summary = "연속 봉사 횟수 조정", description = "관리자 전용. delta=-99~99(0 제외), reason 선택(100자). 일반 봉사와 별도 잔여 횟수이며 차감은 남은 횟수까지만 한다. 기숙사 얼굴·QR 출석 시 자동 지정하고 완료 확인 시에만 1 차감한다. Idempotency-Key는 다른 종류·학생·delta에 재사용할 수 없다.")
+    @PatchMapping("/{studentId}/consecutive/count")
+    public VolunteerResponse adjustConsecutive(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long studentId,
+            @RequestHeader(value = IDEMPOTENCY_KEY, required = false) String idempotencyKey,
+            @Valid @RequestBody VolunteerAdjustRequest request) {
+        return volunteerService.adjustConsecutiveCount(memberId, studentId, idempotencyKey, request.delta(), request.reason());
+    }
 }

@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
 import com.checkup.checkup.domain.room.dto.request.RoomAttendanceRequest;
 import com.checkup.checkup.domain.room.dto.response.RoomFloorResponse;
+import com.checkup.checkup.domain.room.dto.response.RoomFloorStudentsResponse;
+import com.checkup.checkup.domain.room.dto.response.RoomAttendanceStudentResponse;
 import com.checkup.checkup.domain.room.dto.response.RoomStudentResponse;
 import com.checkup.checkup.domain.room.service.RoomService;
 import com.checkup.checkup.global.exception.CustomException;
@@ -271,5 +273,68 @@ class RoomControllerTest {
 
     private static RequestPostProcessor loginAs(Long memberId) {
         return authentication(UsernamePasswordAuthenticationToken.authenticated(memberId, null, List.of()));
+    }
+
+    @Test
+    @DisplayName("층 학생 명단은 호실 상세와 같은 학생 JSON 필드를 반환하고 용도를 전달한다")
+    void returnsFloorStudentsWithRoomAttendanceFields() throws Exception {
+        given(roomService.getFloorStudents(MEMBER_ID, 3, AttendancePurpose.STUDY_ROOM))
+                .willReturn(new RoomFloorStudentsResponse(3, AttendancePurpose.STUDY_ROOM, List.of(
+                        new RoomFloorStudentsResponse.Room(301, List.of(
+                                new RoomAttendanceStudentResponse(20L, "학생A", 1, 1101, true),
+                                new RoomAttendanceStudentResponse(21L, "학생B", 1, 1102, false))))));
+
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "3")
+                        .param("purpose", "STUDY_ROOM").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.floor").value(3))
+                .andExpect(jsonPath("$.purpose").value("STUDY_ROOM"))
+                .andExpect(jsonPath("$.rooms[0].dormitoryRoom").value(301))
+                .andExpect(jsonPath("$.rooms[0].students[0].student_id").value(20))
+                .andExpect(jsonPath("$.rooms[0].students[0].student_name").value("학생A"))
+                .andExpect(jsonPath("$.rooms[0].students[0].student_class").value(1))
+                .andExpect(jsonPath("$.rooms[0].students[0].student_number").value(1101))
+                .andExpect(jsonPath("$.rooms[0].students[0].attended").value(true))
+                .andExpect(jsonPath("$.rooms[0].students[1].attended").value(false));
+    }
+
+    @Test
+    @DisplayName("층 학생 명단은 용도 생략 시 기숙사이고 빈 층은 rooms가 빈 배열이다")
+    void floorStudentsDefaultToDormitory() throws Exception {
+        given(roomService.getFloorStudents(MEMBER_ID, 4, AttendancePurpose.DORMITORY))
+                .willReturn(new RoomFloorStudentsResponse(4, AttendancePurpose.DORMITORY, List.of()));
+
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "4").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purpose").value("DORMITORY"))
+                .andExpect(jsonPath("$.rooms").isEmpty());
+    }
+
+    @Test
+    @DisplayName("층 학생 명단은 비관리자에게 공통 403 ADMIN_ONLY 오류를 반환한다")
+    void floorStudentsRejectNonAdmin() throws Exception {
+        given(roomService.getFloorStudents(MEMBER_ID, 3, AttendancePurpose.DORMITORY))
+                .willThrow(new CustomException(ErrorCode.ADMIN_ONLY));
+
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "3").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ADMIN_ONLY"));
+    }
+
+    @Test
+    @DisplayName("층 학생 명단은 비로그인과 잘못된 층·용도를 조회 전에 거부한다")
+    void floorStudentsRejectInvalidRequests() throws Exception {
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "3"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/room/floor/students").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+        for (String floor : List.of("0", "-1", "100", "abc")) {
+            mockMvc.perform(get("/api/v1/room/floor/students").param("floor", floor).with(loginAs(MEMBER_ID)))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "3")
+                        .param("purpose", "GYM").with(loginAs(MEMBER_ID)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(roomService);
     }
 }

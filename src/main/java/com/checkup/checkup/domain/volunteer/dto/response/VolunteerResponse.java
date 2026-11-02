@@ -25,7 +25,9 @@ public record VolunteerResponse(
         @Schema(description = "호실. 미배정이면 null", example = "301") Integer dormitoryRoom,
         @Schema(description = "앞으로 해야 할 봉사 횟수", example = "2") int volunteerCount,
         @Schema(description = "마지막 횟수 조정 시각. 조정한 적 없으면 null(화면은 -)") Instant lastActivityAt,
-        @Schema(description = "오늘 운영일 당일 봉사자 지정 상태. 지정되지 않았으면 null, ASSIGNED(지정됨), COMPLETED(완료됨), MISSED(미이행)", example = "ASSIGNED") DutyStatus todayDuty
+        @Schema(description = "오늘 운영일 당일 봉사자 지정 상태. 지정되지 않았으면 null, ASSIGNED(지정됨), COMPLETED(완료됨), MISSED(미이행)", example = "ASSIGNED") DutyStatus todayDuty,
+        @Schema(description = "일반 봉사와 별도로 남은 연속 봉사 횟수") int consecutiveVolunteerCount,
+        @Schema(description = "오늘 지정이 연속 봉사 자동 지정인지") boolean consecutiveDuty
 ) {
 
     /**
@@ -34,6 +36,10 @@ public record VolunteerResponse(
      * @param todayDuty      오늘 당일 봉사자 지정 상태. 지정되지 않았으면 {@code null}
      */
     public static VolunteerResponse of(Student student, Instant lastActivityAt, DutyStatus todayDuty) {
+        return of(student, lastActivityAt, todayDuty, false);
+    }
+
+    public static VolunteerResponse of(Student student, Instant lastActivityAt, DutyStatus todayDuty, boolean consecutiveDuty) {
         return new VolunteerResponse(
                 student.getDatagsmStudentId(),
                 student.getName(),
@@ -41,6 +47,11 @@ public record VolunteerResponse(
                 student.getDormitoryRoom(),
                 student.getVolunteerCount(),
                 lastActivityAt,
-                todayDuty);
+                todayDuty, student.getConsecutiveVolunteerCount(), consecutiveDuty);
+    }
+
+    public VolunteerResponse(Long studentId, String name, int studentNumber, Integer dormitoryRoom,
+                             int volunteerCount, Instant lastActivityAt, DutyStatus todayDuty) {
+        this(studentId, name, studentNumber, dormitoryRoom, volunteerCount, lastActivityAt, todayDuty, 0, false);
     }
 }

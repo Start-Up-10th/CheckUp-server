@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,8 +42,10 @@ public class RoomMapController {
     @GetMapping("/attendance")
     public List<RoomAttendanceStudentResponse> getRoomAttendance(
             @AuthenticationPrincipal Long memberId,
-            @Parameter(description = "호실 번호", example = "301") @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom) {
-        return roomMapService.getRoomAttendance(memberId, dormitoryRoom);
+            @Parameter(description = "호실 번호", example = "301") @RequestParam(name = "dormitoryRoom") @Positive Integer dormitoryRoom,
+            @Parameter(description = "운영일(yyyy-MM-dd). 기본 오늘, 지난 30일 조회만 가능") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null ? roomMapService.getRoomAttendance(memberId, dormitoryRoom)
+                : roomMapService.getRoomAttendance(memberId, dormitoryRoom, date);
     }
 
     /**
@@ -57,7 +61,9 @@ public class RoomMapController {
     public ManualRoomAttendanceResponse setManualAttendance(
             @AuthenticationPrincipal Long memberId,
             @Parameter(description = "DataGSM 학생 id. DB id가 아니다", example = "1") @PathVariable @Positive Long studentId,
-            @Valid @RequestBody ManualRoomAttendanceRequest request) {
-        return roomMapService.setManualAttendance(memberId, studentId, request.attended());
+            @Valid @RequestBody ManualRoomAttendanceRequest request,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return date == null ? roomMapService.setManualAttendance(memberId, studentId, request.attended())
+                : roomMapService.setManualAttendance(memberId, studentId, request.attended(), date);
     }
 }

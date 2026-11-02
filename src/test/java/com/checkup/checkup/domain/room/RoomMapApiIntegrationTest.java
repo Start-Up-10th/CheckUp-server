@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.checkup.checkup.global.time.OperatingDayCalculator;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,67 @@ class RoomMapApiIntegrationTest {
     private Long adminId;
     private Long studentMemberId;
     private Long unlinkedDataGsmId;
+
+    @Test
+    @DisplayName("과거 층·호실 조회는 당시 호실의 요약과 용도만 반환하고 현재 배정 변경에 영향을 받지 않는다")
+    void historicalFloorAndRoomUseSummaryAndOriginalRoom() throws Exception {
+        LocalDate day = operatingDayCalculator.today().minusDays(1);
+        jdbcTemplate.update("""
+                INSERT INTO attendance_summary (student_id, operating_day, purpose, dormitory_room, attended)
+                SELECT id, ?, 'DORMITORY', 9701, TRUE FROM student WHERE datagsm_student_id = ?
+                """, day, unlinkedDataGsmId);
+        jdbcTemplate.update("""
+                INSERT INTO attendance_summary (student_id, operating_day, purpose, dormitory_room, attended)
+                SELECT id, ?, 'STUDY_ROOM', 9701, FALSE FROM student WHERE datagsm_student_id = ?
+                """, day, unlinkedDataGsmId);
+        jdbcTemplate.update("UPDATE student SET dormitory_room = 9801 WHERE datagsm_student_id = ?", unlinkedDataGsmId);
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "97").param("date", day.toString()).with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rooms[0].dormitoryRoom").value(9701))
+                .andExpect(jsonPath("$.rooms[0].students[0].student_id").value(unlinkedDataGsmId))
+                .andExpect(jsonPath("$.rooms[0].students[0].attended").value(true))
+                .andExpect(jsonPath("$.rooms[0].students[0].firstVerifiedAt").doesNotExist());
+        mockMvc.perform(get("/api/v1/room/floor").param("floor", "97").param("date", day.toString()).with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.attended").value(1)).andExpect(jsonPath("$.absent").value(0));
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "97").param("purpose", "STUDY_ROOM")
+                        .param("date", day.toString()).with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rooms[0].students[0].attended").value(false));
+        mockMvc.perform(get("/api/v1/room/attendance").param("dormitoryRoom", "9701").param("date", day.toString()).with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].student_id").value(unlinkedDataGsmId))
+                .andExpect(jsonPath("$[0].attended").value(true));
+        mockMvc.perform(get("/api/v1/room/floor/students").param("floor", "97").with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.rooms").isEmpty());
+    }
+
+    @Test
+    @DisplayName("과거 조회는 관리자만 가능하고 잘못된 날짜·미래·30일 초과를 거부한다")
+    void historicalQueriesEnforceRoleAndRetentionDate() throws Exception {
+        String path = "/api/v1/room/floor/students";
+        String yesterday = operatingDayCalculator.today().minusDays(1).toString();
+        mockMvc.perform(get(path).param("floor", "97").param("date", yesterday)).andExpect(status().isUnauthorized());
+        mockMvc.perform(get(path).param("floor", "97").param("date", yesterday).with(loginAs(studentMemberId)))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ADMIN_ONLY"));
+        for (String invalid : List.of("not-a-date", "2026-02-30", operatingDayCalculator.today().plusDays(1).toString(),
+                operatingDayCalculator.today().minusDays(31).toString())) {
+            mockMvc.perform(get(path).param("floor", "97").param("date", invalid).with(loginAs(adminId)))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(get(path).param("floor", "97").param("date", operatingDayCalculator.today().minusDays(30).toString())
+                        .with(loginAs(adminId))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("과거 날짜를 붙인 수동 저장은 두 API 모두 거부해 오늘 상태도 바꾸지 않는다")
+    void pastDateCannotBeUsedForManualWrites() throws Exception {
+        String yesterday = operatingDayCalculator.today().minusDays(1).toString();
+        mockMvc.perform(put("/api/v1/room/student/" + unlinkedDataGsmId + "/attendance").param("date", yesterday)
+                        .with(loginAs(adminId)).contentType(MediaType.APPLICATION_JSON).content("{\"attended\":true}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/api/v1/room/301/attendance").param("date", yesterday).with(loginAs(adminId))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"students\":[{\"studentId\":" + unlinkedDataGsmId + ",\"attended\":true}]}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/room/attendance").param("dormitoryRoom", "301").with(loginAs(adminId)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[1].attended").value(false));
+    }
 
     @BeforeEach
     void setUp() {

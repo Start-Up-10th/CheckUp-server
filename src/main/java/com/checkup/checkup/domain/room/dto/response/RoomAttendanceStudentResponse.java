@@ -11,14 +11,14 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * @param studentName   이름
  * @param studentClass  반
  * @param studentNumber 화면 표시용 학번
- * @param attended      오늘 운영일(08:00 KST 기준) 기숙사 출석 여부
+ * @param attended      오늘 운영일(08:00 KST 기준)의 조회 용도 출석 여부
  */
 public record RoomAttendanceStudentResponse(
         @Schema(description = "DataGSM 학생 id. 수동 출석 수정 API의 경로 값이다", example = "1") @JsonProperty("student_id") Long studentId,
         @Schema(description = "이름", example = "홍길동") @JsonProperty("student_name") String studentName,
         @Schema(description = "반", example = "4") @JsonProperty("student_class") int studentClass,
         @Schema(description = "화면 표시용 학번", example = "2405") @JsonProperty("student_number") int studentNumber,
-        @Schema(description = "오늘 운영일(08:00 KST 기준) 기숙사 출석 여부") @JsonProperty("attended") boolean attended
+        @Schema(description = "오늘 운영일(08:00 KST 기준)의 조회 용도 출석 여부") @JsonProperty("attended") boolean attended
 ) {
     public static RoomAttendanceStudentResponse from(Student student, boolean attended) {
         return new RoomAttendanceStudentResponse(

@@ -74,6 +74,10 @@ public class Student {
     @Column(nullable = false)
     private int volunteerCount;
 
+    /** 일반 봉사와 별도로 남은 연속 봉사 횟수(DEC-036). */
+    @Column(nullable = false)
+    private int consecutiveVolunteerCount;
+
     /** 개인정보 수집 및 이용에 처음 동의한 시각. 동의하지 않았으면 null이다. */
     @Column(nullable = true)
     private Instant privacyAgreedAt;

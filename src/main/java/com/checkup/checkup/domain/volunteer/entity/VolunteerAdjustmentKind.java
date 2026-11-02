@@ -10,5 +10,7 @@ package com.checkup.checkup.domain.volunteer.entity;
 public enum VolunteerAdjustmentKind {
     ADMIN,
     DUTY_COMPLETION,
-    DUTY_MISSED
+    DUTY_MISSED,
+    CONSECUTIVE_ADMIN,
+    CONSECUTIVE_COMPLETION
 }
