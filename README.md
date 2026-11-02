@@ -206,7 +206,7 @@ GET /api/v1/room/floor status=200 queries=2 elapsedMs=14
 
 ### 부하 기준값 측정 (로컬 전용)
 
-출석 시간대에 몰리는 요청(QR 스캔 폭주, 학생 홈 조회, 관리자 호실·층 조회)을 서비스 계층에서 동시에 호출해 응답 시간과 호출당 DB 쿼리 수를 잽니다. 로컬 Postgres·Redis(`docker compose up -d postgres redis`)가 필요하고, 학생 200명을 임시로 만들었다 지웁니다.
+출석 시간대에 몰리는 요청(기숙사·자습실 QR 스캔 폭주, 출석 접수 여부와 학생 홈 조회, 관리자 호실·층 조회)을 서비스 계층에서 동시에 호출해 응답 시간과 호출당 DB 쿼리 수를 잽니다. 로컬 Postgres·Redis(`docker compose up -d postgres redis`)가 필요하고, 학생 200명을 임시로 만들었다 지웁니다.
 
 ```bash
 LOADTEST=true ./gradlew test --rerun --tests "*ServiceLoadTest"
@@ -214,6 +214,7 @@ LOADTEST=true ./gradlew test --rerun --tests "*ServiceLoadTest"
 ```
 
 - 평소 `./gradlew build`에서는 `LOADTEST`가 없어 건너뜁니다.
+- 쿼리 수에는 Hibernate와 `JdbcTemplate` 쿼리가 모두 들어갑니다. Redis 호출은 세지 않습니다.
 - HTTP·로그인·직렬화와 DataGSM·얼굴 AI 호출은 포함하지 않습니다. 절대값이 아니라 변경 전후 비교와 호출당 쿼리 수를 보는 용도입니다.
 - 실행마다 20% 안팎 흔들리니 같은 조건에서 두세 번 돌려 비교하세요.
 
