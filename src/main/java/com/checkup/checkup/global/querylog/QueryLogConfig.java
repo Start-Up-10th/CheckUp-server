@@ -1,5 +1,7 @@
 package com.checkup.checkup.global.querylog;
 
+import javax.sql.DataSource;
+
 import org.hibernate.cfg.JdbcSettings;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
@@ -7,6 +9,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 요청별 DB 쿼리 수 로그를 켠다. {@code checkup.query-log.enabled}(환경변수 {@code QUERY_LOG_ENABLED})가 true일 때만 동작한다.
@@ -27,6 +30,12 @@ public class QueryLogConfig {
     @Bean
     public HibernatePropertiesCustomizer queryCounterCustomizer(QueryCounter queryCounter) {
         return properties -> properties.put(JdbcSettings.STATEMENT_INSPECTOR, queryCounter);
+    }
+
+    /** Hibernate를 거치지 않는 JdbcTemplate 쿼리도 세도록 기본 JdbcTemplate을 대신한다. */
+    @Bean
+    public JdbcTemplate jdbcTemplate(DataSource dataSource, QueryCounter queryCounter) {
+        return new CountingJdbcTemplate(dataSource, queryCounter);
     }
 
     /** 인증 필터에서 실행된 쿼리와 걸린 시간도 포함하도록 가장 바깥에 둔다. */

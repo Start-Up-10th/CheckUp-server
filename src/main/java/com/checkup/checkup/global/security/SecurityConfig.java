@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
@@ -26,8 +27,8 @@ import tools.jackson.databind.ObjectMapper;
  * - {@code /api/v1/webhook}은 DataGSM이 로그인 없이 호출하며, 컨트롤러에서 서명으로 검증한다.
  * - API 문서({@code /v3/api-docs}, {@code /swagger-ui})는 로그인 없이 볼 수 있다. 끄려면 {@code SWAGGER_ENABLED=false}.
  * - 상태 확인({@code /actuator/health})은 배포·컨테이너 점검이 로그인 없이 호출한다(REQ-OPS-001). 다른 actuator 경로는 로그인이 필요하다.
- * - 지표({@code /actuator/prometheus})는 {@code checkup.metrics.enabled}가 true일 때만 로그인 없이 연다. Prometheus는 세션 로그인을 할 수 없다.
- *   기본은 꺼져 있고 운영 compose는 이 값을 넘기지 않는다.
+ * - 지표({@code /actuator/prometheus})는 {@code checkup.metrics.enabled}가 true일 때만 생기고, 세션 대신 {@link MetricsTokenVerifier}의 Bearer 토큰으로 확인한다.
+ *   Prometheus는 세션 로그인을 할 수 없다. 기본은 꺼져 있다.
  * - CSRF 토큰 대신 {@link OriginCheckFilter}로 상태 변경 요청의 출처를 확인한다. 로그아웃도 확인하도록 {@link LogoutFilter} 앞에 둔다.
  */
 @Configuration
@@ -37,7 +38,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper,
                                                    WebProperties webProperties,
-                                                   @Value("${checkup.metrics.enabled:false}") boolean metricsEnabled)
+                                                   @Value("${checkup.metrics.enabled:false}") boolean metricsEnabled,
+                                                   @Value("${checkup.metrics.token:}") String metricsToken)
             throws Exception {
         SecurityErrorHandler errorHandler = new SecurityErrorHandler(objectMapper);
         http
@@ -58,7 +60,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         auth -> {
                             if (metricsEnabled) {
-                                auth.requestMatchers("/actuator/prometheus").permitAll();
+                                MetricsTokenVerifier verifier = new MetricsTokenVerifier(metricsToken);
+                                auth.requestMatchers("/actuator/prometheus").access((authentication, context) ->
+                                        new AuthorizationDecision(verifier.matches(context.getRequest())));
                             }
                             auth
                                     .requestMatchers("/api/v1/auth/me").authenticated()

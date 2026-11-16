@@ -38,6 +38,9 @@ class QueryLogIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private QueryCounter queryCounter;
+
     private Long adminId;
 
     @BeforeEach
@@ -68,6 +71,16 @@ class QueryLogIntegrationTest {
                 .andExpect(status().isOk());
 
         assertThat(output).contains("GET /api/v1/room/floor status=200 queries=2 elapsedMs=");
+    }
+
+    @Test
+    @DisplayName("JdbcTemplate으로 실행한 쿼리도 센다")
+    void countsJdbcTemplateQueries() {
+        queryCounter.start();
+        jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+        jdbcTemplate.update("UPDATE member SET name = name WHERE id = ?", adminId);
+
+        assertThat(queryCounter.stop()).isEqualTo(2);
     }
 
     @Test

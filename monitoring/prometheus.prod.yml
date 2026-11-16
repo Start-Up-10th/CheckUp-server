@@ -1,0 +1,13 @@
+# 운영 Prometheus 설정. 같은 compose 네트워크의 server 컨테이너 지표를 15초마다 긁어 온다.
+# 토큰 파일은 compose.prod.yaml이 컨테이너 시작 때 METRICS_TOKEN으로 만든다.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: checkup-server
+    metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: /tmp/metrics_token
+    static_configs:
+      - targets: ["server:8080"]

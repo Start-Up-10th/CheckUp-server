@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.checkup.checkup.domain.attendance.entity.AttendancePurpose;
+import com.checkup.checkup.domain.attendance.service.AttendanceActiveService;
 import com.checkup.checkup.domain.attendance.service.AttendanceService;
 import com.checkup.checkup.domain.notification.service.NotificationService;
 import com.checkup.checkup.domain.qr.dto.QrSessionIssue;
@@ -39,7 +40,7 @@ import com.checkup.checkup.global.querylog.QueryCounter;
  * 출석 시간대에 몰리는 요청을 서비스 계층에서 동시에 호출해 응답 시간과 요청당 DB 쿼리 수를 잰다(#218).
  *
  * 평소 빌드에서는 돌지 않는다. 환경변수 {@code LOADTEST=true}일 때만 실행하며, 실제 Postgres·Redis(로컬 compose)가 필요하다.
- * 학생 {@value #STUDENTS}명을 임시로 만들고 끝나면 지운다. 결과는 {@code build/loadtest/report.md}에 쓴다.
+ * 학생 {@value #STUDENTS}명을 임시로 만들고 끝나면 지운다. {@value #CONSECUTIVE_DUTY_INTERVAL}명 중 1명은 연속 봉사가 남아 있어 기숙사 출석 때 당번으로 지정된다. 결과는 {@code build/loadtest/report.md}에 쓴다.
  *
  * 한계: HTTP·로그인·보안 필터·JSON 직렬화와 DataGSM·얼굴 AI 호출은 포함하지 않는다. 같은 PC의 DB·Redis라 네트워크 지연이 없다.
  * 절대값이 아니라 변경 전후 비교와 요청당 쿼리 수를 보는 용도다. 동시 호출 수는 {@code LOADTEST_CONCURRENCY}(기본 50)로 바꾼다.
@@ -50,6 +51,7 @@ import com.checkup.checkup.global.querylog.QueryCounter;
 class ServiceLoadTest {
 
     static final int STUDENTS = 200;
+    static final int CONSECUTIVE_DUTY_INTERVAL = 10;
     private static final int WARMUP_STUDENTS = 20;
     private static final int FIRST_ROOM = 301;
     private static final int STUDENTS_PER_ROOM = 4;
@@ -68,6 +70,9 @@ class ServiceLoadTest {
 
     @Autowired
     private AttendanceService attendanceService;
+
+    @Autowired
+    private AttendanceActiveService attendanceActiveService;
 
     @Autowired
     private NotificationService notificationService;
@@ -93,9 +98,11 @@ class ServiceLoadTest {
                     Long.class, base + 1 + i, "부하학생" + i);
             Long studentId = jdbcTemplate.queryForObject(
                     "INSERT INTO student (member_id, name, number, grade, class_number, student_number, "
-                            + "dormitory_room, privacy_agreed_at, face_agreed_at, datagsm_student_id) "
-                            + "VALUES (?, ?, 1, 1, 1, ?, ?, now(), now(), ?) RETURNING id",
-                    Long.class, memberId, "부하학생" + i, 1100 + i, FIRST_ROOM + i / STUDENTS_PER_ROOM, base + 1 + i);
+                            + "dormitory_room, privacy_agreed_at, face_agreed_at, datagsm_student_id, "
+                            + "consecutive_volunteer_count) "
+                            + "VALUES (?, ?, 1, 1, 1, ?, ?, now(), now(), ?, ?) RETURNING id",
+                    Long.class, memberId, "부하학생" + i, 1100 + i, FIRST_ROOM + i / STUDENTS_PER_ROOM, base + 1 + i,
+                    i % CONSECUTIVE_DUTY_INTERVAL == 0 ? 1 : 0);
             memberIds.add(memberId);
             studentIds.add(studentId);
         }
@@ -135,14 +142,25 @@ class ServiceLoadTest {
                 memberId -> qrScanService.scan(memberId, warmupSession.token()));
         qrSessionService.close(adminMemberId, warmupSession.sessionId());
 
+        QrSessionIssue dormitorySession = qrSessionService.create(adminMemberId, AttendancePurpose.DORMITORY);
+        Result dormitoryScan = run("QR 스캔: 기숙사 첫 출석", slice(0, STUDENTS),
+                memberId -> qrScanService.scan(memberId, dormitorySession.token()));
+        assertThat(dormitoryScan.results()).containsOnly(QrScanResult.APPROVED);
+
+        Result dormitoryDuplicate = run("QR 스캔: 기숙사 중복", slice(0, STUDENTS),
+                memberId -> qrScanService.scan(memberId, dormitorySession.token()));
+        assertThat(dormitoryDuplicate.results()).containsOnly(QrScanResult.DUPLICATE);
+
         QrSessionIssue session = qrSessionService.create(adminMemberId, AttendancePurpose.STUDY_ROOM);
-        Result scan = run("QR 스캔(첫 출석)", slice(0, STUDENTS),
+        Result scan = run("QR 스캔: 자습실 첫 출석", slice(0, STUDENTS),
                 memberId -> qrScanService.scan(memberId, session.token()));
         assertThat(scan.results()).containsOnly(QrScanResult.APPROVED);
 
-        Result duplicate = run("QR 스캔(중복)", slice(0, STUDENTS),
+        Result duplicate = run("QR 스캔: 자습실 중복", slice(0, STUDENTS),
                 memberId -> qrScanService.scan(memberId, session.token()));
         assertThat(duplicate.results()).containsOnly(QrScanResult.DUPLICATE);
+
+        run("출석 접수 여부: 두 용도 QR 세션 있음", slice(0, STUDENTS), attendanceActiveService::getActive);
 
         run("학생 홈: 본인 출석 조회", slice(0, STUDENTS), attendanceService::getMyToday);
         run("학생 홈: 미확인 알림 조회", slice(0, STUDENTS), notificationService::hasUnread);
@@ -158,6 +176,9 @@ class ServiceLoadTest {
                 memberId -> roomService.getFloor(memberId, 3, AttendancePurpose.STUDY_ROOM));
 
         qrSessionService.close(adminMemberId, session.sessionId());
+        qrSessionService.close(adminMemberId, dormitorySession.sessionId());
+        run("출석 접수 여부: 세션 없음", slice(0, STUDENTS), attendanceActiveService::getActive);
+
         report.add("");
         report.add("얼굴 인식 프레임은 AI 서버 호출이 있어 이 측정에 포함하지 않았다.");
     }

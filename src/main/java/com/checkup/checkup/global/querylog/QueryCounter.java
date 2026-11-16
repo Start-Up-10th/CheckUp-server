@@ -6,6 +6,7 @@ import org.hibernate.resource.jdbc.spi.StatementInspector;
  * 요청 하나가 DB에 보낸 SQL 문장 수를 센다.
  *
  * Hibernate가 SQL을 실행하기 직전에 부르는 StatementInspector로 등록되어, JPA 메서드·JPQL·native 쿼리를 모두 센다.
+ * JdbcTemplate으로 실행한 쿼리는 {@link CountingJdbcTemplate}이 센다.
  * 수는 스레드마다 따로 세므로 동시에 들어온 다른 요청과 섞이지 않는다.
  * Redis 호출과 요청 스레드 밖에서 실행된 쿼리는 세지 않는다.
  */
@@ -36,10 +37,15 @@ public class QueryCounter implements StatementInspector {
      */
     @Override
     public String inspect(String sql) {
+        count();
+        return sql;
+    }
+
+    /** SQL 문장 하나를 센다. 세기를 시작하지 않은 스레드에서는 아무것도 하지 않는다. */
+    void count() {
         Integer current = count.get();
         if (current != null) {
             count.set(current + 1);
         }
-        return sql;
     }
 }
